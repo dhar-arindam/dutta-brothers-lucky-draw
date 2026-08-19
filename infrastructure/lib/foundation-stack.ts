@@ -1,0 +1,219 @@
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import {
+  CfnOutput,
+  Duration,
+  Fn,
+  RemovalPolicy,
+  Stack,
+  StackProps,
+  aws_apigatewayv2 as apigwv2,
+  aws_apigateway as apigw,
+  aws_cloudfront as cloudfront,
+  aws_cloudfront_origins as origins,
+  aws_dynamodb as dynamodb,
+  aws_lambda as lambda,
+  aws_logs as logs,
+  aws_s3 as s3,
+  aws_s3_deployment as s3deploy,
+} from 'aws-cdk-lib';
+import { HttpLambdaIntegration } from 'aws-cdk-lib/aws-apigatewayv2-integrations';
+import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
+import { Construct } from 'constructs';
+
+const currentDir = path.dirname(fileURLToPath(import.meta.url));
+
+export interface FoundationStackProps extends StackProps {
+  stageName?: 'dev' | 'staging' | 'prod';
+  frontendAllowedOrigin: string;
+  apiThrottleRateLimit: number;
+  apiThrottleBurstLimit: number;
+}
+
+export class FoundationStack extends Stack {
+  public constructor(scope: Construct, id: string, props?: FoundationStackProps) {
+    super(scope, id, props);
+
+    if (!props) {
+      throw new Error('FoundationStackProps are required.');
+    }
+
+    const stageName = props.stageName;
+    const isProduction = stageName === 'prod';
+    const frontendAllowedOrigin = props.frontendAllowedOrigin;
+
+    const frontendBucket = new s3.Bucket(this, 'FrontendBucket', {
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      enforceSSL: true,
+      versioned: false,
+      autoDeleteObjects: !isProduction,
+      removalPolicy: isProduction ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY,
+    });
+
+    const drawsTable = new dynamodb.Table(this, 'DrawsTable', {
+      partitionKey: { name: 'pk', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'sk', type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      pointInTimeRecoverySpecification: {
+        pointInTimeRecoveryEnabled: isProduction,
+      },
+      removalPolicy: isProduction ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY,
+    });
+
+    drawsTable.addGlobalSecondaryIndex({
+      indexName: 'gsi1',
+      partitionKey: { name: 'gsi1pk', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'gsi1sk', type: dynamodb.AttributeType.STRING },
+      projectionType: dynamodb.ProjectionType.ALL,
+    });
+
+    const apiLogGroup = new logs.LogGroup(this, 'ApiFunctionLogGroup', {
+      retention: logs.RetentionDays.ONE_MONTH,
+      removalPolicy: isProduction ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY,
+    });
+
+    const apiFunction = new NodejsFunction(this, 'ApiFunction', {
+      entry: path.join(currentDir, '../../backend/src/lambda.ts'),
+      handler: 'handler',
+      runtime: lambda.Runtime.NODEJS_22_X,
+      memorySize: 512,
+      timeout: Duration.seconds(10),
+      bundling: {
+        target: 'node22',
+        sourceMap: false,
+      },
+      logGroup: apiLogGroup,
+      environment: {
+        APP_RUNTIME: 'PRODUCTION',
+        DRAWS_TABLE_NAME: drawsTable.tableName,
+      },
+    });
+
+    drawsTable.grantReadWriteData(apiFunction);
+
+    const httpApi = new apigwv2.HttpApi(this, 'DrawApi', {
+      createDefaultStage: false,
+      corsPreflight: {
+        allowHeaders: ['content-type', 'idempotency-key'],
+        allowMethods: [
+          apigwv2.CorsHttpMethod.GET,
+          apigwv2.CorsHttpMethod.POST,
+          apigwv2.CorsHttpMethod.PATCH,
+          apigwv2.CorsHttpMethod.OPTIONS,
+        ],
+        allowOrigins: [frontendAllowedOrigin],
+        maxAge: Duration.hours(1),
+      },
+    });
+
+    const apiGatewayAccessLogs = new logs.LogGroup(this, 'ApiGatewayAccessLogs', {
+      retention: logs.RetentionDays.ONE_MONTH,
+      removalPolicy: isProduction ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY,
+    });
+
+    new apigwv2.HttpStage(this, 'DrawApiDefaultStage', {
+      httpApi,
+      stageName: '$default',
+      autoDeploy: true,
+      accessLogSettings: {
+        destination: new apigwv2.LogGroupLogDestination(apiGatewayAccessLogs),
+        format: apigw.AccessLogFormat.custom(JSON.stringify({
+          requestId: '$context.requestId',
+          requestTime: '$context.requestTime',
+          httpMethod: '$context.httpMethod',
+          routeKey: '$context.routeKey',
+          status: '$context.status',
+          protocol: '$context.protocol',
+          responseLength: '$context.responseLength',
+          integrationErrorMessage: '$context.integrationErrorMessage',
+        })),
+      },
+      throttle: {
+        rateLimit: props.apiThrottleRateLimit,
+        burstLimit: props.apiThrottleBurstLimit,
+      },
+      detailedMetricsEnabled: true,
+    });
+
+    const integration = new HttpLambdaIntegration('ApiIntegration', apiFunction);
+
+    httpApi.addRoutes({
+      path: '/api/{proxy+}',
+      methods: [
+        apigwv2.HttpMethod.GET,
+        apigwv2.HttpMethod.POST,
+        apigwv2.HttpMethod.PATCH,
+      ],
+      integration,
+    });
+
+    const spaRewriteFunction = new cloudfront.Function(this, 'SpaRewriteFunction', {
+      code: cloudfront.FunctionCode.fromInline(`function handler(event) {
+  var request = event.request;
+  var uri = request.uri;
+
+  if (uri.startsWith('/api/')) {
+    return request;
+  }
+
+  if (uri === '/' || uri.indexOf('.') === -1) {
+    request.uri = '/index.html';
+  }
+
+  return request;
+}`),
+    });
+
+    const apiDomainName = Fn.select(2, Fn.split('/', httpApi.apiEndpoint));
+    const distribution = new cloudfront.Distribution(this, 'FrontendDistribution', {
+      defaultBehavior: {
+        origin: origins.S3BucketOrigin.withOriginAccessControl(frontendBucket),
+        viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+        cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
+        functionAssociations: [
+          {
+            eventType: cloudfront.FunctionEventType.VIEWER_REQUEST,
+            function: spaRewriteFunction,
+          },
+        ],
+      },
+      additionalBehaviors: {
+        '/api/*': {
+          origin: new origins.HttpOrigin(apiDomainName, {
+            protocolPolicy: cloudfront.OriginProtocolPolicy.HTTPS_ONLY,
+          }),
+          viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+          allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
+          cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
+          originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
+        },
+      },
+      defaultRootObject: 'index.html',
+    });
+
+    const frontendDistPath = path.join(currentDir, '../../frontend/dist');
+    new s3deploy.BucketDeployment(this, 'FrontendDeployment', {
+      destinationBucket: frontendBucket,
+      sources: [s3deploy.Source.asset(frontendDistPath)],
+      prune: false,
+      retainOnDelete: false,
+    });
+
+    new CfnOutput(this, 'FrontendBucketName', {
+      value: frontendBucket.bucketName,
+    });
+
+    new CfnOutput(this, 'CloudFrontDistributionDomainName', {
+      value: distribution.domainName,
+    });
+
+    new CfnOutput(this, 'ApiBaseUrl', {
+      value: httpApi.apiEndpoint,
+    });
+
+    new CfnOutput(this, 'DrawsTableName', {
+      value: drawsTable.tableName,
+    });
+  }
+}

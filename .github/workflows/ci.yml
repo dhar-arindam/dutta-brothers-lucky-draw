@@ -1,0 +1,65 @@
+name: ci
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality-gate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Node and npm versions
+        run: |
+          node --version
+          npm --version
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Tests
+        run: npm test
+
+      - name: Coverage quality gate
+        run: npm run test:coverage
+
+      - name: Build
+        run: npm run build
+
+      - name: CDK synth
+        run: npm run cdk:synth:dev
+
+      - name: Package validated source artifact
+        run: git archive --format=tar.gz --output validated-source.tar.gz HEAD
+
+      - name: Upload validated source artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: validated-source
+          path: validated-source.tar.gz
+          if-no-files-found: error

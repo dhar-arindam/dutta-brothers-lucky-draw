@@ -1,0 +1,237 @@
+name: deploy-production
+
+on:
+  workflow_dispatch:
+
+env:
+  AWS_REGION: ap-south-1
+  AWS_ACCOUNT_ID: "176515272004"
+  STAGING_STACK_NAME: DuttaDrawFoundationStackStaging
+  PRODUCTION_STACK_NAME: DuttaDrawFoundationStackProd
+  STAGING_FRONTEND_ORIGIN: ${{ vars.STAGING_FRONTEND_ORIGIN }}
+  PRODUCTION_FRONTEND_ORIGIN: ${{ vars.PRODUCTION_FRONTEND_ORIGIN }}
+
+permissions:
+  contents: read
+  id-token: write
+  actions: write
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  staging-validation:
+    needs: ci
+    runs-on: ubuntu-latest
+    environment: staging
+    outputs:
+      staging_frontend_url: ${{ steps.outputs.staging_frontend_url }}
+      staging_api_base_url: ${{ steps.outputs.staging_api_base_url }}
+    steps:
+      - name: Download validated source artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: validated-source
+
+      - name: Extract validated source artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar -xzf validated-source.tar.gz
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Configure AWS credentials (OIDC staging role)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN_STAGING }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Verify AWS account and region
+        shell: bash
+        run: |
+          set -euo pipefail
+          ACTUAL_ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
+          if [ "$ACTUAL_ACCOUNT_ID" != "${AWS_ACCOUNT_ID}" ]; then
+            echo "Unexpected AWS account: $ACTUAL_ACCOUNT_ID"
+            exit 1
+          fi
+          ACTUAL_REGION="$(aws configure get region)"
+          if [ "$ACTUAL_REGION" != "${AWS_REGION}" ]; then
+            echo "Unexpected AWS region: $ACTUAL_REGION"
+            exit 1
+          fi
+
+      - name: CDK synth (staging)
+        run: npm run cdk:synth:staging -- --context frontendOriginStaging=${STAGING_FRONTEND_ORIGIN}
+
+      - name: CDK diff (staging)
+        run: npm run cdk:diff:staging -- --context frontendOriginStaging=${STAGING_FRONTEND_ORIGIN}
+
+      - name: Deploy staging stack
+        run: npm run cdk:deploy:staging -- --context frontendOriginStaging=${STAGING_FRONTEND_ORIGIN} --require-approval any-change
+
+      - name: Resolve staging endpoints
+        id: outputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          FRONTEND_DOMAIN="$(aws cloudformation describe-stacks --stack-name "${STAGING_STACK_NAME}" --query "Stacks[0].Outputs[?OutputKey=='CloudFrontDistributionDomainName'].OutputValue" --output text)"
+          API_BASE_URL="$(aws cloudformation describe-stacks --stack-name "${STAGING_STACK_NAME}" --query "Stacks[0].Outputs[?OutputKey=='ApiBaseUrl'].OutputValue" --output text)"
+          echo "staging_frontend_url=https://${FRONTEND_DOMAIN}" >> "$GITHUB_OUTPUT"
+          echo "staging_api_base_url=${API_BASE_URL}" >> "$GITHUB_OUTPUT"
+
+      - name: Staging smoke tests
+        env:
+          STAGING_FRONTEND_URL: ${{ steps.outputs.outputs.staging_frontend_url }}
+          STAGING_API_BASE_URL: ${{ steps.outputs.outputs.staging_api_base_url }}
+        run: npm run smoke:staging
+
+  deploy-production:
+    needs: staging-validation
+    runs-on: ubuntu-latest
+    if: ${{ github.ref == 'refs/heads/main' }}
+    environment: production
+    outputs:
+      production_frontend_url: ${{ steps.outputs.production_frontend_url }}
+      production_api_base_url: ${{ steps.outputs.production_api_base_url }}
+    steps:
+      - name: Download validated source artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: validated-source
+
+      - name: Extract validated source artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar -xzf validated-source.tar.gz
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Configure AWS credentials (OIDC production role)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN_PRODUCTION }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Verify AWS account and region
+        shell: bash
+        run: |
+          set -euo pipefail
+          ACTUAL_ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
+          if [ "$ACTUAL_ACCOUNT_ID" != "${AWS_ACCOUNT_ID}" ]; then
+            echo "Unexpected AWS account: $ACTUAL_ACCOUNT_ID"
+            exit 1
+          fi
+          ACTUAL_REGION="$(aws configure get region)"
+          if [ "$ACTUAL_REGION" != "${AWS_REGION}" ]; then
+            echo "Unexpected AWS region: $ACTUAL_REGION"
+            exit 1
+          fi
+
+      - name: CDK synth (production)
+        run: npm run cdk:synth:prod -- --context frontendOriginProd=${PRODUCTION_FRONTEND_ORIGIN}
+
+      - name: CDK diff (production)
+        run: npm run cdk:diff:prod -- --context frontendOriginProd=${PRODUCTION_FRONTEND_ORIGIN}
+
+      - name: Deploy production stack
+        run: npm run cdk:deploy:prod -- --context frontendOriginProd=${PRODUCTION_FRONTEND_ORIGIN} --require-approval any-change
+
+      - name: Resolve production endpoints
+        id: outputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          FRONTEND_DOMAIN="$(aws cloudformation describe-stacks --stack-name "${PRODUCTION_STACK_NAME}" --query "Stacks[0].Outputs[?OutputKey=='CloudFrontDistributionDomainName'].OutputValue" --output text)"
+          API_BASE_URL="$(aws cloudformation describe-stacks --stack-name "${PRODUCTION_STACK_NAME}" --query "Stacks[0].Outputs[?OutputKey=='ApiBaseUrl'].OutputValue" --output text)"
+          echo "production_frontend_url=https://${FRONTEND_DOMAIN}" >> "$GITHUB_OUTPUT"
+          echo "production_api_base_url=${API_BASE_URL}" >> "$GITHUB_OUTPUT"
+
+  production-smoke:
+    needs: deploy-production
+    runs-on: ubuntu-latest
+    if: ${{ needs.deploy-production.result == 'success' }}
+    steps:
+      - name: Download validated source artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: validated-source
+
+      - name: Extract validated source artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar -xzf validated-source.tar.gz
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Production smoke tests
+        env:
+          PRODUCTION_FRONTEND_URL: ${{ needs.deploy-production.outputs.production_frontend_url }}
+          PRODUCTION_API_BASE_URL: ${{ needs.deploy-production.outputs.production_api_base_url }}
+        run: npm run smoke:production
+
+  destroy-staging-after-production:
+    needs: [staging-validation, deploy-production, production-smoke]
+    runs-on: ubuntu-latest
+    if: ${{ needs.staging-validation.result == 'success' && needs.deploy-production.result == 'success' && needs.production-smoke.result == 'success' }}
+    environment: staging
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Configure AWS credentials (OIDC staging role)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN_STAGING }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Verify AWS account and region
+        shell: bash
+        run: |
+          set -euo pipefail
+          ACTUAL_ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
+          if [ "$ACTUAL_ACCOUNT_ID" != "${AWS_ACCOUNT_ID}" ]; then
+            echo "Unexpected AWS account: $ACTUAL_ACCOUNT_ID"
+            exit 1
+          fi
+          ACTUAL_REGION="$(aws configure get region)"
+          if [ "$ACTUAL_REGION" != "${AWS_REGION}" ]; then
+            echo "Unexpected AWS region: $ACTUAL_REGION"
+            exit 1
+          fi
+
+      - name: Destroy staging stack after successful production rollout
+        run: npm run cdk:destroy:staging -- --force

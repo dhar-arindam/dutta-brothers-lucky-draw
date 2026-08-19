@@ -1,0 +1,69 @@
+name: destroy-staging
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_destroy:
+        description: "Type DESTROY_STAGING to confirm staged resource cleanup"
+        required: true
+        type: string
+
+env:
+  AWS_REGION: ap-south-1
+  AWS_ACCOUNT_ID: "176515272004"
+  STAGING_STACK_NAME: DuttaDrawFoundationStackStaging
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  destroy-staging:
+    if: ${{ github.event.inputs.confirm_destroy == 'DESTROY_STAGING' }}
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Configure AWS credentials (OIDC staging role)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN_STAGING }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Verify AWS account and region
+        shell: bash
+        run: |
+          set -euo pipefail
+          ACTUAL_ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
+          if [ "$ACTUAL_ACCOUNT_ID" != "${AWS_ACCOUNT_ID}" ]; then
+            echo "Unexpected AWS account: $ACTUAL_ACCOUNT_ID"
+            exit 1
+          fi
+          ACTUAL_REGION="$(aws configure get region)"
+          if [ "$ACTUAL_REGION" != "${AWS_REGION}" ]; then
+            echo "Unexpected AWS region: $ACTUAL_REGION"
+            exit 1
+          fi
+
+      - name: Destroy staging stack only
+        run: npm run cdk:destroy:staging -- --force
+
+  invalid-confirmation:
+    if: ${{ github.event.inputs.confirm_destroy != 'DESTROY_STAGING' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail due to missing explicit confirmation
+        run: |
+          echo "Explicit confirmation missing. Provide DESTROY_STAGING."
+          exit 1

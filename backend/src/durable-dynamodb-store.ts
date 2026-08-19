@@ -1,0 +1,892 @@
+import {
+  GetCommand,
+  PutCommand,
+  QueryCommand,
+  TransactWriteCommand,
+  UpdateCommand,
+} from '@aws-sdk/lib-dynamodb';
+
+import { campaignDateInKolkata, isCampaignActive } from './campaign.js';
+import type { AdminClaimItem, AdminSummaryDistributionItem } from './contracts.js';
+import type { Claim, ConfiguredPrize, Prize } from './domain.js';
+import type {
+  AddPrizeInput,
+  AdminCsvClaimItem,
+  AdminClaimsQuery,
+  AdminClaimsQueryResult,
+  AdminPrizeMutationResult,
+  AdminSummaryData,
+  CampaignUpdateInput,
+  CampaignUpdateResult,
+  CampaignView,
+  CreateClaimInput,
+  CreateClaimResult,
+  UpdatePrizeInput,
+} from './store.js';
+
+interface CampaignConfig {
+  id: string;
+  timezone: 'Asia/Kolkata';
+  fromDate: string;
+  toDate: string;
+}
+
+interface DynamoLikeClient {
+  send(command: unknown): Promise<unknown>;
+}
+
+interface DurableStoreOptions {
+  tableName: string;
+  now?: () => Date;
+}
+
+const DEFAULT_CAMPAIGN: CampaignConfig = {
+  id: 'festive-2026',
+  timezone: 'Asia/Kolkata',
+  fromDate: '2026-08-01',
+  toDate: '2026-11-01',
+};
+
+const MAX_PRIZE_NAME_LENGTH = 100;
+
+interface ClaimEntity {
+  pk: 'CLAIM';
+  sk: string;
+  entityType: 'CLAIM';
+  claimId: string;
+  claimTimestamp: string;
+  customerName: string;
+  phone: string;
+  billNumberDisplay: string;
+  billNumberNormalized: string;
+  prize: {
+    id: string;
+    name: string;
+    displayName: string;
+  };
+  gsi1pk: 'CLAIM';
+  gsi1sk: string;
+}
+
+interface BillEntity {
+  pk: 'BILL';
+  sk: string;
+  entityType: 'BILL';
+  claimId: string;
+  createdAt: string;
+}
+
+interface PrizeEntity {
+  pk: 'PRIZE';
+  sk: string;
+  entityType: 'PRIZE';
+  id: string;
+  name: string;
+  displayName: string;
+  weight: number;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface AggregateEntity {
+  pk: 'AGG';
+  sk: string;
+  entityType: 'AGG';
+  successfulSpins: number;
+  prizeId?: string;
+  prizeName?: string;
+  updatedAt: string;
+}
+
+interface CampaignEntity {
+  pk: 'CAMPAIGN';
+  sk: 'CONFIG';
+  entityType: 'CAMPAIGN';
+  id: string;
+  timezone: 'Asia/Kolkata';
+  fromDate: string;
+  toDate: string;
+}
+
+export class DynamoDbDrawStore {
+  private readonly tableName: string;
+  private readonly docClient: DynamoLikeClient;
+  private readonly nowProvider: () => Date;
+
+  public constructor(docClient: DynamoLikeClient, options: DurableStoreOptions) {
+    this.docClient = docClient;
+    this.tableName = options.tableName;
+    this.nowProvider = options.now ?? (() => new Date());
+  }
+
+  public async createClaimAndUpdateAggregatesAtomic(
+    input: CreateClaimInput,
+  ): Promise<CreateClaimResult> {
+    const sequence = await this.nextSequence('CLAIM');
+    const claimId = toClaimId(sequence);
+    const claimTimestamp = input.claim.claimTimestamp;
+
+    const claim: Claim = {
+      ...input.claim,
+      claimId,
+      claimTimestamp,
+    };
+
+    const dateKey = campaignDateInKolkata(input.now);
+    const timestamp = this.nowProvider().toISOString();
+
+    const billEntity: BillEntity = {
+      pk: 'BILL',
+      sk: claim.billNumberNormalized,
+      entityType: 'BILL',
+      claimId: claim.claimId,
+      createdAt: timestamp,
+    };
+
+    const claimEntity: ClaimEntity = {
+      pk: 'CLAIM',
+      sk: claim.claimId,
+      entityType: 'CLAIM',
+      claimId: claim.claimId,
+      claimTimestamp: claim.claimTimestamp,
+      customerName: claim.customerName,
+      phone: claim.phone,
+      billNumberDisplay: claim.billNumberDisplay,
+      billNumberNormalized: claim.billNumberNormalized,
+      prize: claim.prize,
+      gsi1pk: 'CLAIM',
+      gsi1sk: `${claim.claimTimestamp}#${claim.claimId}`,
+    };
+
+    try {
+      await this.docClient.send(
+        new TransactWriteCommand({
+          TransactItems: [
+            {
+              Put: {
+                TableName: this.tableName,
+                Item: billEntity,
+                ConditionExpression: 'attribute_not_exists(pk) AND attribute_not_exists(sk)',
+              },
+            },
+            {
+              Put: {
+                TableName: this.tableName,
+                Item: claimEntity,
+                ConditionExpression: 'attribute_not_exists(pk) AND attribute_not_exists(sk)',
+              },
+            },
+            {
+              Update: {
+                TableName: this.tableName,
+                Key: {
+                  pk: 'AGG',
+                  sk: 'TOTAL',
+                },
+                UpdateExpression:
+                  'SET #entityType = :aggType, #updatedAt = :updatedAt ADD #successfulSpins :one',
+                ExpressionAttributeNames: {
+                  '#entityType': 'entityType',
+                  '#updatedAt': 'updatedAt',
+                  '#successfulSpins': 'successfulSpins',
+                },
+                ExpressionAttributeValues: {
+                  ':aggType': 'AGG',
+                  ':updatedAt': timestamp,
+                  ':one': 1,
+                },
+              },
+            },
+            {
+              Update: {
+                TableName: this.tableName,
+                Key: {
+                  pk: 'AGG',
+                  sk: `DATE#${dateKey}`,
+                },
+                UpdateExpression:
+                  'SET #entityType = :aggType, #updatedAt = :updatedAt ADD #successfulSpins :one',
+                ExpressionAttributeNames: {
+                  '#entityType': 'entityType',
+                  '#updatedAt': 'updatedAt',
+                  '#successfulSpins': 'successfulSpins',
+                },
+                ExpressionAttributeValues: {
+                  ':aggType': 'AGG',
+                  ':updatedAt': timestamp,
+                  ':one': 1,
+                },
+              },
+            },
+            {
+              Update: {
+                TableName: this.tableName,
+                Key: {
+                  pk: 'AGG',
+                  sk: `PRIZE#${claim.prize.id}`,
+                },
+                UpdateExpression:
+                  'SET #entityType = :aggType, #prizeId = :prizeId, #prizeName = :prizeName, #updatedAt = :updatedAt ADD #successfulSpins :one',
+                ExpressionAttributeNames: {
+                  '#entityType': 'entityType',
+                  '#prizeId': 'prizeId',
+                  '#prizeName': 'prizeName',
+                  '#updatedAt': 'updatedAt',
+                  '#successfulSpins': 'successfulSpins',
+                },
+                ExpressionAttributeValues: {
+                  ':aggType': 'AGG',
+                  ':prizeId': claim.prize.id,
+                  ':prizeName': claim.prize.name,
+                  ':updatedAt': timestamp,
+                  ':one': 1,
+                },
+              },
+            },
+          ],
+        }),
+      );
+
+      return {
+        type: 'CREATED',
+        claim,
+      };
+    } catch {
+      const existing = await this.getClaimByNormalizedBill(claim.billNumberNormalized);
+      if (existing) {
+        return {
+          type: 'EXISTS',
+          claim: existing,
+        };
+      }
+
+      throw new Error('Unable to persist claim transaction.');
+    }
+  }
+
+  public async listEligiblePrizesForDraw(): Promise<Prize[]> {
+    const prizes = await this.listAllPrizes();
+    return prizes.filter((prize) => prize.active && prize.weight > 0);
+  }
+
+  public async listAllPrizes(): Promise<ConfiguredPrize[]> {
+    const result = await this.docClient.send(
+      new QueryCommand({
+        TableName: this.tableName,
+        KeyConditionExpression: 'pk = :pk',
+        ExpressionAttributeValues: {
+          ':pk': 'PRIZE',
+        },
+      }),
+    );
+
+    const items = ((result as { Items?: PrizeEntity[] }).Items ?? []).map(toConfiguredPrize);
+    return items.sort((left, right) => left.id.localeCompare(right.id));
+  }
+
+  public async addPrize(input: AddPrizeInput): Promise<AdminPrizeMutationResult> {
+    const validationError = validatePrizeInput(input);
+    if (validationError) {
+      return validationError;
+    }
+
+    const sequence = await this.nextSequence('PRIZE');
+    const id = `prize-${sequence.toString().padStart(3, '0')}`;
+    const timestamp = this.nowProvider().toISOString();
+
+    const item: PrizeEntity = {
+      pk: 'PRIZE',
+      sk: id,
+      entityType: 'PRIZE',
+      id,
+      name: input.name.trim(),
+      displayName: input.name.trim(),
+      weight: input.weight,
+      active: input.active,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+
+    await this.docClient.send(
+      new PutCommand({
+        TableName: this.tableName,
+        Item: item,
+        ConditionExpression: 'attribute_not_exists(pk) AND attribute_not_exists(sk)',
+      }),
+    );
+
+    return {
+      type: 'SUCCESS',
+      prize: toConfiguredPrize(item),
+    };
+  }
+
+  public async updatePrize(prizeId: string, input: UpdatePrizeInput): Promise<AdminPrizeMutationResult> {
+    const existing = await this.getPrize(prizeId);
+    if (!existing) {
+      return {
+        type: 'NOT_FOUND',
+        message: 'Prize was not found.',
+      };
+    }
+
+    if (input.weight === undefined && input.active === undefined) {
+      return {
+        type: 'VALIDATION_ERROR',
+        message: 'Please check the form and try again.',
+        fieldErrors: {
+          weight: 'At least one updatable field is required.',
+        },
+      };
+    }
+
+    const nextWeight = input.weight ?? existing.weight;
+    const nextActive = input.active ?? existing.active;
+    const validationError = validatePrizeInput({
+      name: existing.name,
+      weight: nextWeight,
+      active: nextActive,
+    });
+    if (validationError) {
+      return validationError;
+    }
+
+    const updatedAt = this.nowProvider().toISOString();
+
+    await this.docClient.send(
+      new UpdateCommand({
+        TableName: this.tableName,
+        Key: { pk: 'PRIZE', sk: prizeId },
+        ConditionExpression: 'attribute_exists(pk) AND attribute_exists(sk)',
+        UpdateExpression: 'SET #weight = :weight, #active = :active, #updatedAt = :updatedAt',
+        ExpressionAttributeNames: {
+          '#weight': 'weight',
+          '#active': 'active',
+          '#updatedAt': 'updatedAt',
+        },
+        ExpressionAttributeValues: {
+          ':weight': nextWeight,
+          ':active': nextActive,
+          ':updatedAt': updatedAt,
+        },
+      }),
+    );
+
+    const latest = await this.getPrize(prizeId);
+    if (!latest) {
+      throw new Error('Updated prize could not be read.');
+    }
+
+    return {
+      type: 'SUCCESS',
+      prize: latest,
+    };
+  }
+
+  public async listAdminClaims(query: AdminClaimsQuery): Promise<AdminClaimsQueryResult> {
+    const pageSize = clampPageSize(query.pageSize);
+    const search = (query.search ?? '').trim();
+    const normalizedSearch = search.toUpperCase();
+    const searchLower = search.toLowerCase();
+
+    let exclusiveStartKey = decodePageToken(query.pageToken);
+    const claims: AdminClaimItem[] = [];
+
+    do {
+      const page = await this.docClient.send(
+        new QueryCommand({
+          TableName: this.tableName,
+          IndexName: 'gsi1',
+          KeyConditionExpression: 'gsi1pk = :gsi1pk',
+          ExpressionAttributeValues: {
+            ':gsi1pk': 'CLAIM',
+          },
+          ExclusiveStartKey: exclusiveStartKey ?? undefined,
+          ScanIndexForward: false,
+          Limit: 100,
+        }),
+      );
+
+      const pageItems = ((page as { Items?: ClaimEntity[] }).Items ?? []).map(toClaimFromEntity);
+
+      for (const claim of pageItems) {
+        if (!passesClaimFilter(claim, query, search, normalizedSearch, searchLower)) {
+          continue;
+        }
+
+        claims.push({
+          claimId: claim.claimId,
+          claimTimestamp: claim.claimTimestamp,
+          customerName: claim.customerName,
+          maskedPhone: maskPhone(claim.phone),
+          billNumber: claim.billNumberDisplay,
+          prize: claim.prize.name,
+        });
+
+        if (claims.length >= pageSize) {
+          break;
+        }
+      }
+
+      exclusiveStartKey = (page as { LastEvaluatedKey?: Record<string, unknown> }).LastEvaluatedKey;
+      if (claims.length >= pageSize) {
+        break;
+      }
+    } while (exclusiveStartKey);
+
+    return {
+      items: claims,
+      nextPageToken: exclusiveStartKey ? encodePageToken(exclusiveStartKey) : null,
+    };
+  }
+
+  public async listAdminClaimsForCsv(): Promise<AdminCsvClaimItem[]> {
+    let exclusiveStartKey: Record<string, unknown> | undefined;
+    const claims: AdminCsvClaimItem[] = [];
+
+    do {
+      const page = await this.docClient.send(
+        new QueryCommand({
+          TableName: this.tableName,
+          IndexName: 'gsi1',
+          KeyConditionExpression: 'gsi1pk = :gsi1pk',
+          ExpressionAttributeValues: {
+            ':gsi1pk': 'CLAIM',
+          },
+          ExclusiveStartKey: exclusiveStartKey,
+          ScanIndexForward: false,
+          Limit: 100,
+        }),
+      );
+
+      const pageItems = ((page as { Items?: ClaimEntity[] }).Items ?? []).map(toClaimFromEntity);
+      for (const claim of pageItems) {
+        claims.push({
+          claimId: claim.claimId,
+          claimTimestamp: claim.claimTimestamp,
+          customerName: claim.customerName,
+          phone: claim.phone,
+          billNumber: claim.billNumberDisplay,
+          prize: claim.prize.name,
+        });
+      }
+
+      exclusiveStartKey = (page as { LastEvaluatedKey?: Record<string, unknown> }).LastEvaluatedKey;
+    } while (exclusiveStartKey);
+
+    return claims;
+  }
+
+  public async summary(): Promise<AdminSummaryData> {
+    const totalItem = await this.docClient.send(
+      new GetCommand({
+        TableName: this.tableName,
+        Key: { pk: 'AGG', sk: 'TOTAL' },
+      }),
+    );
+
+    const todayDate = campaignDateInKolkata(this.nowProvider());
+    const todayItem = await this.docClient.send(
+      new GetCommand({
+        TableName: this.tableName,
+        Key: { pk: 'AGG', sk: `DATE#${todayDate}` },
+      }),
+    );
+
+    const distributionQuery = await this.docClient.send(
+      new QueryCommand({
+        TableName: this.tableName,
+        KeyConditionExpression: 'pk = :pk AND begins_with(sk, :prefix)',
+        ExpressionAttributeValues: {
+          ':pk': 'AGG',
+          ':prefix': 'PRIZE#',
+        },
+      }),
+    );
+
+    const totalSuccessfulSpins = Number(
+      ((totalItem as { Item?: AggregateEntity }).Item?.successfulSpins ?? 0),
+    );
+    const todaySuccessfulSpins = Number(
+      ((todayItem as { Item?: AggregateEntity }).Item?.successfulSpins ?? 0),
+    );
+
+    const prizeDistribution = ((distributionQuery as { Items?: AggregateEntity[] }).Items ?? [])
+      .map((item): AdminSummaryDistributionItem => {
+        const prizeId = item.prizeId ?? item.sk.replace('PRIZE#', '');
+        return {
+          prizeId,
+          prizeName: item.prizeName ?? prizeId,
+          givenCount: Number(item.successfulSpins ?? 0),
+        };
+      })
+      .sort((left, right) => left.prizeId.localeCompare(right.prizeId));
+
+    return {
+      totalSuccessfulSpins,
+      today: {
+        date: todayDate,
+        successfulSpins: todaySuccessfulSpins,
+      },
+      prizeDistribution,
+    };
+  }
+
+  public async getCampaign(): Promise<CampaignView> {
+    const item = await this.docClient.send(
+      new GetCommand({
+        TableName: this.tableName,
+        Key: { pk: 'CAMPAIGN', sk: 'CONFIG' },
+      }),
+    );
+
+    const campaign = toCampaignConfig((item as { Item?: CampaignEntity }).Item) ?? DEFAULT_CAMPAIGN;
+    const status = isCampaignActive(campaign, this.nowProvider()) ? 'ACTIVE' : 'ENDED';
+
+    return {
+      ...campaign,
+      status,
+    };
+  }
+
+  public async updateCampaign(input: CampaignUpdateInput): Promise<CampaignUpdateResult> {
+    const current = await this.getCampaign();
+    const fromDate = input.fromDate ?? current.fromDate;
+    const toDate = input.toDate ?? current.toDate;
+    const fieldErrors: Partial<Record<'fromDate' | 'toDate', string>> = {};
+
+    const fromMillis = parseIsoDate(fromDate);
+    const toMillis = parseIsoDate(toDate);
+
+    if (fromMillis === null) {
+      fieldErrors.fromDate = 'From Date must be a valid calendar date.';
+    }
+    if (toMillis === null) {
+      fieldErrors.toDate = 'To Date must be a valid calendar date.';
+    }
+
+    if (Object.keys(fieldErrors).length === 0 && fromMillis !== null && toMillis !== null && fromMillis > toMillis) {
+      fieldErrors.toDate = 'To Date must be on or after From Date.';
+    }
+
+    if (Object.keys(fieldErrors).length > 0) {
+      return {
+        type: 'VALIDATION_ERROR',
+        message: 'Please check the form and try again.',
+        fieldErrors,
+      };
+    }
+
+    const item: CampaignEntity = {
+      pk: 'CAMPAIGN',
+      sk: 'CONFIG',
+      entityType: 'CAMPAIGN',
+      id: current.id,
+      timezone: 'Asia/Kolkata',
+      fromDate,
+      toDate,
+    };
+
+    await this.docClient.send(
+      new PutCommand({
+        TableName: this.tableName,
+        Item: item,
+      }),
+    );
+
+    return {
+      type: 'SUCCESS',
+      campaign: {
+        id: item.id,
+        timezone: item.timezone,
+        fromDate: item.fromDate,
+        toDate: item.toDate,
+      },
+    };
+  }
+
+  public async getClaimById(claimId: string): Promise<Claim | undefined> {
+    const item = await this.docClient.send(
+      new GetCommand({
+        TableName: this.tableName,
+        Key: {
+          pk: 'CLAIM',
+          sk: claimId,
+        },
+      }),
+    );
+
+    const entity = (item as { Item?: ClaimEntity }).Item;
+    if (!entity) {
+      return undefined;
+    }
+
+    return toClaimFromEntity(entity);
+  }
+
+  private async getClaimByNormalizedBill(billNumberNormalized: string): Promise<Claim | undefined> {
+    const billItem = await this.docClient.send(
+      new GetCommand({
+        TableName: this.tableName,
+        Key: {
+          pk: 'BILL',
+          sk: billNumberNormalized,
+        },
+      }),
+    );
+
+    const bill = (billItem as { Item?: BillEntity }).Item;
+    if (!bill) {
+      return undefined;
+    }
+
+    return this.getClaimById(bill.claimId);
+  }
+
+  private async getPrize(prizeId: string): Promise<ConfiguredPrize | undefined> {
+    const item = await this.docClient.send(
+      new GetCommand({
+        TableName: this.tableName,
+        Key: {
+          pk: 'PRIZE',
+          sk: prizeId,
+        },
+      }),
+    );
+
+    const entity = (item as { Item?: PrizeEntity }).Item;
+    if (!entity) {
+      return undefined;
+    }
+
+    return toConfiguredPrize(entity);
+  }
+
+  private async nextSequence(sequenceName: 'CLAIM' | 'PRIZE'): Promise<number> {
+    const result = await this.docClient.send(
+      new UpdateCommand({
+        TableName: this.tableName,
+        Key: {
+          pk: 'SEQ',
+          sk: sequenceName,
+        },
+        UpdateExpression: 'ADD #value :inc',
+        ExpressionAttributeNames: {
+          '#value': 'value',
+        },
+        ExpressionAttributeValues: {
+          ':inc': 1,
+        },
+        ReturnValues: 'UPDATED_NEW',
+      }),
+    );
+
+    const value = Number((result as { Attributes?: { value?: number } }).Attributes?.value ?? 0);
+    if (!Number.isInteger(value) || value <= 0) {
+      throw new Error(`Invalid ${sequenceName} sequence value.`);
+    }
+
+    return value;
+  }
+}
+
+const toClaimId = (sequence: number): string => {
+  if (sequence > 999999) {
+    throw new Error('Claim sequence exceeded six-digit capacity.');
+  }
+
+  return `DB26-${sequence.toString().padStart(6, '0')}`;
+};
+
+const toConfiguredPrize = (entity: PrizeEntity): ConfiguredPrize => {
+  return {
+    id: entity.id,
+    name: entity.name,
+    displayName: entity.displayName,
+    weight: entity.weight,
+    active: entity.active,
+    createdAt: entity.createdAt,
+    updatedAt: entity.updatedAt,
+  };
+};
+
+const toCampaignConfig = (entity: CampaignEntity | undefined): CampaignConfig | undefined => {
+  if (!entity) {
+    return undefined;
+  }
+
+  const fromDate = entity.fromDate ?? toIsoDateFromTimestamp((entity as { startAt?: string }).startAt);
+  const toDate = entity.toDate ?? toIsoDateFromTimestamp((entity as { endAt?: string }).endAt);
+  if (!fromDate || !toDate) {
+    return undefined;
+  }
+
+  return {
+    id: entity.id,
+    timezone: entity.timezone,
+    fromDate,
+    toDate,
+  };
+};
+
+const toIsoDateFromTimestamp = (value: string | undefined): string | null => {
+  if (!value) {
+    return null;
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+
+  return parsed.toISOString().slice(0, 10);
+};
+
+const parseIsoDate = (value: string): number | null => {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) {
+    return null;
+  }
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const candidate = new Date(Date.UTC(year, month - 1, day));
+  if (
+    candidate.getUTCFullYear() !== year ||
+    candidate.getUTCMonth() !== month - 1 ||
+    candidate.getUTCDate() !== day
+  ) {
+    return null;
+  }
+
+  return candidate.getTime();
+};
+
+const toClaimFromEntity = (entity: ClaimEntity): Claim => {
+  return {
+    claimId: entity.claimId,
+    claimTimestamp: entity.claimTimestamp,
+    customerName: entity.customerName,
+    phone: entity.phone,
+    billNumberDisplay: entity.billNumberDisplay,
+    billNumberNormalized: entity.billNumberNormalized,
+    prize: {
+      id: entity.prize.id,
+      name: entity.prize.name,
+      displayName: entity.prize.displayName,
+    },
+  };
+};
+
+const clampPageSize = (value: number | undefined): number => {
+  if (value === undefined) {
+    return 25;
+  }
+
+  if (!Number.isInteger(value) || value < 1 || value > 150) {
+    return 25;
+  }
+
+  return value;
+};
+
+const encodePageToken = (key: Record<string, unknown>): string => {
+  return Buffer.from(JSON.stringify(key), 'utf-8').toString('base64url');
+};
+
+const decodePageToken = (token: string | undefined): Record<string, unknown> | undefined => {
+  if (!token) {
+    return undefined;
+  }
+
+  try {
+    const decoded = JSON.parse(Buffer.from(token, 'base64url').toString('utf-8'));
+    if (!decoded || typeof decoded !== 'object') {
+      return undefined;
+    }
+
+    return decoded as Record<string, unknown>;
+  } catch {
+    return undefined;
+  }
+};
+
+const maskPhone = (phone: string): string => {
+  const digits = phone.replace(/\D/g, '');
+  const tail = digits.slice(-4);
+  return `*****${tail.padStart(4, '*')}`;
+};
+
+const passesClaimFilter = (
+  claim: Claim,
+  query: AdminClaimsQuery,
+  search: string,
+  normalizedSearch: string,
+  searchLower: string,
+): boolean => {
+  const claimMillis = new Date(claim.claimTimestamp).getTime();
+  if (query.from) {
+    const fromMillis = Date.parse(query.from);
+    if (!Number.isNaN(fromMillis) && claimMillis < fromMillis) {
+      return false;
+    }
+  }
+
+  if (query.to) {
+    const toMillis = Date.parse(query.to);
+    if (!Number.isNaN(toMillis) && claimMillis > toMillis) {
+      return false;
+    }
+  }
+
+  if (query.prizeId && claim.prize.id !== query.prizeId) {
+    return false;
+  }
+
+  if (!search) {
+    return true;
+  }
+
+  const customerName = claim.customerName.trim().toLowerCase();
+  const prizeName = claim.prize.name.trim().toLowerCase();
+
+  return (
+    claim.claimId.startsWith(search) ||
+    customerName.startsWith(searchLower) ||
+    claim.billNumberNormalized.startsWith(normalizedSearch) ||
+    prizeName.startsWith(searchLower)
+  );
+};
+
+const validatePrizeInput = (
+  input: AddPrizeInput,
+): Extract<AdminPrizeMutationResult, { type: 'VALIDATION_ERROR' }> | null => {
+  const fieldErrors: Partial<Record<'name' | 'weight' | 'active', string>> = {};
+  const normalizedName = input.name.trim();
+
+  if (normalizedName.length === 0) {
+    fieldErrors.name = 'Prize name is required.';
+  } else if (normalizedName.length > MAX_PRIZE_NAME_LENGTH) {
+    fieldErrors.name = 'Prize name must be at most 100 characters.';
+  }
+
+  if (!Number.isFinite(input.weight) || input.weight <= 0) {
+    fieldErrors.weight = 'Weight must be a positive number.';
+  }
+
+  if (typeof input.active !== 'boolean') {
+    fieldErrors.active = 'Active flag must be true or false.';
+  }
+
+  if (Object.keys(fieldErrors).length > 0) {
+    return {
+      type: 'VALIDATION_ERROR',
+      message: 'Please check the form and try again.',
+      fieldErrors,
+    };
+  }
+
+  return null;
+};

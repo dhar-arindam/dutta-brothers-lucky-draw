@@ -1,0 +1,80 @@
+name: AWS OIDC Authentication Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment_name:
+        description: "GitHub Environment (staging or production)"
+        required: true
+        default: "staging"
+        type: choice
+        options:
+          - staging
+          - production
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  test-aws-oidc-auth:
+    name: Test AWS ${{ github.event.inputs.environment_name }} Authentication
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment_name }}
+    env:
+      AWS_REGION: ap-south-1
+    steps:
+      - name: Resolve AWS role ARN variable
+        id: aws_role
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event.inputs.environment_name }}" == "staging" ]; then
+            echo "role_arn_var=AWS_ROLE_ARN_STAGING" >> "$GITHUB_OUTPUT"
+            echo "expected_role_name=DuttaBrothersLuckyDraw-GitHubActions-Staging" >> "$GITHUB_OUTPUT"
+          else
+            echo "role_arn_var=AWS_ROLE_ARN_PRODUCTION" >> "$GITHUB_OUTPUT"
+            echo "expected_role_name=DuttaBrothersLuckyDraw-GitHubActions-Prod" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars[steps.aws_role.outputs.role_arn_var] }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Verify AWS identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Verifying AWS identity..."
+          IDENTITY=$(aws sts get-caller-identity)
+          echo "AWS STS Identity:"
+          echo "$IDENTITY" | jq '.'
+          
+          # Extract and display key information
+          ACCOUNT_ID=$(echo "$IDENTITY" | jq -r '.Account')
+          ARN=$(echo "$IDENTITY" | jq -r '.Arn')
+          
+          echo ""
+          echo "Account ID: $ACCOUNT_ID"
+          echo "ARN: $ARN"
+          echo "Region: ${{ env.AWS_REGION }}"
+          
+          # Verify expected role name is in ARN
+          if echo "$ARN" | grep -q "${{ steps.aws_role.outputs.expected_role_name }}"; then
+            echo "✓ ARN contains expected role name: ${{ steps.aws_role.outputs.expected_role_name }}"
+          else
+            echo "✗ ARN does not contain expected role name: ${{ steps.aws_role.outputs.expected_role_name }}"
+            echo "Actual ARN: $ARN"
+            exit 1
+          fi
+
+      - name: Authentication test summary
+        shell: bash
+        run: |
+          echo "Authentication Test: PASSED"
+          echo "Environment: ${{ github.event.inputs.environment_name }}"
+          echo "AWS Region: ${{ env.AWS_REGION }}"
+          echo "OIDC Trust: Verified"
+          echo "No AWS resources were deployed or modified."

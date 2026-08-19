@@ -1,0 +1,15 @@
+{
+  "app": "node --import tsx ./bin/app.ts",
+  "context": {
+    "stage": "dev",
+    "frontendOriginDev": "http://localhost:5173",
+    "frontendOriginStaging": "https://example.invalid",
+    "frontendOriginProd": "https://example.invalid",
+    "apiThrottleRateLimitDev": 25,
+    "apiThrottleBurstLimitDev": 50,
+    "apiThrottleRateLimitStaging": 75,
+    "apiThrottleBurstLimitStaging": 150,
+    "apiThrottleRateLimitProd": 150,
+    "apiThrottleBurstLimitProd": 300
+  }
+}

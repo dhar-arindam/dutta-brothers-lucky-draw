@@ -1,0 +1,55 @@
+{
+  "stagingTrustPolicyExample": {
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Effect": "Allow",
+        "Principal": {
+          "Federated": "arn:aws:iam::176515272004:oidc-provider/token.actions.githubusercontent.com"
+        },
+        "Action": "sts:AssumeRoleWithWebIdentity",
+        "Condition": {
+          "StringEquals": {
+            "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
+          },
+          "StringLike": {
+            "token.actions.githubusercontent.com:sub": [
+              "repo:<OWNER>/<REPO>:environment:staging",
+              "repo:<OWNER>/<REPO>:ref:refs/heads/main"
+            ],
+            "token.actions.githubusercontent.com:job_workflow_ref": [
+              "<OWNER>/<REPO>/.github/workflows/deploy-staging.yml@refs/heads/main",
+              "<OWNER>/<REPO>/.github/workflows/deploy-production.yml@refs/heads/main",
+              "<OWNER>/<REPO>/.github/workflows/destroy-staging.yml@refs/heads/main"
+            ]
+          }
+        }
+      }
+    ]
+  },
+  "productionTrustPolicyExample": {
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Effect": "Allow",
+        "Principal": {
+          "Federated": "arn:aws:iam::176515272004:oidc-provider/token.actions.githubusercontent.com"
+        },
+        "Action": "sts:AssumeRoleWithWebIdentity",
+        "Condition": {
+          "StringEquals": {
+            "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
+          },
+          "StringLike": {
+            "token.actions.githubusercontent.com:sub": [
+              "repo:<OWNER>/<REPO>:environment:production"
+            ],
+            "token.actions.githubusercontent.com:job_workflow_ref": [
+              "<OWNER>/<REPO>/.github/workflows/deploy-production.yml@refs/heads/main"
+            ]
+          }
+        }
+      }
+    ]
+  }
+}

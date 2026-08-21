@@ -209,7 +209,7 @@ This is a business-critical constraint and must be enforced server-side.
 Display an appropriate message such as:
 
 ```
-"The lucky draw has ended for today. Please visit the Dutta Brothers counter."
+"The lucky draw has ended for this festive season. Please visit the Dutta Brothers counter."
 ```
 
 An "eligible prize" is one that is:

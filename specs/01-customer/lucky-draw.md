@@ -295,7 +295,7 @@ If the backend returns ALREADY_CLAIMED:
 If the backend returns DRAW_ENDED:
 
 - Display an appropriate message
-- Example: "The lucky draw has ended for today. Please visit the Dutta Brothers counter."
+- Example: "The lucky draw has ended for this festive season. Please visit the Dutta Brothers counter."
 - Do NOT play a winning reveal animation
 - Provide next steps if applicable
 
@@ -304,7 +304,7 @@ If the backend returns DRAW_ENDED:
 If the backend returns NO_ELIGIBLE_PRIZE:
 
 - Display an appropriate message
-- Example: "The lucky draw has ended for today. Please visit the Dutta Brothers counter."
+- Example: "The lucky draw has ended for this festive season. Please visit the Dutta Brothers counter."
 - Do NOT play a winning reveal animation
 - Do NOT show a fallback prize
 

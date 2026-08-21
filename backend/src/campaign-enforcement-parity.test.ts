@@ -278,7 +278,7 @@ describe('campaign enforcement parity across local and lambda runtimes', () => {
     expect(localResponse.body).toMatchObject({
       status: 'ERROR',
       code: 'DRAW_ENDED',
-      message: 'The lucky draw has ended for today. Please visit the Dutta Brothers counter.',
+      message: 'The lucky draw has ended for this festive season. Please visit the Dutta Brothers counter.',
     });
     expect(localSnapshot.claimCount).toBe(0);
     expect(localSnapshot.aggregate.totalSuccessfulSpins).toBe(0);
@@ -313,7 +313,7 @@ describe('campaign enforcement parity across local and lambda runtimes', () => {
     expect(lambdaBody).toMatchObject({
       status: 'ERROR',
       code: 'DRAW_ENDED',
-      message: 'The lucky draw has ended for today. Please visit the Dutta Brothers counter.',
+      message: 'The lucky draw has ended for this festive season. Please visit the Dutta Brothers counter.',
     });
     expect(mockLambdaState.listEligibleCalls).toBe(0);
     expect(mockLambdaState.createClaimCalls).toBe(0);
@@ -329,14 +329,14 @@ describe('campaign enforcement parity across local and lambda runtimes', () => {
     expect(local.response.body).toMatchObject({
       status: 'ERROR',
       code: 'DRAW_ENDED',
-      message: 'The lucky draw has ended for today. Please visit the Dutta Brothers counter.',
+      message: 'The lucky draw has ended for this festive season. Please visit the Dutta Brothers counter.',
     });
 
     expect(lambda.response.statusCode).toBe(409);
     expect(lambdaBody).toMatchObject({
       status: 'ERROR',
       code: 'DRAW_ENDED',
-      message: 'The lucky draw has ended for today. Please visit the Dutta Brothers counter.',
+      message: 'The lucky draw has ended for this festive season. Please visit the Dutta Brothers counter.',
     });
   });
 });

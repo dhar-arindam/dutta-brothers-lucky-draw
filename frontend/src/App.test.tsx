@@ -465,7 +465,7 @@ describe('customer draw app gift box reveal flow', () => {
       json: async () => ({
         status: 'ERROR',
         code: 'DRAW_ENDED',
-        message: 'The lucky draw has ended for today. Please visit the Dutta Brothers counter.',
+        message: 'The lucky draw has ended for this festive season. Please visit the Dutta Brothers counter.',
       }),
     });
     vi.stubGlobal('fetch', mockFetch);
@@ -478,7 +478,7 @@ describe('customer draw app gift box reveal flow', () => {
 
     expect(
       await screen.findByText(
-        'The lucky draw has ended for today. Please visit the Dutta Brothers counter.',
+        'The lucky draw has ended for this festive season. Please visit the Dutta Brothers counter.',
       ),
     ).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Draw Ended' })).toBeInTheDocument();
@@ -490,7 +490,7 @@ describe('customer draw app gift box reveal flow', () => {
       json: async () => ({
         status: 'ERROR',
         code: 'NO_ELIGIBLE_PRIZE',
-        message: 'The lucky draw has ended for today. Please visit the Dutta Brothers counter.',
+        message: 'The lucky draw has ended for this festive season. Please visit the Dutta Brothers counter.',
       }),
     });
     vi.stubGlobal('fetch', mockFetch);
@@ -503,7 +503,7 @@ describe('customer draw app gift box reveal flow', () => {
 
     expect(
       await screen.findByText(
-        'The lucky draw has ended for today. Please visit the Dutta Brothers counter.',
+        'The lucky draw has ended for this festive season. Please visit the Dutta Brothers counter.',
       ),
     ).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'No Eligible Prize' })).toBeInTheDocument();

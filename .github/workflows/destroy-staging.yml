@@ -51,10 +51,14 @@ jobs:
             echo "Unexpected AWS account: $ACTUAL_ACCOUNT_ID"
             exit 1
           fi
-          # aws configure get region ignores AWS_REGION/AWS_DEFAULT_REGION; aws configure list reports the effective, env-sourced region
-          ACTUAL_REGION="$(aws configure list | awk '$1 == "region" { print $2 }')"
-          if [ "$ACTUAL_REGION" != "${AWS_REGION}" ]; then
-            echo "Unexpected AWS region: $ACTUAL_REGION"
+          # AWS_REGION is fixed by the workflow env block, so it can't reveal a credentials-step failure;
+          # AWS_DEFAULT_REGION is only ever set by the configure-aws-credentials step, making it the real signal
+          if [ -z "${AWS_DEFAULT_REGION:-}" ]; then
+            echo "AWS_DEFAULT_REGION was not set by the credentials step"
+            exit 1
+          fi
+          if [ "${AWS_DEFAULT_REGION}" != "${AWS_REGION}" ]; then
+            echo "Unexpected AWS region: ${AWS_DEFAULT_REGION}"
             exit 1
           fi
 

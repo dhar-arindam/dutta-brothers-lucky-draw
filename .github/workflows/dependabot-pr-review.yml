@@ -236,7 +236,7 @@ jobs:
             high=$(node -e "console.log(require('./audit-summary.json').counts.high)")
             moderate=$(node -e "console.log(require('./audit-summary.json').counts.moderate)")
             low=$(node -e "console.log(require('./audit-summary.json').counts.low)")
-            high_critical_details=$(node -e "const r=require('./audit-summary.json'); console.log((r.highOrCritical||[]).map(v=>`${v.package} [${v.severity}] -> ${v.remediation}`).join(' | '))")
+            high_critical_details=$(node -e 'const r=require("./audit-summary.json"); console.log((r.highOrCritical||[]).map(v=>`${v.package} [${v.severity}] -> ${v.remediation}`).join(" | "))')
           fi
 
           major_update=false

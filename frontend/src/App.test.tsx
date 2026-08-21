@@ -237,6 +237,7 @@ describe('customer draw app gift box reveal flow', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('reveal-view')).toBeInTheDocument();
+      expect(screen.getByTestId('gift-box-hero')).toHaveAttribute('data-presentation-state', 'BOX_IDLE');
     }, { timeout: 2500 });
 
     expect(screen.queryByText('CONGRATULATIONS!')).not.toBeInTheDocument();
@@ -245,7 +246,9 @@ describe('customer draw app gift box reveal flow', () => {
 
     expect(await screen.findByText('CONGRATULATIONS!')).toBeInTheDocument();
     expect(await screen.findByText('DB26-300001')).toBeInTheDocument();
-    expect(screen.getByTestId('gift-box-hero')).toBeDisabled();
+    await waitFor(() => {
+      expect(screen.getByTestId('gift-box-hero')).toBeDisabled();
+    });
   });
 
   it('keeps reveal and result layers mounted during transition handoff', async () => {

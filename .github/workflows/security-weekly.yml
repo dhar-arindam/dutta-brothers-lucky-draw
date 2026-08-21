@@ -1,0 +1,129 @@
+name: security-weekly
+
+on:
+  schedule:
+    - cron: "0 2 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-weekly-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  security-posture:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Node and npm versions
+        run: |
+          node --version
+          npm --version
+
+      - name: Validate lockfile consistency
+        run: git diff --exit-code -- package-lock.json
+
+      - name: Build frontend assets for infrastructure checks
+        run: npm run build --workspace frontend
+
+      - name: npm audit (JSON report)
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm audit --json > npm-audit.json || true
+
+      - name: Enforce audit severity policy (fail on high/critical)
+        shell: bash
+        run: |
+          set -euo pipefail
+          node - <<'EOF'
+          const fs = require('node:fs');
+
+          const report = JSON.parse(fs.readFileSync('npm-audit.json', 'utf8'));
+          const summary = report.metadata?.vulnerabilities ?? {};
+          const vulnerabilities = report.vulnerabilities ?? {};
+
+          const critical = Number(summary.critical ?? 0);
+          const high = Number(summary.high ?? 0);
+          const moderate = Number(summary.moderate ?? 0);
+          const low = Number(summary.low ?? 0);
+
+          console.log('npm audit summary');
+          console.log(`critical=${critical} high=${high} moderate=${moderate} low=${low}`);
+
+          const highOrCritical = Object.entries(vulnerabilities).filter(([, details]) => {
+            const severity = (details && details.severity) || 'unknown';
+            return severity === 'high' || severity === 'critical';
+          });
+
+          if (highOrCritical.length > 0) {
+            console.log('High/Critical vulnerabilities detected:');
+            for (const [pkg, details] of highOrCritical) {
+              const severity = details.severity || 'unknown';
+              const range = details.range || 'unknown';
+              let recommendation = 'No automated remediation available';
+
+              if (details.fixAvailable === true) {
+                recommendation = 'Run npm audit fix (review changes before merge)';
+              } else if (details.fixAvailable && typeof details.fixAvailable === 'object') {
+                const target = details.fixAvailable.name
+                  ? `${details.fixAvailable.name}@${details.fixAvailable.version || 'latest'}`
+                  : (details.fixAvailable.version || 'latest');
+                recommendation = `Upgrade to ${target}`;
+              }
+
+              let affected = 'N/A';
+              if (Array.isArray(details.via)) {
+                const viaObjects = details.via.filter((item) => item && typeof item === 'object');
+                if (viaObjects.length > 0) {
+                  affected = viaObjects
+                    .map((item) => `${item.name || pkg}: ${item.range || 'unknown range'}`)
+                    .join('; ');
+                }
+              }
+
+              console.log(`- package=${pkg}`);
+              console.log(`  severity=${severity}`);
+              console.log(`  installedRange=${range}`);
+              console.log(`  affected=${affected}`);
+              console.log(`  remediation=${recommendation}`);
+            }
+          }
+
+          if (critical > 0 || high > 0) {
+            console.error('Security policy violation: high or critical vulnerabilities present.');
+            process.exit(1);
+          }
+          EOF
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Tests
+        run: npm test
+
+      - name: Coverage quality gate
+        run: npm run test:coverage
+
+      - name: Build remaining workspaces
+        run: npm run build --workspace backend --workspace infrastructure --workspace shared
+
+      - name: CDK synth (dev)
+        run: npm run cdk:synth:dev

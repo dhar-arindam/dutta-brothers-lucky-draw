@@ -38,6 +38,16 @@ describe('campaign window evaluation', () => {
     expect(
       isCampaignActive(
         {
+          fromDate: '2026/08/16',
+          toDate: '2026-08-16',
+        },
+        new Date('2026-08-16T10:00:00.000Z'),
+      ),
+    ).toBe(false);
+
+    expect(
+      isCampaignActive(
+        {
           fromDate: '2026-02-31',
           toDate: '2026-08-16',
         },

@@ -140,6 +140,53 @@ describe('foundation stack aws configuration', () => {
     });
   }, 30000);
 
+  it('applies required project tags on taggable infrastructure resources', () => {
+    const template = devTemplate;
+
+    template.hasResourceProperties('AWS::S3::Bucket', {
+      Tags: Match.arrayWith([
+        { Key: 'project', Value: 'lucky-draw' },
+      ]),
+    });
+
+    template.hasResourceProperties('AWS::S3::Bucket', {
+      Tags: Match.arrayWith([
+        { Key: 'organization', Value: 'dutta-brothers' },
+      ]),
+    });
+
+    template.hasResourceProperties('AWS::DynamoDB::Table', {
+      Tags: Match.arrayWith([
+        { Key: 'project', Value: 'lucky-draw' },
+      ]),
+    });
+
+    template.hasResourceProperties('AWS::DynamoDB::Table', {
+      Tags: Match.arrayWith([
+        { Key: 'organization', Value: 'dutta-brothers' },
+      ]),
+    });
+
+    template.hasResourceProperties('AWS::Lambda::Function', {
+      Tags: Match.arrayWith([
+        { Key: 'project', Value: 'lucky-draw' },
+      ]),
+    });
+
+    template.hasResourceProperties('AWS::Lambda::Function', {
+      Tags: Match.arrayWith([
+        { Key: 'organization', Value: 'dutta-brothers' },
+      ]),
+    });
+
+    template.hasResourceProperties('AWS::ApiGatewayV2::Api', {
+      Tags: Match.objectLike({
+        project: 'lucky-draw',
+        organization: 'dutta-brothers',
+      }),
+    });
+  }, 30000);
+
   it('does not grant wildcard CloudFront invalidation permissions to deployment helper roles', () => {
     const template = devTemplate;
 

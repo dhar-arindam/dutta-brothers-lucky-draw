@@ -101,6 +101,8 @@ This architecture preserves business integrity while keeping implementation prop
 - API Gateway for REST API exposure
 - Lambda for business logic
 
+Operational tagging policy: all taggable AWS resources created via CDK must include `project=lucky-draw` and `organization=dutta-brothers` for consistent governance, operations, and cost visibility.
+
 ## Core business rules enforced server-side
 
 - Unique participation rule: normalized bill number can only produce one successful draw claim.

@@ -15,6 +15,22 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  dependency-review:
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Dependency review
+        uses: actions/dependency-review-action@v5
+        with:
+          fail-on-severity: high
+
   quality-gate:
     runs-on: ubuntu-latest
 
@@ -25,7 +41,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
 
       - name: Install dependencies
@@ -35,6 +51,9 @@ jobs:
         run: |
           node --version
           npm --version
+
+      - name: Build frontend assets for infrastructure tests and synth
+        run: npm run build --workspace frontend
 
       - name: Lint
         run: npm run lint
@@ -48,8 +67,8 @@ jobs:
       - name: Coverage quality gate
         run: npm run test:coverage
 
-      - name: Build
-        run: npm run build
+      - name: Build remaining workspaces
+        run: npm run build --workspace backend --workspace infrastructure --workspace shared
 
       - name: CDK synth
         run: npm run cdk:synth:dev

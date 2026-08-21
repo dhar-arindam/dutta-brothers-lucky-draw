@@ -272,7 +272,10 @@ const toCsvCell = (raw: string): string => {
   return `"${escaped}"`;
 };
 
-const buildDrawResponse = async (request: DrawRequest): Promise<{ statusCode: number; body: DrawResponse }> => {
+const buildDrawResponse = async (
+  request: DrawRequest,
+  correlationId?: string,
+): Promise<{ statusCode: number; body: DrawResponse }> => {
   const validationResult = validateDrawRequest(request);
   if ('fieldErrors' in validationResult) {
     return {
@@ -314,6 +317,7 @@ const buildDrawResponse = async (request: DrawRequest): Promise<{ statusCode: nu
   const claimTimestamp = currentTime.toISOString();
   const claimResult = await store.createClaimAndUpdateAggregatesAtomic({
     now: currentTime,
+    ...(correlationId ? { correlationId } : {}),
     claim: {
       claimId: '',
       claimTimestamp,
@@ -414,7 +418,7 @@ export const handler = async (event: {
         });
       }
 
-      const response = await buildDrawResponse(parsed.value);
+      const response = await buildDrawResponse(parsed.value, event.requestContext.requestId);
       return responseJson(response.statusCode, response.body);
     }
 
@@ -540,6 +544,23 @@ export const handler = async (event: {
       });
     }
 
+    const claimDeleteMatch = path.match(/^\/api\/admin\/claims\/([^/]+)$/);
+    if (method === 'DELETE' && claimDeleteMatch?.[1]) {
+      const claimId = decodeURIComponent(claimDeleteMatch[1]);
+      const result = await store.deleteClaim(claimId);
+      if (result.type === 'NOT_FOUND') {
+        const response = validationErrorResponse('Claim was not found.');
+        return responseJson(response.statusCode, response.body);
+      }
+
+      return responseJson(200, { status: 'SUCCESS' });
+    }
+
+    if (method === 'DELETE' && path === '/api/admin/claims') {
+      const deletedCount = await store.clearAllClaims();
+      return responseJson(200, { status: 'SUCCESS', deletedCount });
+    }
+
     if (method === 'GET' && path === '/api/admin/claims.csv') {
       const claims = await store.listAdminClaimsForCsv();
       const rows = [
@@ -617,7 +638,17 @@ export const handler = async (event: {
       code: 'INTERNAL_ERROR',
       message: 'Route not found.',
     });
-  } catch {
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        event: 'UNHANDLED_REQUEST_ERROR',
+        method,
+        path,
+        errorName: error instanceof Error ? error.name : typeof error,
+        requestId: event.requestContext.requestId,
+      }),
+    );
+
     if (path === '/api/draw') {
       return responseJson(500, drawInternalErrorResponse().body);
     }

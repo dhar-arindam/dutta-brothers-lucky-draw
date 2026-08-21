@@ -10,6 +10,8 @@ import type {
 } from './types';
 import {
   addAdminPrize,
+  clearAdminClaims,
+  deleteAdminClaim,
   exportAdminClaimsCsv,
   getAdminCampaign,
   getAdminSummary,
@@ -30,6 +32,8 @@ type BusyAction =
   | 'INITIAL'
   | 'CLAIMS'
   | 'CSV'
+  | 'CLAIM_DELETE'
+  | 'CLAIMS_CLEAR'
   | 'PRIZE_ADD'
   | 'PRIZE_WEIGHT'
   | 'PRIZE_TOGGLE'
@@ -167,15 +171,19 @@ export const AdminPrizePage = () => {
         ? 'Loading claims...'
         : busyAction === 'CSV'
           ? 'Preparing CSV export...'
-          : busyAction === 'PRIZE_ADD'
-            ? 'Adding prize...'
-            : busyAction === 'PRIZE_WEIGHT'
-              ? 'Saving weight...'
-              : busyAction === 'PRIZE_TOGGLE'
-                ? 'Updating prize state...'
-                : busyAction === 'CAMPAIGN'
-                  ? 'Saving campaign period...'
-                  : '';
+          : busyAction === 'CLAIM_DELETE'
+            ? 'Deleting claim...'
+            : busyAction === 'CLAIMS_CLEAR'
+              ? 'Clearing all claims...'
+              : busyAction === 'PRIZE_ADD'
+                ? 'Adding prize...'
+                : busyAction === 'PRIZE_WEIGHT'
+                  ? 'Saving weight...'
+                  : busyAction === 'PRIZE_TOGGLE'
+                    ? 'Updating prize state...'
+                    : busyAction === 'CAMPAIGN'
+                      ? 'Saving campaign period...'
+                      : '';
 
   const setFeedback = (message: string) => {
     setStatusMessage(message);
@@ -592,6 +600,60 @@ export const AdminPrizePage = () => {
     }
   };
 
+  const onDeleteClaim = async (claimId: string) => {
+    const confirmed = window.confirm(
+      `Delete claim ${claimId}? This permanently removes the claim and adjusts prize and summary counts. This cannot be undone.`,
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setBusyAction('CLAIM_DELETE');
+    setFeedback('Deleting claim...');
+
+    try {
+      const response = await deleteAdminClaim(claimId);
+      if (response.status === 'ERROR') {
+        setErrorState(response.message);
+        return;
+      }
+
+      await loadAdminData();
+      setFeedback(`Claim ${claimId} deleted.`);
+    } catch {
+      setErrorState('We could not complete the admin request. Please try again.');
+    } finally {
+      setBusyAction('NONE');
+    }
+  };
+
+  const onClearAllClaims = async () => {
+    const typedConfirmation = window.prompt(
+      'This permanently deletes ALL claims and resets prize and summary counts to zero. This cannot be undone.\n\nType CLEAR ALL CLAIMS to confirm.',
+    );
+    if (typedConfirmation !== 'CLEAR ALL CLAIMS') {
+      return;
+    }
+
+    setBusyAction('CLAIMS_CLEAR');
+    setFeedback('Clearing all claims...');
+
+    try {
+      const response = await clearAdminClaims();
+      if (response.status === 'ERROR') {
+        setErrorState(response.message);
+        return;
+      }
+
+      await loadAdminData();
+      setFeedback(`Cleared ${response.deletedCount} claim(s).`);
+    } catch {
+      setErrorState('We could not complete the admin request. Please try again.');
+    } finally {
+      setBusyAction('NONE');
+    }
+  };
+
   const shellClass = isLightTheme
     ? 'min-h-screen bg-[#efe5d4] px-3 py-4 text-slate-800 sm:px-5'
     : 'min-h-screen bg-[#0f1224] px-3 py-4 text-[#ffeecf] sm:px-5';
@@ -616,6 +678,12 @@ export const AdminPrizePage = () => {
   const smallSecondaryButtonClass = isLightTheme
     ? 'min-h-8 rounded-lg border border-slate-300 bg-[#f8efdf] px-3 text-xs font-semibold text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b88f20] focus-visible:ring-offset-2 focus-visible:ring-offset-[#f7efdf] disabled:border-slate-300/50 disabled:bg-[#ece1cc] disabled:text-slate-500'
     : 'min-h-8 rounded-lg border border-amber-200/70 bg-[#1b1849] px-3 text-xs font-semibold text-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200 focus-visible:ring-offset-2 focus-visible:ring-offset-[#151933] disabled:border-amber-200/30 disabled:bg-[#1b1849]/60 disabled:text-amber-100/60';
+  const dangerButtonClass = isLightTheme
+    ? 'min-h-10 rounded-lg border border-red-300 bg-red-50 px-4 text-sm font-semibold text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f7efdf] disabled:border-red-200/50 disabled:bg-red-50/60 disabled:text-red-700/50'
+    : 'min-h-10 rounded-lg border border-red-400/70 bg-red-950/40 px-4 text-sm font-semibold text-red-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[#151933] disabled:border-red-400/30 disabled:bg-red-950/20 disabled:text-red-200/50';
+  const smallDangerButtonClass = isLightTheme
+    ? 'min-h-8 rounded-lg border border-red-300 bg-red-50 px-3 text-xs font-semibold text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f7efdf] disabled:border-red-200/50 disabled:bg-red-50/60 disabled:text-red-700/50'
+    : 'min-h-8 rounded-lg border border-red-400/70 bg-red-950/40 px-3 text-xs font-semibold text-red-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[#151933] disabled:border-red-400/30 disabled:bg-red-950/20 disabled:text-red-200/50';
   const isCampaignActive = campaignStatus.tone === 'active';
   const isCampaignNotStarted = campaignStatus.tone === 'not-started';
   const campaignToneClass = isLightTheme
@@ -1132,6 +1200,14 @@ export const AdminPrizePage = () => {
               >
                 {busyAction === 'CSV' ? 'Exporting...' : 'Export All Data'}
               </button>
+              <button
+                type="button"
+                className={dangerButtonClass}
+                disabled={isBusy || claims.length === 0}
+                onClick={() => void onClearAllClaims()}
+              >
+                {busyAction === 'CLAIMS_CLEAR' ? 'Clearing...' : 'Clear All Claims'}
+              </button>
             </div>
           </form>
 
@@ -1152,6 +1228,7 @@ export const AdminPrizePage = () => {
                       <th className={`border border-solid px-2 py-2 text-left text-xs uppercase tracking-[0.06em] ${isLightTheme ? 'border-[#d4af37]' : 'border-amber-300/25'}`}>Bill Number</th>
                       <th className={`border border-solid px-2 py-2 text-left text-xs uppercase tracking-[0.06em] ${isLightTheme ? 'border-[#d4af37]' : 'border-amber-300/25'}`}>Prize</th>
                       <th className={`border border-solid px-2 py-2 text-left text-xs uppercase tracking-[0.06em] ${isLightTheme ? 'border-[#d4af37]' : 'border-amber-300/25'}`}>Date/Time</th>
+                      <th className={`border border-solid px-2 py-2 text-left text-xs uppercase tracking-[0.06em] ${isLightTheme ? 'border-[#d4af37]' : 'border-amber-300/25'}`}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1178,6 +1255,17 @@ export const AdminPrizePage = () => {
                         <td className={`border border-solid px-2 py-2 text-sm ${isLightTheme ? 'border-[#d4af37] text-slate-700' : 'border-amber-300/20 text-amber-100'}`}>{claim.billNumber}</td>
                         <td className={`border border-solid px-2 py-2 text-sm ${isLightTheme ? 'border-[#d4af37] text-slate-700' : 'border-amber-300/20 text-amber-100'}`}>{claim.prize}</td>
                         <td className={`border border-solid px-2 py-2 text-sm ${isLightTheme ? 'border-[#d4af37] text-slate-700' : 'border-amber-300/20 text-amber-100'}`}>{formatDateTime(claim.claimTimestamp, campaign?.timezone)}</td>
+                        <td className={`border border-solid px-2 py-2 text-sm ${isLightTheme ? 'border-[#d4af37] text-slate-700' : 'border-amber-300/20 text-amber-100'}`}>
+                          <button
+                            type="button"
+                            className={smallDangerButtonClass}
+                            disabled={isBusy}
+                            aria-label={`Delete claim ${claim.claimId}`}
+                            onClick={() => void onDeleteClaim(claim.claimId)}
+                          >
+                            Delete
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -1222,6 +1310,15 @@ export const AdminPrizePage = () => {
                           <dd className={`m-0 text-sm ${headingTextClass}`}>{formatDateTime(claim.claimTimestamp, campaign?.timezone)}</dd>
                         </div>
                       </dl>
+                      <button
+                        type="button"
+                        className={smallDangerButtonClass}
+                        disabled={isBusy}
+                        aria-label={`Delete claim ${claim.claimId}`}
+                        onClick={() => void onDeleteClaim(claim.claimId)}
+                      >
+                        Delete
+                      </button>
                     </article>
                   ))}
                 </div>

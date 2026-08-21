@@ -40,6 +40,8 @@ export interface AdminPrizeApiHandler {
   addPrize(bodyText: string): AdminHttpResponse;
   updatePrize(prizeId: string, bodyText: string): AdminHttpResponse;
   listClaims(query: URLSearchParams): AdminHttpResponse;
+  deleteClaim(claimId: string): AdminHttpResponse;
+  clearAllClaims(): AdminHttpResponse;
   exportClaimsCsv(query: URLSearchParams): AdminCsvResponse;
   getSummary(): AdminHttpResponse;
   getCampaign(): AdminHttpResponse;
@@ -251,6 +253,31 @@ export const createAdminPrizeApiHandler = (
           'content-disposition': 'attachment; filename="claims.csv"',
         },
         body: rows.map((row) => row.map(toCsvCell).join(',')).join('\n'),
+      };
+    },
+
+    deleteClaim(claimId: string): AdminHttpResponse {
+      const result = store.deleteClaim(claimId);
+      if (result.type === 'NOT_FOUND') {
+        return validationErrorResponse('Claim was not found.');
+      }
+
+      return {
+        statusCode: 200,
+        body: {
+          status: 'SUCCESS',
+        },
+      };
+    },
+
+    clearAllClaims(): AdminHttpResponse {
+      const deletedCount = store.clearAllClaims();
+      return {
+        statusCode: 200,
+        body: {
+          status: 'SUCCESS',
+          deletedCount,
+        },
       };
     },
 
@@ -645,6 +672,30 @@ export const createNodeHandler = (handlers: NodeHandlers) => {
       const response = handlers.adminPrizeApiHandler.exportClaimsCsv(parsedUrl.searchParams);
       res.writeHead(response.statusCode, response.headers);
       res.end(response.body);
+      return;
+    }
+
+    const claimDeleteMatch = parsedUrl.pathname.match(/^\/api\/admin\/claims\/([^/]+)$/);
+    if (method === 'DELETE' && claimDeleteMatch) {
+      const rawClaimId = claimDeleteMatch[1];
+      if (!rawClaimId) {
+        const response = validationErrorResponse();
+        res.writeHead(response.statusCode, jsonHeaders);
+        res.end(JSON.stringify(response.body));
+        return;
+      }
+
+      const claimId = decodeURIComponent(rawClaimId);
+      const response = handlers.adminPrizeApiHandler.deleteClaim(claimId);
+      res.writeHead(response.statusCode, jsonHeaders);
+      res.end(JSON.stringify(response.body));
+      return;
+    }
+
+    if (method === 'DELETE' && parsedUrl.pathname === '/api/admin/claims') {
+      const response = handlers.adminPrizeApiHandler.clearAllClaims();
+      res.writeHead(response.statusCode, jsonHeaders);
+      res.end(JSON.stringify(response.body));
       return;
     }
 

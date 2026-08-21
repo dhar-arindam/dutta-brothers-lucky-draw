@@ -155,3 +155,50 @@ describe('in-memory store campaign and prize admin operations', () => {
     expect(store.listEligiblePrizesForDraw().some((item) => item.id === created.prize.id)).toBe(false);
   });
 });
+
+describe('in-memory store claim deletion', () => {
+  it('deletes a claim, decrements aggregates, and frees the bill number for reuse', () => {
+    const store = new InMemoryDrawStore({ now: () => now });
+
+    store.createClaimAndUpdateAggregatesAtomic({ claim: createClaim(), now });
+    expect(store.snapshot().claimCount).toBe(1);
+    expect(store.snapshot().aggregate.totalSuccessfulSpins).toBe(1);
+
+    const result = store.deleteClaim('DB26-000001');
+    expect(result.type).toBe('SUCCESS');
+    expect(store.snapshot().claimCount).toBe(0);
+    expect(store.snapshot().aggregate.totalSuccessfulSpins).toBe(0);
+    expect(store.snapshot().aggregate.byPrizeId['prize-001']).toBeUndefined();
+
+    const reused = store.createClaimAndUpdateAggregatesAtomic({
+      claim: createClaim({ claimId: 'DB26-000002' }),
+      now,
+    });
+    expect(reused.type).toBe('CREATED');
+  });
+
+  it('returns NOT_FOUND when deleting an unknown claim', () => {
+    const store = new InMemoryDrawStore({ now: () => now });
+
+    const result = store.deleteClaim('DB26-999999');
+    expect(result.type).toBe('NOT_FOUND');
+  });
+
+  it('clears all claims and resets aggregates to zero', () => {
+    const store = new InMemoryDrawStore({ now: () => now });
+
+    store.createClaimAndUpdateAggregatesAtomic({ claim: createClaim(), now });
+    store.createClaimAndUpdateAggregatesAtomic({
+      claim: createClaim({ claimId: 'DB26-000002', billNumberDisplay: 'AB124', billNumberNormalized: 'AB124' }),
+      now,
+    });
+
+    const deletedCount = store.clearAllClaims();
+
+    expect(deletedCount).toBe(2);
+    expect(store.snapshot().claimCount).toBe(0);
+    expect(store.snapshot().aggregate.totalSuccessfulSpins).toBe(0);
+    expect(Object.keys(store.snapshot().aggregate.byPrizeId)).toHaveLength(0);
+    expect(Object.keys(store.snapshot().aggregate.byDate)).toHaveLength(0);
+  });
+});

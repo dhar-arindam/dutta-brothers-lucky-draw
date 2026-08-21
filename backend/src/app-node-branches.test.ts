@@ -19,6 +19,8 @@ const createAdminStub = (): AdminPrizeApiHandler => ({
   addPrize: () => ({ statusCode: 201, body: { status: 'SUCCESS', item: adminPrizeItem } }),
   updatePrize: () => ({ statusCode: 200, body: { status: 'SUCCESS', item: adminPrizeItem } }),
   listClaims: () => ({ statusCode: 200, body: { status: 'SUCCESS', items: [], nextPageToken: null } }),
+  deleteClaim: () => ({ statusCode: 200, body: { status: 'SUCCESS' } }),
+  clearAllClaims: () => ({ statusCode: 200, body: { status: 'SUCCESS', deletedCount: 0 } }),
   exportClaimsCsv: () => ({ statusCode: 200, headers: { 'content-type': 'text/csv' }, body: 'h1,h2' }),
   getSummary: () => ({ statusCode: 200, body: { status: 'SUCCESS', totalSuccessfulSpins: 0, today: { date: '2026-08-16', successfulSpins: 0 }, prizeDistribution: [] } }),
   getCampaign: () => ({ statusCode: 200, body: { status: 'SUCCESS', campaign: { id: 'festive-2026', timezone: 'Asia/Kolkata', fromDate: '2026-08-01', toDate: '2026-11-01', status: 'ACTIVE' } } }),

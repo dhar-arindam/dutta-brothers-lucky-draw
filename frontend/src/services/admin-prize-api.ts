@@ -1,7 +1,9 @@
 import type {
-  AdminErrorResponse,
   AdminCampaignResponse,
+  AdminClaimDeleteResponse,
+  AdminClaimsClearResponse,
   AdminClaimsListResponse,
+  AdminErrorResponse,
   AdminPrizeItemResponse,
   AdminPrizesListResponse,
   AdminPrizeResponse,
@@ -150,6 +152,19 @@ export const listAdminClaims = async (
 ): Promise<AdminClaimsListResponse | AdminErrorResponse> => {
   const response = await request(`/api/admin/claims${buildClaimsQuery(query)}`, { method: 'GET' });
   return response as AdminClaimsListResponse | AdminErrorResponse;
+};
+
+export const deleteAdminClaim = async (
+  claimId: string,
+): Promise<AdminClaimDeleteResponse | AdminErrorResponse> => {
+  const response = await request(`/api/admin/claims/${encodeURIComponent(claimId)}`, { method: 'DELETE' });
+  return response as AdminClaimDeleteResponse | AdminErrorResponse;
+};
+
+export const clearAdminClaims = async (
+): Promise<AdminClaimsClearResponse | AdminErrorResponse> => {
+  const response = await request('/api/admin/claims', { method: 'DELETE' });
+  return response as AdminClaimsClearResponse | AdminErrorResponse;
 };
 
 export const getAdminSummary = async (

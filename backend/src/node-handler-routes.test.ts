@@ -87,6 +87,14 @@ describe('node handler admin and routing coverage', () => {
       statusCode: 200,
       body: { status: 'SUCCESS', items: [], nextPageToken: null },
     }));
+    const deleteClaim = vi.fn<AdminPrizeApiHandler['deleteClaim']>(() => ({
+      statusCode: 200,
+      body: { status: 'SUCCESS' },
+    }));
+    const clearAllClaims = vi.fn<AdminPrizeApiHandler['clearAllClaims']>(() => ({
+      statusCode: 200,
+      body: { status: 'SUCCESS', deletedCount: 0 },
+    }));
     const exportClaimsCsv = vi.fn<AdminPrizeApiHandler['exportClaimsCsv']>(() => ({
       statusCode: 200,
       headers: { 'content-type': 'text/csv' },
@@ -133,6 +141,8 @@ describe('node handler admin and routing coverage', () => {
       addPrize,
       updatePrize,
       listClaims,
+      deleteClaim,
+      clearAllClaims,
       exportClaimsCsv,
       getSummary,
       getCampaign,
@@ -145,6 +155,8 @@ describe('node handler admin and routing coverage', () => {
     expect((await fetch(`${baseUrl}/api/admin/prizes`, { method: 'POST', body: '{}', headers: { 'content-type': 'application/json' } })).status).toBe(201);
     expect((await fetch(`${baseUrl}/api/admin/prizes/prize-001`, { method: 'PATCH', body: '{}', headers: { 'content-type': 'application/json' } })).status).toBe(200);
     expect((await fetch(`${baseUrl}/api/admin/claims?pageSize=25`)).status).toBe(200);
+    expect((await fetch(`${baseUrl}/api/admin/claims/DB26-000001`, { method: 'DELETE' })).status).toBe(200);
+    expect((await fetch(`${baseUrl}/api/admin/claims`, { method: 'DELETE' })).status).toBe(200);
     expect((await fetch(`${baseUrl}/api/admin/claims.csv?pageSize=999`)).status).toBe(200);
     expect((await fetch(`${baseUrl}/api/admin/summary`)).status).toBe(200);
     expect((await fetch(`${baseUrl}/api/admin/campaign`)).status).toBe(200);
@@ -157,6 +169,8 @@ describe('node handler admin and routing coverage', () => {
     expect(addPrize).toHaveBeenCalledTimes(1);
     expect(updatePrize).toHaveBeenCalledWith('prize-001', '{}');
     expect(listClaims).toHaveBeenCalledTimes(1);
+    expect(deleteClaim).toHaveBeenCalledWith('DB26-000001');
+    expect(clearAllClaims).toHaveBeenCalledTimes(1);
     expect(exportClaimsCsv).toHaveBeenCalledTimes(1);
     expect(getSummary).toHaveBeenCalledTimes(1);
     expect(getCampaign).toHaveBeenCalledTimes(1);

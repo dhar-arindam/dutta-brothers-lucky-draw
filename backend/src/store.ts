@@ -16,6 +16,9 @@ export interface CampaignView extends CampaignConfig {
 export interface CreateClaimInput {
   claim: Claim;
   now: Date;
+  // Optional request correlation id (e.g. API Gateway requestId), used only for
+  // diagnostic logging in durable stores. Never used for business logic.
+  correlationId?: string;
 }
 
 export type CreateClaimResult =
@@ -432,6 +435,35 @@ export class InMemoryDrawStore {
     };
   }
 
+  public deleteClaim(claimId: string): { type: 'SUCCESS' } | { type: 'NOT_FOUND' } {
+    const claim = this.claimById.get(claimId);
+    if (!claim) {
+      return { type: 'NOT_FOUND' };
+    }
+
+    this.claimById.delete(claimId);
+    this.claimByNormalizedBill.delete(claim.billNumberNormalized);
+    const index = this.claimsInCreatedOrder.findIndex((existing) => existing.claimId === claimId);
+    if (index !== -1) {
+      this.claimsInCreatedOrder.splice(index, 1);
+    }
+    this.decrementAggregatesForClaim(claim);
+
+    return { type: 'SUCCESS' };
+  }
+
+  public clearAllClaims(): number {
+    const deletedCount = this.claimById.size;
+    this.claimById.clear();
+    this.claimByNormalizedBill.clear();
+    this.claimsInCreatedOrder.length = 0;
+    this.totalSuccessfulSpins = 0;
+    this.successfulByDate.clear();
+    this.successfulByPrizeId.clear();
+
+    return deletedCount;
+  }
+
   public snapshot(): DrawStoreSnapshot {
     const byDate: Record<string, number> = {};
     for (const [date, count] of this.successfulByDate.entries()) {
@@ -459,6 +491,30 @@ export class InMemoryDrawStore {
   private storeClaim(claim: Claim): void {
     this.claimById.set(claim.claimId, claim);
     this.claimsInCreatedOrder.push(claim);
+  }
+
+  private decrementAggregatesForClaim(claim: Claim): void {
+    this.totalSuccessfulSpins = Math.max(0, this.totalSuccessfulSpins - 1);
+
+    const campaignDate = campaignDateInKolkata(new Date(claim.claimTimestamp));
+    const previousDateCount = this.successfulByDate.get(campaignDate) ?? 0;
+    if (previousDateCount <= 1) {
+      this.successfulByDate.delete(campaignDate);
+    } else {
+      this.successfulByDate.set(campaignDate, previousDateCount - 1);
+    }
+
+    const existingPrizeAggregate = this.successfulByPrizeId.get(claim.prize.id);
+    if (existingPrizeAggregate) {
+      if (existingPrizeAggregate.successfulSpins <= 1) {
+        this.successfulByPrizeId.delete(claim.prize.id);
+      } else {
+        this.successfulByPrizeId.set(claim.prize.id, {
+          ...existingPrizeAggregate,
+          successfulSpins: existingPrizeAggregate.successfulSpins - 1,
+        });
+      }
+    }
   }
 
   private incrementAggregatesForClaim(claim: Claim, when: Date): void {

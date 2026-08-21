@@ -79,6 +79,15 @@ export interface AdminClaimsListResponse {
   nextPageToken: string | null;
 }
 
+export interface AdminClaimDeleteResponse {
+  status: 'SUCCESS';
+}
+
+export interface AdminClaimsClearResponse {
+  status: 'SUCCESS';
+  deletedCount: number;
+}
+
 export interface AdminSummaryDistributionItem {
   prizeId: string;
   prizeName: string;

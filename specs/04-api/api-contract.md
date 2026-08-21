@@ -280,6 +280,35 @@ Arbitrary full-text search is not supported.
 
 Results are newest first. Page tokens are opaque and must not expose internal database keys.
 
+### `DELETE /api/admin/claims/{claimId}`
+
+Deletes a single claim and decrements its associated aggregates (total successful spins, today's successful spins if applicable, and the claim's prize `Given` count). Releases the claim's bill number so it can be used for a future draw.
+
+`200 OK` response:
+
+```json
+{
+  "status": "SUCCESS"
+}
+```
+
+If `claimId` does not exist, returns `400 Bad Request` with `VALIDATION_ERROR` and message `"Claim was not found."`.
+
+### `DELETE /api/admin/claims`
+
+Deletes all claims and resets all claim-derived aggregates (total successful spins, per-date counts, per-prize `Given` counts) to zero. Prize configuration (name, weight, active status) and campaign dates are unaffected.
+
+`200 OK` response:
+
+```json
+{
+  "status": "SUCCESS",
+  "deletedCount": 42
+}
+```
+
+This is a destructive, irreversible operation. The admin UI must require explicit confirmation before calling this endpoint.
+
 ### `GET /api/admin/claims.csv`
 
 Exports all successful claims irrespective of active claims filters and returns only the approved CSV fields: date/time, claim ID, customer name, bill number, prize, and unmasked phone number.

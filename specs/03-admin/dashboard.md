@@ -154,8 +154,20 @@ Phone numbers must be masked by default.
 - CSV export
 - Prize-based claim drill-down from prize rows/counts
 - Manual refresh of operational data
+- Delete an individual claim
+- Clear all claims in one action
 
 Claims must not be loaded without a bounded page size.
+
+### Claim Deletion
+
+- The admin can delete an individual claim from the Claims Report.
+- The admin can clear all claims in one action ("Clear All Claims").
+- Both actions are destructive and irreversible and must require an explicit confirmation step before executing.
+- Clearing all claims requires a stronger confirmation than deleting a single claim (for example, typing a confirmation phrase), reflecting its larger blast radius.
+- Deleting a claim must decrement the associated prize `Given` count and the summary aggregates (total successful spins, today's successful spins) so dashboard figures remain consistent with the remaining claims.
+- Deleting a claim releases its bill number so the same bill can be used for a future draw.
+- Deleting claims does not change prize configuration (name, weight, active status) or campaign dates.
 
 ### Prize-Based Claims Filter Behaviour
 
@@ -260,8 +272,6 @@ Configuration changes affect future draws only. Historical claims and their awar
 
 The admin cannot:
 
-- Modify claims
-- Delete claims
 - Change historical prizes
 - Rename an existing prize
 - Manage prize inventory

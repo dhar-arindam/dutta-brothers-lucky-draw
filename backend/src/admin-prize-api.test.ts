@@ -384,4 +384,104 @@ describe('campaign, summary, and claims endpoints', () => {
     expect(response.body).toContain('CSV-001');
     expect(response.body).toContain('CSV-002');
   });
+
+  it('deletes a single claim and decrements aggregates', () => {
+    const { drawApiHandler, adminApiHandler } = createHarness();
+
+    drawApiHandler.handle(
+      JSON.stringify({
+        name: 'Amit Das',
+        phone: '9123456789',
+        billNumber: 'DEL-001',
+      }),
+    );
+
+    const claimsBefore = adminApiHandler.listClaims(new URLSearchParams());
+    const claimId =
+      'items' in claimsBefore.body && claimsBefore.body.items[0] && 'claimId' in claimsBefore.body.items[0]
+        ? claimsBefore.body.items[0].claimId
+        : undefined;
+    expect(claimId).toBeDefined();
+
+    const summaryBefore = adminApiHandler.getSummary();
+    expect(summaryBefore.body).toMatchObject({ totalSuccessfulSpins: 1 });
+
+    const deleteResponse = adminApiHandler.deleteClaim(claimId as string);
+    expect(deleteResponse.statusCode).toBe(200);
+    expect(deleteResponse.body).toMatchObject({ status: 'SUCCESS' });
+
+    const summaryAfter = adminApiHandler.getSummary();
+    expect(summaryAfter.body).toMatchObject({ totalSuccessfulSpins: 0 });
+
+    const claimsAfter = adminApiHandler.listClaims(new URLSearchParams());
+    expect(claimsAfter.body).toMatchObject({ status: 'SUCCESS', items: [] });
+  });
+
+  it('returns validation error when deleting a claim that does not exist', () => {
+    const { adminApiHandler } = createHarness();
+
+    const response = adminApiHandler.deleteClaim('DB26-999999');
+    expect(response.statusCode).toBe(400);
+    expect(response.body).toMatchObject({
+      status: 'ERROR',
+      code: 'VALIDATION_ERROR',
+      message: 'Claim was not found.',
+    });
+  });
+
+  it('allows the same bill number to be reused for a draw after its claim is deleted', () => {
+    const { drawApiHandler, adminApiHandler } = createHarness();
+
+    drawApiHandler.handle(
+      JSON.stringify({
+        name: 'Amit Das',
+        phone: '9123456789',
+        billNumber: 'REUSE-001',
+      }),
+    );
+
+    const claimsBefore = adminApiHandler.listClaims(new URLSearchParams());
+    const claimId =
+      'items' in claimsBefore.body && claimsBefore.body.items[0] && 'claimId' in claimsBefore.body.items[0]
+        ? claimsBefore.body.items[0].claimId
+        : undefined;
+
+    adminApiHandler.deleteClaim(claimId as string);
+
+    const secondAttempt = drawApiHandler.handle(
+      JSON.stringify({
+        name: 'Riya Sen',
+        phone: '9876543210',
+        billNumber: 'REUSE-001',
+      }),
+    );
+
+    expect(secondAttempt.statusCode).toBe(201);
+    expect(secondAttempt.body).toMatchObject({ status: 'SUCCESS' });
+  });
+
+  it('clears all claims and resets aggregates to zero', () => {
+    const { drawApiHandler, adminApiHandler } = createHarness();
+
+    drawApiHandler.handle(
+      JSON.stringify({ name: 'Amit Das', phone: '9123456789', billNumber: 'CLR-001' }),
+    );
+    drawApiHandler.handle(
+      JSON.stringify({ name: 'Riya Sen', phone: '9876543210', billNumber: 'CLR-002' }),
+    );
+
+    const clearResponse = adminApiHandler.clearAllClaims();
+    expect(clearResponse.statusCode).toBe(200);
+    expect(clearResponse.body).toMatchObject({ status: 'SUCCESS', deletedCount: 2 });
+
+    const summaryAfter = adminApiHandler.getSummary();
+    expect(summaryAfter.body).toMatchObject({
+      status: 'SUCCESS',
+      totalSuccessfulSpins: 0,
+      prizeDistribution: [],
+    });
+
+    const claimsAfter = adminApiHandler.listClaims(new URLSearchParams());
+    expect(claimsAfter.body).toMatchObject({ status: 'SUCCESS', items: [] });
+  });
 });

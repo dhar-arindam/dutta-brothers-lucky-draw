@@ -150,6 +150,146 @@ describe('admin operations page', () => {
     expect(screen.getAllByText('Mixer Grinder').length).toBeGreaterThan(0);
   });
 
+  it('deletes a claim after confirmation and reloads dashboard data', async () => {
+    enqueueDashboardSuccess();
+    mockFetch.mockResolvedValueOnce(successJson({ status: 'SUCCESS' }));
+    mockFetch
+      .mockResolvedValueOnce(
+        successJson({
+          status: 'SUCCESS',
+          totalSuccessfulSpins: 0,
+          today: { date: '2026-08-16', successfulSpins: 0 },
+          prizeDistribution: [],
+        }),
+      )
+      .mockResolvedValueOnce(
+        successJson({
+          status: 'SUCCESS',
+          campaign: {
+            id: 'festive-2026',
+            timezone: 'Asia/Kolkata',
+            fromDate: '2026-08-01',
+            toDate: '2026-11-01',
+            status: 'ACTIVE',
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        successJson({
+          status: 'SUCCESS',
+          items: [
+            {
+              id: 'prize-001',
+              name: 'Electric Kettle',
+              weight: 1,
+              active: true,
+              givenCount: 0,
+              createdAt: '2026-08-16T10:30:00.000Z',
+              updatedAt: '2026-08-16T10:30:00.000Z',
+            },
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(successJson({ status: 'SUCCESS', items: [], nextPageToken: null }));
+
+    vi.stubGlobal('fetch', mockFetch);
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    render(<AdminPrizePage />);
+    await waitForAutoLoad();
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Delete claim CLM-20260816-000001' })[0] as HTMLElement);
+
+    const status = await screen.findByRole('status');
+    expect(status).toHaveTextContent('Claim CLM-20260816-000001 deleted.');
+    expect(screen.getByText('No claims yet.')).toBeInTheDocument();
+  });
+
+  it('does not delete a claim when confirmation is cancelled', async () => {
+    enqueueDashboardSuccess();
+    vi.stubGlobal('fetch', mockFetch);
+    vi.spyOn(window, 'confirm').mockReturnValue(false);
+
+    render(<AdminPrizePage />);
+    await waitForAutoLoad();
+
+    const callCountBefore = mockFetch.mock.calls.length;
+    fireEvent.click(screen.getAllByRole('button', { name: 'Delete claim CLM-20260816-000001' })[0] as HTMLElement);
+
+    expect(mockFetch.mock.calls.length).toBe(callCountBefore);
+    expect(screen.getAllByText('Amit Das').length).toBeGreaterThan(0);
+  });
+
+  it('clears all claims after typed confirmation and reloads dashboard data', async () => {
+    enqueueDashboardSuccess();
+    mockFetch.mockResolvedValueOnce(successJson({ status: 'SUCCESS', deletedCount: 1 }));
+    mockFetch
+      .mockResolvedValueOnce(
+        successJson({
+          status: 'SUCCESS',
+          totalSuccessfulSpins: 0,
+          today: { date: '2026-08-16', successfulSpins: 0 },
+          prizeDistribution: [],
+        }),
+      )
+      .mockResolvedValueOnce(
+        successJson({
+          status: 'SUCCESS',
+          campaign: {
+            id: 'festive-2026',
+            timezone: 'Asia/Kolkata',
+            fromDate: '2026-08-01',
+            toDate: '2026-11-01',
+            status: 'ACTIVE',
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        successJson({
+          status: 'SUCCESS',
+          items: [
+            {
+              id: 'prize-001',
+              name: 'Electric Kettle',
+              weight: 1,
+              active: true,
+              givenCount: 0,
+              createdAt: '2026-08-16T10:30:00.000Z',
+              updatedAt: '2026-08-16T10:30:00.000Z',
+            },
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(successJson({ status: 'SUCCESS', items: [], nextPageToken: null }));
+
+    vi.stubGlobal('fetch', mockFetch);
+    vi.spyOn(window, 'prompt').mockReturnValue('CLEAR ALL CLAIMS');
+
+    render(<AdminPrizePage />);
+    await waitForAutoLoad();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear All Claims' }));
+
+    const status = await screen.findByRole('status');
+    expect(status).toHaveTextContent('Cleared 1 claim(s).');
+    expect(screen.getByText('No claims yet.')).toBeInTheDocument();
+  });
+
+  it('does not clear claims when typed confirmation phrase is incorrect', async () => {
+    enqueueDashboardSuccess();
+    vi.stubGlobal('fetch', mockFetch);
+    vi.spyOn(window, 'prompt').mockReturnValue('nope');
+
+    render(<AdminPrizePage />);
+    await waitForAutoLoad();
+
+    const callCountBefore = mockFetch.mock.calls.length;
+    fireEvent.click(screen.getByRole('button', { name: 'Clear All Claims' }));
+
+    expect(mockFetch.mock.calls.length).toBe(callCountBefore);
+    expect(screen.getAllByText('Amit Das').length).toBeGreaterThan(0);
+  });
+
   it('rejects invalid add-prize form data', async () => {
     enqueueDashboardSuccess();
     vi.stubGlobal('fetch', mockFetch);

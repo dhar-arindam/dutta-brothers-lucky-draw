@@ -46,6 +46,8 @@ describe('node handler idempotency header propagation', () => {
         addPrize: () => ({ statusCode: 500, body: { status: 'ERROR', code: 'INTERNAL_ERROR', message: 'n/a' } }),
         updatePrize: () => ({ statusCode: 500, body: { status: 'ERROR', code: 'INTERNAL_ERROR', message: 'n/a' } }),
         listClaims: () => ({ statusCode: 500, body: { status: 'ERROR', code: 'INTERNAL_ERROR', message: 'n/a' } }),
+        deleteClaim: () => ({ statusCode: 500, body: { status: 'ERROR', code: 'INTERNAL_ERROR', message: 'n/a' } }),
+        clearAllClaims: () => ({ statusCode: 500, body: { status: 'ERROR', code: 'INTERNAL_ERROR', message: 'n/a' } }),
         exportClaimsCsv: () => ({
           statusCode: 500,
           headers: { 'content-type': 'application/json' },

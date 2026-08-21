@@ -238,3 +238,22 @@ These criteria define the Definition of Done for the initial product scope.
 - [ ] Malformed/invalid JSON below limit still returns the approved validation behavior.
 - [ ] Frontend does not auto-retry on `413`; it presents a usable API error and allows corrected resubmission.
 - [ ] Application-layer oversized rejections emit structured warning logs without request-body content.
+
+## 14. Performance Verification
+
+- [ ] Live performance tests are restricted to `DuttaDrawFoundationStackStaging` and approved HTTPS staging hostnames.
+- [ ] Live performance execution requires the exact typed confirmation `RUN_PERFORMANCE_TEST`.
+- [ ] Dry-run mode executes without network calls and uses no production resources.
+- [ ] The resolved performance target is printed before any scenario request is made.
+- [ ] Performance scenarios never deploy, destroy infrastructure, change configuration, or bypass backend business rules.
+- [ ] `sequential-20` passes only when all 20 unique sequential draws succeed without unexpected statuses.
+- [ ] Same-participant concurrency produces exactly one success, nine `ALREADY_CLAIMED` responses, and one claim ID.
+- [ ] Unique-participant concurrency produces 10 successful responses and 10 unique claim IDs.
+- [ ] `load-500` uses the staged 50, 100, 250, and 500-user ramp, with no stage exceeding 500 users.
+- [ ] `load-500` stops early when a stage reaches at least 30% 5xx responses or at least 20% timeouts.
+- [ ] `load-500` fails on 5xx responses or severe circuit-breaker termination and reports non-severe throttling/timeouts as warnings.
+- [ ] `randomness-5000` refuses to run unless the campaign is `ACTIVE` and eligible prizes exist.
+- [ ] `randomness-5000` uses configured active positive relative weights as expected probabilities.
+- [ ] `randomness-5000` reports chi-square goodness-of-fit and distinguishes PASS, INCONCLUSIVE, and FAIL using the approved p-value thresholds.
+- [ ] Impossible prize outcomes and statistically significant distribution deviation fail the randomness scenario.
+- [ ] Each performance scenario writes machine-readable and human-readable results.

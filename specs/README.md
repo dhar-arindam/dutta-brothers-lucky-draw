@@ -13,6 +13,8 @@ Admin V1 supports explicitly confirmed deletion of individual claims and clearin
 
 The active delivery model builds a validated source artifact from an exact Git SHA and deploys staging from that artifact. Staging deployment provenance must be verifiable before production promotion.
 
+The performance test suite is a staging-only verification tool. It must never target production and must use the explicit `RUN_PERFORMANCE_TEST` confirmation gate or offline dry-run mode.
+
 Admin UI technology constraint: Tailwind CSS is approved for Admin only and must remain isolated from customer-facing UI styling.
 
 Historical/deprecated customer reveal references (Envelope and Wheel) are retained only for traceability and are not active implementation targets.

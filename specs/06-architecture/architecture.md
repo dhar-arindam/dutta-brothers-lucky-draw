@@ -94,6 +94,21 @@ IAM permissions are scoped by function and resource. Lambda receives only the mi
 - Deployment summaries and staging verification record and confirm the deployed Git SHA.
 - Frontend deployments must not leave the SPA entry document serving an older cached bundle.
 
+## Performance Verification
+
+Performance verification is an operational test capability, not a production feature. It runs only against `DuttaDrawFoundationStackStaging` using HTTPS staging API and CloudFront hostnames.
+
+The test runner must require explicit target details and typed `RUN_PERFORMANCE_TEST` confirmation for live execution, refuse non-staging or unapproved targets before making requests, support offline `--dry-run` mode, print the resolved target, and write machine-readable and human-readable reports. It must never deploy, destroy infrastructure, or change prize/campaign configuration.
+
+Approved scenarios are:
+
+- `sequential-20`: twenty sequential unique draws; all must succeed without unexpected errors or duplicate responses.
+- `concurrency`: ten identical concurrent requests produce exactly one `SUCCESS` and nine `ALREADY_CLAIMED` responses with one claim ID; ten unique concurrent requests all succeed with ten unique claim IDs.
+- `load-500`: staged unique-user ramp of 50, 100, 250, and 500 users, with no stage exceeding 500 users. A circuit breaker stops the ramp at at least 30% 5xx responses or at least 20% timeouts. 5xx or early termination fails the scenario; non-severe throttling/timeouts are warnings.
+- `randomness-5000`: 5,000 unique draws only when the campaign is `ACTIVE` and eligible prizes exist. Successful prize distribution is compared with configured relative weights using chi-square goodness-of-fit: p >= 0.05 passes, 0.01 <= p < 0.05 is inconclusive, and p < 0.01 fails. Impossible or missing prize outcomes fail.
+
+The runner must not bypass campaign enforcement, uniqueness rules, backend prize selection, or API throttling. Participants and bills must be synthetic and uniquely identifiable.
+
 ## Infrastructure Scope
 
 CDK may define the required S3, CloudFront, API Gateway, Lambda, DynamoDB, IAM, and CloudWatch resources. No infrastructure code is created by this specification.

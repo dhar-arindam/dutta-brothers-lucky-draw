@@ -27,8 +27,8 @@ jobs:
     env:
       STAGING_FRONTEND_ORIGIN: ${{ vars.STAGING_FRONTEND_ORIGIN }}
     outputs:
-      staging_frontend_url: ${{ steps.outputs.staging_frontend_url }}
-      staging_api_base_url: ${{ steps.outputs.staging_api_base_url }}
+      staging_frontend_url: ${{ steps.resolve-endpoints.outputs.staging_frontend_url }}
+      staging_api_base_url: ${{ steps.resolve-endpoints.outputs.staging_api_base_url }}
     steps:
       - name: Download validated source artifact
         uses: actions/download-artifact@v4
@@ -115,7 +115,7 @@ jobs:
           npm run cdk:deploy:staging -- --context frontendOriginStaging="https://${REAL_DOMAIN}" --require-approval never
 
       - name: Resolve staging endpoints
-        id: outputs
+        id: resolve-endpoints
         shell: bash
         run: |
           set -euo pipefail
@@ -126,8 +126,8 @@ jobs:
 
       - name: Staging smoke tests
         env:
-          STAGING_FRONTEND_URL: ${{ steps.outputs.staging_frontend_url }}
-          STAGING_API_BASE_URL: ${{ steps.outputs.staging_api_base_url }}
+          STAGING_FRONTEND_URL: ${{ steps.resolve-endpoints.outputs.staging_frontend_url }}
+          STAGING_API_BASE_URL: ${{ steps.resolve-endpoints.outputs.staging_api_base_url }}
         run: npm run smoke:staging
 
   deploy-production:
@@ -138,8 +138,8 @@ jobs:
     env:
       PRODUCTION_FRONTEND_ORIGIN: ${{ vars.PRODUCTION_FRONTEND_ORIGIN }}
     outputs:
-      production_frontend_url: ${{ steps.outputs.production_frontend_url }}
-      production_api_base_url: ${{ steps.outputs.production_api_base_url }}
+      production_frontend_url: ${{ steps.resolve-endpoints.outputs.production_frontend_url }}
+      production_api_base_url: ${{ steps.resolve-endpoints.outputs.production_api_base_url }}
     steps:
       - name: Download validated source artifact
         uses: actions/download-artifact@v4
@@ -226,7 +226,7 @@ jobs:
           npm run cdk:deploy:prod -- --context frontendOriginProd="https://${REAL_DOMAIN}" --require-approval never
 
       - name: Resolve production endpoints
-        id: outputs
+        id: resolve-endpoints
         shell: bash
         run: |
           set -euo pipefail

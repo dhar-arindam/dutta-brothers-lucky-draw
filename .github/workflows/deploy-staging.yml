@@ -110,7 +110,7 @@ jobs:
           npm run cdk:deploy:staging -- --context frontendOriginStaging="https://${REAL_DOMAIN}" --require-approval never
 
       - name: Resolve staging endpoints
-        id: outputs
+        id: resolve-endpoints
         shell: bash
         run: |
           set -euo pipefail
@@ -121,11 +121,11 @@ jobs:
 
       - name: Staging smoke tests
         env:
-          STAGING_FRONTEND_URL: ${{ steps.outputs.staging_frontend_url }}
-          STAGING_API_BASE_URL: ${{ steps.outputs.staging_api_base_url }}
+          STAGING_FRONTEND_URL: ${{ steps.resolve-endpoints.outputs.staging_frontend_url }}
+          STAGING_API_BASE_URL: ${{ steps.resolve-endpoints.outputs.staging_api_base_url }}
         run: npm run smoke:staging
 
       - name: Staging summary
         run: |
-          echo "Staging frontend URL: ${{ steps.outputs.staging_frontend_url }}"
-          echo "Staging API base URL: ${{ steps.outputs.staging_api_base_url }}"
+          echo "Staging frontend URL: ${{ steps.resolve-endpoints.outputs.staging_frontend_url }}"
+          echo "Staging API base URL: ${{ steps.resolve-endpoints.outputs.staging_api_base_url }}"

@@ -120,6 +120,23 @@ describe('foundation stack aws configuration', () => {
       RouteKey: 'POST /api/{proxy+}',
       AuthorizationType: 'NONE',
     });
+
+    template.hasResourceProperties('AWS::ApiGatewayV2::Route', {
+      RouteKey: 'DELETE /api/{proxy+}',
+      AuthorizationType: 'NONE',
+    });
+  }, 30000);
+
+  it('does not cache the frontend index between deployments', () => {
+    const template = stagingTemplate;
+
+    template.hasResourceProperties('AWS::CloudFront::CachePolicy', {
+      CachePolicyConfig: {
+        DefaultTTL: 0,
+        MinTTL: 0,
+        MaxTTL: 0,
+      },
+    });
   }, 30000);
 
   it('enables API Gateway stage throttling and access logging', () => {

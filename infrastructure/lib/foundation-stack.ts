@@ -148,6 +148,7 @@ export class FoundationStack extends Stack {
         apigwv2.HttpMethod.GET,
         apigwv2.HttpMethod.POST,
         apigwv2.HttpMethod.PATCH,
+        apigwv2.HttpMethod.DELETE,
       ],
       integration,
     });
@@ -170,11 +171,16 @@ export class FoundationStack extends Stack {
     });
 
     const apiDomainName = Fn.select(2, Fn.split('/', httpApi.apiEndpoint));
+    const frontendCachePolicy = new cloudfront.CachePolicy(this, 'FrontendCachePolicy', {
+      defaultTtl: Duration.seconds(0),
+      minTtl: Duration.seconds(0),
+      maxTtl: Duration.seconds(0),
+    });
     const distribution = new cloudfront.Distribution(this, 'FrontendDistribution', {
       defaultBehavior: {
         origin: origins.S3BucketOrigin.withOriginAccessControl(frontendBucket),
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-        cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
+        cachePolicy: frontendCachePolicy,
         functionAssociations: [
           {
             eventType: cloudfront.FunctionEventType.VIEWER_REQUEST,

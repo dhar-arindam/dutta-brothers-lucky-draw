@@ -76,7 +76,10 @@ jobs:
       - name: Package validated source artifact
         # git archive only captures committed files, so it drops gitignored build output
         # (frontend/dist) that CDK's BucketDeployment needs; tar the built working tree instead.
-        run: tar --exclude=.git --exclude=node_modules --exclude=cdk.out --exclude=validated-source.tar.gz -czf validated-source.tar.gz .
+        # Write outside the tree being archived so tar doesn't see its own output file appear mid-read.
+        run: |
+          tar --exclude=.git --exclude=node_modules --exclude=cdk.out -czf /tmp/validated-source.tar.gz .
+          mv /tmp/validated-source.tar.gz validated-source.tar.gz
 
       - name: Upload validated source artifact
         uses: actions/upload-artifact@v4

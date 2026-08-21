@@ -7,7 +7,6 @@ env:
   AWS_REGION: ap-south-1
   AWS_ACCOUNT_ID: "176515272004"
   STAGING_STACK_NAME: DuttaDrawFoundationStackStaging
-  STAGING_FRONTEND_ORIGIN: ${{ vars.STAGING_FRONTEND_ORIGIN }}
 
 permissions:
   contents: read
@@ -23,6 +22,8 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ github.ref == 'refs/heads/main' }}
     environment: staging
+    env:
+      STAGING_FRONTEND_ORIGIN: ${{ vars.STAGING_FRONTEND_ORIGIN }}
     steps:
       - name: Download validated source artifact
         uses: actions/download-artifact@v4
@@ -70,14 +71,43 @@ jobs:
             exit 1
           fi
 
+      - name: Resolve frontend origin
+        id: frontend-origin
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "${STAGING_FRONTEND_ORIGIN:-}" ]; then
+            echo "origin=${STAGING_FRONTEND_ORIGIN}" >> "$GITHUB_OUTPUT"
+            echo "bootstrap=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # No configured origin: reuse the CloudFront domain from an existing stack, or fall back to a
+          # fail-closed placeholder on a true first deploy (real domain is unknown until the stack exists).
+          EXISTING_DOMAIN="$(aws cloudformation describe-stacks --stack-name "${STAGING_STACK_NAME}" --query "Stacks[0].Outputs[?OutputKey=='CloudFrontDistributionDomainName'].OutputValue" --output text 2>/dev/null || true)"
+          if [ -n "$EXISTING_DOMAIN" ] && [ "$EXISTING_DOMAIN" != "None" ]; then
+            echo "origin=https://${EXISTING_DOMAIN}" >> "$GITHUB_OUTPUT"
+            echo "bootstrap=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "origin=https://bootstrap-placeholder.invalid" >> "$GITHUB_OUTPUT"
+            echo "bootstrap=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: CDK synth (staging)
-        run: npm run cdk:synth:staging -- --context frontendOriginStaging=${STAGING_FRONTEND_ORIGIN}
+        run: npm run cdk:synth:staging -- --context frontendOriginStaging=${{ steps.frontend-origin.outputs.origin }}
 
       - name: CDK diff (staging)
-        run: npm run cdk:diff:staging -- --context frontendOriginStaging=${STAGING_FRONTEND_ORIGIN}
+        run: npm run cdk:diff:staging -- --context frontendOriginStaging=${{ steps.frontend-origin.outputs.origin }}
 
       - name: Deploy staging stack
-        run: npm run cdk:deploy:staging -- --context frontendOriginStaging=${STAGING_FRONTEND_ORIGIN} --require-approval any-change
+        run: npm run cdk:deploy:staging -- --context frontendOriginStaging=${{ steps.frontend-origin.outputs.origin }} --require-approval any-change
+
+      - name: Finalize CORS origin after bootstrap deploy
+        if: steps.frontend-origin.outputs.bootstrap == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          REAL_DOMAIN="$(aws cloudformation describe-stacks --stack-name "${STAGING_STACK_NAME}" --query "Stacks[0].Outputs[?OutputKey=='CloudFrontDistributionDomainName'].OutputValue" --output text)"
+          npm run cdk:deploy:staging -- --context frontendOriginStaging="https://${REAL_DOMAIN}" --require-approval any-change
 
       - name: Resolve staging endpoints
         id: outputs

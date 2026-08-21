@@ -65,7 +65,8 @@ jobs:
             echo "Unexpected AWS account: $ACTUAL_ACCOUNT_ID"
             exit 1
           fi
-          ACTUAL_REGION="$(aws configure get region)"
+          # aws configure get region ignores AWS_REGION/AWS_DEFAULT_REGION; aws configure list reports the effective, env-sourced region
+          ACTUAL_REGION="$(aws configure list | awk '$1 == "region" { print $2 }')"
           if [ "$ACTUAL_REGION" != "${AWS_REGION}" ]; then
             echo "Unexpected AWS region: $ACTUAL_REGION"
             exit 1
@@ -140,7 +141,8 @@ jobs:
             echo "Unexpected AWS account: $ACTUAL_ACCOUNT_ID"
             exit 1
           fi
-          ACTUAL_REGION="$(aws configure get region)"
+          # aws configure get region ignores AWS_REGION/AWS_DEFAULT_REGION; aws configure list reports the effective, env-sourced region
+          ACTUAL_REGION="$(aws configure list | awk '$1 == "region" { print $2 }')"
           if [ "$ACTUAL_REGION" != "${AWS_REGION}" ]; then
             echo "Unexpected AWS region: $ACTUAL_REGION"
             exit 1
@@ -229,7 +231,8 @@ jobs:
             echo "Unexpected AWS account: $ACTUAL_ACCOUNT_ID"
             exit 1
           fi
-          ACTUAL_REGION="$(aws configure get region)"
+          # aws configure get region ignores AWS_REGION/AWS_DEFAULT_REGION; aws configure list reports the effective, env-sourced region
+          ACTUAL_REGION="$(aws configure list | awk '$1 == "region" { print $2 }')"
           if [ "$ACTUAL_REGION" != "${AWS_REGION}" ]; then
             echo "Unexpected AWS region: $ACTUAL_REGION"
             exit 1

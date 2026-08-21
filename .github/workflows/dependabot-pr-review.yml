@@ -1,0 +1,395 @@
+name: dependabot-pr-review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: write
+
+concurrency:
+  group: dependabot-pr-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    if: ${{ github.actor == 'dependabot[bot]' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Dependabot metadata
+        id: metadata
+        uses: dependabot/fetch-metadata@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve release notes/changelog links (best effort)
+        id: depinfo
+        shell: bash
+        env:
+          DEPENDENCY_NAMES: ${{ steps.metadata.outputs.dependency-names }}
+        run: |
+          set -euo pipefail
+          node - <<'EOF'
+          const { execSync } = require('node:child_process');
+          const fs = require('node:fs');
+
+          const dependencies = (process.env.DEPENDENCY_NAMES || '')
+            .split(',')
+            .map((name) => name.trim())
+            .filter(Boolean);
+
+          const lines = [];
+          for (const dep of dependencies) {
+            try {
+              const raw = execSync(`npm view ${dep} --json`, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+              const info = JSON.parse(raw);
+
+              const homepage = typeof info.homepage === 'string' ? info.homepage : '';
+              const repository = typeof info.repository === 'string'
+                ? info.repository
+                : (info.repository && typeof info.repository.url === 'string' ? info.repository.url : '');
+
+              // Changelog URL is not standardized on npm; try common package.json fields when present.
+              const bugs = info.bugs && typeof info.bugs.url === 'string' ? info.bugs.url : '';
+              const releaseHint = repository || homepage || bugs || 'N/A';
+              lines.push(`${dep}: ${releaseHint}`);
+            } catch {
+              lines.push(`${dep}: N/A`);
+            }
+          }
+
+          const summary = lines.length > 0 ? lines.join(' | ') : 'N/A';
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `release_refs=${summary}\n`);
+          EOF
+        continue-on-error: true
+
+      - name: Collect pull request context
+        id: prctx
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const files = await github.paginate(github.rest.pulls.listFiles, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pr.number,
+              per_page: 100,
+            });
+
+            const lockfiles = ['package-lock.json', 'npm-shrinkwrap.json'];
+            const lockfileChanged = files.some((f) => lockfiles.includes(f.filename));
+            const changedFileList = files.map((f) => f.filename).join(', ');
+
+            const combinedText = `${pr.title}\n\n${pr.body || ''}`;
+            const advisoryMatches = combinedText.match(/(CVE-\d{4}-\d+|GHSA-[a-z0-9-]+)/gi) || [];
+            const advisories = [...new Set(advisoryMatches.map((id) => id.toUpperCase()))];
+
+            core.setOutput('lockfile_changed', String(lockfileChanged));
+            core.setOutput('changed_files', changedFileList);
+            core.setOutput('advisories', advisories.join(', '));
+            core.setOutput('security_related', String(advisories.length > 0 || /security|vulnerab|cve|ghsa/i.test(combinedText)));
+
+      - name: Install dependencies
+        id: npm_ci
+        run: npm ci
+        continue-on-error: true
+
+      - name: Build frontend assets for infrastructure checks
+        id: frontend_build
+        run: npm run build --workspace frontend
+        continue-on-error: true
+
+      - name: Lint
+        id: lint
+        run: npm run lint
+        continue-on-error: true
+
+      - name: Typecheck
+        id: typecheck
+        run: npm run typecheck
+        continue-on-error: true
+
+      - name: Tests
+        id: tests
+        run: npm test
+        continue-on-error: true
+
+      - name: Coverage quality gate
+        id: coverage
+        run: npm run test:coverage
+        continue-on-error: true
+
+      - name: Build remaining workspaces
+        id: build
+        run: npm run build --workspace backend --workspace infrastructure --workspace shared
+        continue-on-error: true
+
+      - name: CDK synth (dev)
+        id: synth
+        run: npm run cdk:synth:dev
+        continue-on-error: true
+
+      - name: npm audit (JSON)
+        id: audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm audit --json > npm-audit.json || true
+
+      - name: Enforce audit policy
+        id: audit_policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          node - <<'EOF'
+          const fs = require('node:fs');
+          const report = JSON.parse(fs.readFileSync('npm-audit.json', 'utf8'));
+          const summary = report.metadata?.vulnerabilities ?? {};
+          const vulnerabilities = report.vulnerabilities ?? {};
+
+          const critical = Number(summary.critical ?? 0);
+          const high = Number(summary.high ?? 0);
+          const moderate = Number(summary.moderate ?? 0);
+          const low = Number(summary.low ?? 0);
+
+          const highOrCritical = Object.entries(vulnerabilities)
+            .filter(([, details]) => details && (details.severity === 'high' || details.severity === 'critical'))
+            .map(([name, details]) => {
+              const via = Array.isArray(details.via)
+                ? details.via.filter((item) => item && typeof item === 'object')
+                : [];
+              const affected = via.map((item) => `${item.name || name}:${item.range || 'unknown'}`).join('; ') || 'N/A';
+              let remediation = 'No automated remediation available';
+              if (details.fixAvailable === true) {
+                remediation = 'Run npm audit fix and verify gates';
+              } else if (details.fixAvailable && typeof details.fixAvailable === 'object') {
+                const target = details.fixAvailable.name
+                  ? `${details.fixAvailable.name}@${details.fixAvailable.version || 'latest'}`
+                  : (details.fixAvailable.version || 'latest');
+                remediation = `Upgrade to ${target}`;
+              }
+              return {
+                package: name,
+                severity: details.severity,
+                installedRange: details.range || 'unknown',
+                affected,
+                remediation,
+              };
+            });
+
+          fs.writeFileSync('audit-summary.json', JSON.stringify({
+            counts: { critical, high, moderate, low },
+            highOrCritical,
+          }, null, 2));
+
+          console.log(`critical=${critical} high=${high} moderate=${moderate} low=${low}`);
+          if (critical > 0 || high > 0) {
+            console.error('High/Critical vulnerabilities found.');
+            process.exit(1);
+          }
+          EOF
+        continue-on-error: true
+
+      - name: Build review recommendation
+        id: verdict
+        shell: bash
+        env:
+          UPDATE_TYPE: ${{ steps.metadata.outputs.update-type }}
+          DEPENDENCY_TYPE: ${{ steps.metadata.outputs.dependency-type }}
+          DEPENDENCY_NAMES: ${{ steps.metadata.outputs.dependency-names }}
+          PREVIOUS_VERSION: ${{ steps.metadata.outputs.previous-version }}
+          NEW_VERSION: ${{ steps.metadata.outputs.new-version }}
+          LOCKFILE_CHANGED: ${{ steps.prctx.outputs.lockfile_changed }}
+          ADVISORIES: ${{ steps.prctx.outputs.advisories }}
+          SECURITY_RELATED: ${{ steps.prctx.outputs.security_related }}
+          NPM_CI: ${{ steps.npm_ci.outcome }}
+          FRONTEND_BUILD: ${{ steps.frontend_build.outcome }}
+          LINT: ${{ steps.lint.outcome }}
+          TYPECHECK: ${{ steps.typecheck.outcome }}
+          TESTS: ${{ steps.tests.outcome }}
+          COVERAGE: ${{ steps.coverage.outcome }}
+          BUILD: ${{ steps.build.outcome }}
+          SYNTH: ${{ steps.synth.outcome }}
+          AUDIT_POLICY: ${{ steps.audit_policy.outcome }}
+        run: |
+          set -euo pipefail
+
+          critical=0
+          high=0
+          moderate=0
+          low=0
+          high_critical_details=""
+          if [ -f audit-summary.json ]; then
+            critical=$(node -e "console.log(require('./audit-summary.json').counts.critical)")
+            high=$(node -e "console.log(require('./audit-summary.json').counts.high)")
+            moderate=$(node -e "console.log(require('./audit-summary.json').counts.moderate)")
+            low=$(node -e "console.log(require('./audit-summary.json').counts.low)")
+            high_critical_details=$(node -e "const r=require('./audit-summary.json'); console.log((r.highOrCritical||[]).map(v=>`${v.package} [${v.severity}] -> ${v.remediation}`).join(' | '))")
+          fi
+
+          major_update=false
+          if [[ "${UPDATE_TYPE}" == *"semver-major"* ]]; then
+            major_update=true
+          fi
+
+          gates_ok=true
+          for gate in NPM_CI FRONTEND_BUILD LINT TYPECHECK TESTS COVERAGE BUILD SYNTH; do
+            if [ "${!gate}" != "success" ]; then
+              gates_ok=false
+            fi
+          done
+
+          unresolved_high_critical=false
+          if [ "$critical" -gt 0 ] || [ "$high" -gt 0 ] || [ "$AUDIT_POLICY" != "success" ]; then
+            unresolved_high_critical=true
+          fi
+
+          recommendation="SAFE TO MERGE"
+          reason="All validation gates passed with no unresolved high/critical vulnerability findings."
+
+          if [ "$unresolved_high_critical" = true ]; then
+            recommendation="DO NOT MERGE"
+            reason="High/critical vulnerability findings remain unresolved."
+          elif [ "$gates_ok" != true ]; then
+            recommendation="DO NOT MERGE"
+            reason="One or more required quality gates failed (lint/typecheck/tests/coverage/build/synth)."
+          elif [ "$major_update" = true ]; then
+            recommendation="HUMAN REVIEW REQUIRED"
+            reason="Major dependency update detected; potential breaking-change risk requires human review."
+          elif [ "$SECURITY_RELATED" = "true" ]; then
+            recommendation="SAFE TO MERGE — SECURITY UPDATE"
+            reason="Security-related update with passing quality/security validation and no unresolved high/critical findings."
+          fi
+
+          {
+            echo "recommendation=${recommendation}"
+            echo "reason=${reason}"
+            echo "critical=${critical}"
+            echo "high=${high}"
+            echo "moderate=${moderate}"
+            echo "low=${low}"
+            echo "major_update=${major_update}"
+            echo "gates_ok=${gates_ok}"
+            echo "high_critical_details=${high_critical_details}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Post or update Dependabot review comment
+        if: ${{ always() }}
+        uses: actions/github-script@v7
+        env:
+          DEPENDENCY_NAMES: ${{ steps.metadata.outputs.dependency-names }}
+          PREVIOUS_VERSION: ${{ steps.metadata.outputs.previous-version }}
+          NEW_VERSION: ${{ steps.metadata.outputs.new-version }}
+          DEPENDENCY_TYPE: ${{ steps.metadata.outputs.dependency-type }}
+          UPDATE_TYPE: ${{ steps.metadata.outputs.update-type }}
+          ADVISORIES: ${{ steps.prctx.outputs.advisories }}
+          SECURITY_RELATED: ${{ steps.prctx.outputs.security_related }}
+          LOCKFILE_CHANGED: ${{ steps.prctx.outputs.lockfile_changed }}
+          CHANGED_FILES: ${{ steps.prctx.outputs.changed_files }}
+          NPM_CI: ${{ steps.npm_ci.outcome }}
+          FRONTEND_BUILD: ${{ steps.frontend_build.outcome }}
+          LINT: ${{ steps.lint.outcome }}
+          TYPECHECK: ${{ steps.typecheck.outcome }}
+          TESTS: ${{ steps.tests.outcome }}
+          COVERAGE: ${{ steps.coverage.outcome }}
+          BUILD: ${{ steps.build.outcome }}
+          SYNTH: ${{ steps.synth.outcome }}
+          AUDIT_POLICY: ${{ steps.audit_policy.outcome }}
+          RECOMMENDATION: ${{ steps.verdict.outputs.recommendation }}
+          REASON: ${{ steps.verdict.outputs.reason }}
+          CRITICAL: ${{ steps.verdict.outputs.critical }}
+          HIGH: ${{ steps.verdict.outputs.high }}
+          MODERATE: ${{ steps.verdict.outputs.moderate }}
+          LOW: ${{ steps.verdict.outputs.low }}
+          HIGH_CRITICAL_DETAILS: ${{ steps.verdict.outputs.high_critical_details }}
+          RELEASE_REFS: ${{ steps.depinfo.outputs.release_refs }}
+        with:
+          script: |
+            const marker = '<!-- dependabot-review-v1 -->';
+            const issueNumber = context.payload.pull_request.number;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            const formatOutcome = (value) => {
+              if (value === 'success') return 'PASS';
+              if (value === 'failure') return 'FAIL';
+              if (value === 'cancelled') return 'CANCELLED';
+              return 'SKIPPED';
+            };
+
+            const advisories = process.env.ADVISORIES && process.env.ADVISORIES.trim().length > 0
+              ? process.env.ADVISORIES
+              : 'None reported in PR metadata/body';
+
+            const securityLine = process.env.SECURITY_RELATED === 'true'
+              ? `Security-related update. Advisories: ${advisories}. Severity counts (critical/high/moderate/low): ${process.env.CRITICAL}/${process.env.HIGH}/${process.env.MODERATE}/${process.env.LOW}.`
+              : `No explicit security advisory detected in PR metadata/body. Severity counts (critical/high/moderate/low): ${process.env.CRITICAL}/${process.env.HIGH}/${process.env.MODERATE}/${process.env.LOW}.`;
+
+            const highCriticalDetails = process.env.HIGH_CRITICAL_DETAILS && process.env.HIGH_CRITICAL_DETAILS.trim().length > 0
+              ? `\nHigh/Critical findings: ${process.env.HIGH_CRITICAL_DETAILS}`
+              : '';
+
+            const body = [
+              marker,
+              '### Dependabot Review',
+              '',
+              `Dependency: ${process.env.DEPENDENCY_NAMES || 'Unknown'} (${process.env.DEPENDENCY_TYPE || 'Unknown'}, ${process.env.UPDATE_TYPE || 'Unknown'})`,
+              `Version: ${process.env.PREVIOUS_VERSION || 'Unknown'} -> ${process.env.NEW_VERSION || 'Unknown'}`,
+              `Security: ${securityLine}${highCriticalDetails}`,
+              `Breaking change risk: ${(process.env.UPDATE_TYPE || '').includes('semver-major') ? 'High (major update)' : 'Low/Medium (non-major update)'}`,
+              `Tests: ${formatOutcome(process.env.TESTS)}`,
+              `Coverage: ${formatOutcome(process.env.COVERAGE)}`,
+              `Build: ${formatOutcome(process.env.BUILD)} (frontend prebuild: ${formatOutcome(process.env.FRONTEND_BUILD)})`,
+              `CDK synth: ${formatOutcome(process.env.SYNTH)}`,
+              `Lockfile changes: ${process.env.LOCKFILE_CHANGED === 'true' ? 'Yes' : 'No'}`,
+              `Release notes/changelog refs: ${process.env.RELEASE_REFS || 'N/A'}`,
+              '',
+              `Recommendation: ${process.env.RECOMMENDATION || 'HUMAN REVIEW REQUIRED'}`,
+              '',
+              `Reason: ${process.env.REASON || 'No reason provided'}`,
+              '',
+              'Compatibility checks:',
+              '- Node.js/NPM: validated through npm ci + full quality gates on workflow runtime.',
+              `- TypeScript: ${formatOutcome(process.env.TYPECHECK)}`,
+              `- Vite/Vitest: ${formatOutcome(process.env.TESTS)} and ${formatOutcome(process.env.COVERAGE)}`,
+              `- AWS CDK/Lambda runtime: ${formatOutcome(process.env.SYNTH)}`,
+              '',
+              `Changed files (dependency PR): ${process.env.CHANGED_FILES || 'N/A'}`,
+            ].join('\n');
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner,
+              repo,
+              issue_number: issueNumber,
+              per_page: 100,
+            });
+
+            const existing = comments.find((c) => c.user?.type === 'Bot' && c.body?.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: issueNumber,
+                body,
+              });
+            }

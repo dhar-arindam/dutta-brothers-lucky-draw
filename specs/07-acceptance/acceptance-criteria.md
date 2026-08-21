@@ -6,10 +6,10 @@ Reason: Finalized UX redesign approval
 Backend impact: None  
 API impact: None  
 Owner: Principal Software Engineer  
-Version: 1.6  
-Last Updated: 2026-08-19
-Change: Admin UX refinement  
-Reason: Approved admin requirements update
+Version: 1.7  
+Last Updated: 2026-08-21
+Change: Infrastructure tagging requirement update  
+Reason: Ensure consistent AWS resource tagging for operations and governance
 
 These criteria define the Definition of Done for the initial product scope.
 
@@ -180,6 +180,7 @@ These criteria define the Definition of Done for the initial product scope.
 - [ ] No token header authentication, session, cookie-based auth, Cognito, OIDC, OAuth, SSO, JWT, or authentication bootstrap is introduced for V1 admin access.
 - [ ] No customer endpoint behavior or business-critical draw rule depends on client-side trust.
 - [ ] Lambda receives only the minimum scoped permissions required for runtime responsibilities.
+- [ ] All taggable AWS resources created by CDK include tags `project=lucky-draw` and `organization=dutta-brothers`.
 - [ ] CSV values beginning with `=`, `+`, `-`, or `@` are prefixed with a single apostrophe before normal CSV quoting.
 - [ ] No internal database identifiers or unnecessary personal information are exported.
 

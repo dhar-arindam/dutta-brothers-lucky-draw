@@ -2,10 +2,10 @@
 
 Status: APPROVED  
 Owner: Principal Software Engineer  
-Version: 1.3  
-Last Updated: 2026-08-19
-Change: Admin UX refinement  
-Reason: Approved admin requirements update
+Version: 1.4  
+Last Updated: 2026-08-21
+Change: Infrastructure tagging requirement update  
+Reason: Ensure consistent AWS resource tagging for operations and governance
 
 ## Technology
 
@@ -69,6 +69,7 @@ DynamoDB
 - CloudFront is the public frontend entry point.
 - API Gateway uses explicit CORS, throttling, and request limits.
 - IAM permissions follow least privilege.
+- All taggable AWS resources created by CDK must include tags `project=lucky-draw` and `organization=dutta-brothers`.
 - Customer PII is masked in admin responses and exports.
 - V1 has no authentication model for admin routes or admin APIs (no login/token header auth/cookie auth/session/Cognito/OIDC/OAuth/SSO/JWT/bootstrap).
 - Campaign dates use `Asia/Kolkata`; APIs use ISO 8601 UTC timestamps where time values are returned and the backend is authoritative for campaign-period enforcement.

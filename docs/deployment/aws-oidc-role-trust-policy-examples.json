@@ -1,5 +1,5 @@
 {
-  "stagingTrustPolicyExample": {
+  "GitHubActions-DuttaLuckyDraw-Staging": {
     "Version": "2012-10-17",
     "Statement": [
       {
@@ -14,20 +14,19 @@
           },
           "StringLike": {
             "token.actions.githubusercontent.com:sub": [
-              "repo:<OWNER>/<REPO>:environment:staging",
-              "repo:<OWNER>/<REPO>:ref:refs/heads/main"
+              "repo:dhar-arindam/dutta-brothers-lucky-draw:environment:staging"
             ],
             "token.actions.githubusercontent.com:job_workflow_ref": [
-              "<OWNER>/<REPO>/.github/workflows/deploy-staging.yml@refs/heads/main",
-              "<OWNER>/<REPO>/.github/workflows/deploy-production.yml@refs/heads/main",
-              "<OWNER>/<REPO>/.github/workflows/destroy-staging.yml@refs/heads/main"
+              "dhar-arindam/dutta-brothers-lucky-draw/.github/workflows/deploy-staging.yml@refs/heads/main",
+              "dhar-arindam/dutta-brothers-lucky-draw/.github/workflows/deploy-production.yml@refs/heads/main",
+              "dhar-arindam/dutta-brothers-lucky-draw/.github/workflows/destroy-staging.yml@refs/heads/main"
             ]
           }
         }
       }
     ]
   },
-  "productionTrustPolicyExample": {
+  "GitHubActions-DuttaLuckyDraw-Production": {
     "Version": "2012-10-17",
     "Statement": [
       {
@@ -42,10 +41,10 @@
           },
           "StringLike": {
             "token.actions.githubusercontent.com:sub": [
-              "repo:<OWNER>/<REPO>:environment:production"
+              "repo:dhar-arindam/dutta-brothers-lucky-draw:environment:production"
             ],
             "token.actions.githubusercontent.com:job_workflow_ref": [
-              "<OWNER>/<REPO>/.github/workflows/deploy-production.yml@refs/heads/main"
+              "dhar-arindam/dutta-brothers-lucky-draw/.github/workflows/deploy-production.yml@refs/heads/main"
             ]
           }
         }

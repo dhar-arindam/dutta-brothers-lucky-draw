@@ -8,6 +8,7 @@ import {
   RemovalPolicy,
   Stack,
   StackProps,
+  Tags,
   aws_apigatewayv2 as apigwv2,
   aws_apigateway as apigw,
   aws_cloudfront as cloudfront,
@@ -34,6 +35,9 @@ export interface FoundationStackProps extends StackProps {
 export class FoundationStack extends Stack {
   public constructor(scope: Construct, id: string, props?: FoundationStackProps) {
     super(scope, id, props);
+
+    Tags.of(this).add('project', 'lucky-draw');
+    Tags.of(this).add('organization', 'dutta-brothers');
 
     if (!props) {
       throw new Error('FoundationStackProps are required.');

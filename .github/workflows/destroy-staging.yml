@@ -19,7 +19,7 @@ permissions:
 
 jobs:
   destroy-staging:
-    if: ${{ github.event.inputs.confirm_destroy == 'DESTROY_STAGING' }}
+    if: ${{ github.event.inputs.confirm_destroy == 'DESTROY_STAGING' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     environment: staging
     steps:

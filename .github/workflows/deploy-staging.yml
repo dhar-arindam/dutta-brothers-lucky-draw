@@ -99,7 +99,7 @@ jobs:
         run: npm run cdk:diff:staging -- --context frontendOriginStaging=${{ steps.frontend-origin.outputs.origin }}
 
       - name: Deploy staging stack
-        run: npm run cdk:deploy:staging -- --context frontendOriginStaging=${{ steps.frontend-origin.outputs.origin }} --require-approval any-change
+        run: npm run cdk:deploy:staging -- --context frontendOriginStaging=${{ steps.frontend-origin.outputs.origin }} --require-approval never
 
       - name: Finalize CORS origin after bootstrap deploy
         if: steps.frontend-origin.outputs.bootstrap == 'true'
@@ -107,7 +107,7 @@ jobs:
         run: |
           set -euo pipefail
           REAL_DOMAIN="$(aws cloudformation describe-stacks --stack-name "${STAGING_STACK_NAME}" --query "Stacks[0].Outputs[?OutputKey=='CloudFrontDistributionDomainName'].OutputValue" --output text)"
-          npm run cdk:deploy:staging -- --context frontendOriginStaging="https://${REAL_DOMAIN}" --require-approval any-change
+          npm run cdk:deploy:staging -- --context frontendOriginStaging="https://${REAL_DOMAIN}" --require-approval never
 
       - name: Resolve staging endpoints
         id: outputs

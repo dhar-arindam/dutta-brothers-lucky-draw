@@ -39,10 +39,12 @@ const main = async () => {
     throw new Error('Campaign endpoint did not return SUCCESS status.');
   }
 
-  const apiProbe = await assertOk('API base route probe', `${apiBaseUrl.replace(/\/$/, '')}/api/admin/prizes`);
+  const apiProbe = await assertOk('API base route probe', `${apiBaseUrl.replace(/\/$/, '')}/api/admin/prizes`, {
+    headers: { Origin: frontendUrl },
+  });
   const corsOrigin = apiProbe.headers.get('access-control-allow-origin');
-  if (!corsOrigin) {
-    throw new Error('CORS header missing on production API probe.');
+  if (corsOrigin !== frontendUrl) {
+    throw new Error(`CORS header mismatch on production API probe: expected ${frontendUrl}, got ${corsOrigin}`);
   }
 
   console.log('Production smoke tests passed.');

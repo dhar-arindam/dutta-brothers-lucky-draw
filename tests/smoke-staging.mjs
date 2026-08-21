@@ -33,10 +33,12 @@ const main = async () => {
     throw new Error('Campaign endpoint did not return SUCCESS status.');
   }
 
-  const prizesResponse = await assertOk('Admin prizes endpoint', `${apiBaseUrl.replace(/\/$/, '')}/api/admin/prizes`);
+  const prizesResponse = await assertOk('Admin prizes endpoint', `${apiBaseUrl.replace(/\/$/, '')}/api/admin/prizes`, {
+    headers: { Origin: frontendUrl },
+  });
   const corsOrigin = prizesResponse.headers.get('access-control-allow-origin');
-  if (!corsOrigin) {
-    throw new Error('CORS header missing on admin prizes response.');
+  if (corsOrigin !== frontendUrl) {
+    throw new Error(`CORS header mismatch on admin prizes response: expected ${frontendUrl}, got ${corsOrigin}`);
   }
 
   console.log('Staging smoke tests passed.');

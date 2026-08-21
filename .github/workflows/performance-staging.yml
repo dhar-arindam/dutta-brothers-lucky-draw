@@ -1,0 +1,113 @@
+name: performance-staging
+
+on:
+  workflow_dispatch:
+    inputs:
+      scenario:
+        description: "Performance scenario to run"
+        required: true
+        type: choice
+        default: sequential-20
+        options:
+          - sequential-20
+          - load-500
+          - randomness-5000
+          - concurrency
+          - all
+      confirm:
+        description: "Type RUN_PERFORMANCE_TEST to confirm this targets live staging"
+        required: true
+        type: string
+
+env:
+  AWS_REGION: ap-south-1
+  AWS_ACCOUNT_ID: "176515272004"
+  STAGING_STACK_NAME: DuttaDrawFoundationStackStaging
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: performance-staging
+  cancel-in-progress: false
+
+jobs:
+  invalid-confirmation:
+    if: ${{ github.event.inputs.confirm != 'RUN_PERFORMANCE_TEST' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail due to missing explicit confirmation
+        run: |
+          echo "Explicit confirmation missing. Provide RUN_PERFORMANCE_TEST."
+          exit 1
+
+  performance-test:
+    if: ${{ github.event.inputs.confirm == 'RUN_PERFORMANCE_TEST' }}
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Configure AWS credentials (OIDC staging role)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN_STAGING }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Verify AWS account and region
+        shell: bash
+        run: |
+          set -euo pipefail
+          ACTUAL_ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
+          if [ "$ACTUAL_ACCOUNT_ID" != "${AWS_ACCOUNT_ID}" ]; then
+            echo "Unexpected AWS account: $ACTUAL_ACCOUNT_ID"
+            exit 1
+          fi
+          # AWS_REGION is fixed by the workflow env block, so it can't reveal a credentials-step failure;
+          # AWS_DEFAULT_REGION is only ever set by the configure-aws-credentials step, making it the real signal
+          if [ -z "${AWS_DEFAULT_REGION:-}" ]; then
+            echo "AWS_DEFAULT_REGION was not set by the credentials step"
+            exit 1
+          fi
+          if [ "${AWS_DEFAULT_REGION}" != "${AWS_REGION}" ]; then
+            echo "Unexpected AWS region: ${AWS_DEFAULT_REGION}"
+            exit 1
+          fi
+
+      - name: Resolve staging target from the live staging stack only
+        id: resolve-target
+        shell: bash
+        run: |
+          set -euo pipefail
+          FRONTEND_DOMAIN="$(aws cloudformation describe-stacks --stack-name "${STAGING_STACK_NAME}" --query "Stacks[0].Outputs[?OutputKey=='CloudFrontDistributionDomainName'].OutputValue" --output text)"
+          API_BASE_URL="$(aws cloudformation describe-stacks --stack-name "${STAGING_STACK_NAME}" --query "Stacks[0].Outputs[?OutputKey=='ApiBaseUrl'].OutputValue" --output text)"
+          echo "frontend_url=https://${FRONTEND_DOMAIN}" >> "$GITHUB_OUTPUT"
+          echo "api_base_url=${API_BASE_URL}" >> "$GITHUB_OUTPUT"
+          echo "Resolved staging target: https://${FRONTEND_DOMAIN} / ${API_BASE_URL}"
+
+      - name: Run performance scenario
+        env:
+          PERFORMANCE_TARGET_STACK_NAME: ${{ env.STAGING_STACK_NAME }}
+          PERFORMANCE_TARGET_API_BASE_URL: ${{ steps.resolve-target.outputs.api_base_url }}
+          PERFORMANCE_TARGET_FRONTEND_URL: ${{ steps.resolve-target.outputs.frontend_url }}
+          PERFORMANCE_CONFIRM: ${{ github.event.inputs.confirm }}
+        run: node tests/performance/run.mjs "${{ github.event.inputs.scenario }}"
+
+      - name: Upload performance report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-report-${{ github.event.inputs.scenario }}-${{ github.run_id }}
+          path: tests/performance/results/
+          if-no-files-found: warn

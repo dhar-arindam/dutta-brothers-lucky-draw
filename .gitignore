@@ -11,3 +11,4 @@ out/
 !.env.example
 .DS_Store
 .vscode/*.local.json
+tests/performance/results/

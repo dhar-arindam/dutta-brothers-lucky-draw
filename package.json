@@ -29,7 +29,13 @@
     "cdk:deploy:prod": "npm run deploy --workspace infrastructure -- --context stage=prod DuttaDrawFoundationStackProd",
     "cdk:destroy:staging": "npm run destroy --workspace infrastructure -- --context stage=staging DuttaDrawFoundationStackStaging",
     "smoke:staging": "node tests/smoke-staging.mjs",
-    "smoke:production": "node tests/smoke-production.mjs"
+    "smoke:production": "node tests/smoke-production.mjs",
+    "perf:sequential-20": "node tests/performance/run.mjs sequential-20",
+    "perf:load-500": "node tests/performance/run.mjs load-500",
+    "perf:randomness-5000": "node tests/performance/run.mjs randomness-5000",
+    "perf:concurrency": "node tests/performance/run.mjs concurrency",
+    "perf:all": "node tests/performance/run.mjs all",
+    "perf:dry-run": "node tests/performance/run.mjs all --dry-run"
   },
   "devDependencies": {
     "prettier": "^3.6.2",

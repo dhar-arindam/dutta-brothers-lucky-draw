@@ -1181,7 +1181,7 @@ export const AdminPrizePage = () => {
               </select>
             </div>
 
-            <div className="grid gap-2 sm:col-span-2 sm:grid-cols-3 lg:col-span-5 lg:w-full">
+            <div className="grid gap-2 sm:col-span-2 sm:grid-cols-3 lg:col-span-5 lg:w-full lg:grid-cols-4">
               <button
                 type="submit"
                 className={primaryButtonClass}

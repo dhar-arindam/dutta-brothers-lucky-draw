@@ -1,5 +1,5 @@
-import { GetCommand, QueryCommand, TransactWriteCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
-import { describe, expect, it } from 'vitest';
+import { BatchWriteCommand, GetCommand, QueryCommand, TransactWriteCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { describe, expect, it, vi } from 'vitest';
 
 import { DynamoDbDrawStore } from './durable-dynamodb-store.js';
 
@@ -19,6 +19,80 @@ class FakeDocClient {
     }
 
     return next();
+  }
+}
+
+const makeTransactionCanceledException = (reasonCodes: Array<string | undefined>): Error => {
+  const error = new Error('Transaction cancelled');
+  Object.assign(error, {
+    name: 'TransactionCanceledException',
+    CancellationReasons: reasonCodes.map((code) => (code ? { Code: code } : { Code: 'None' })),
+  });
+  return error;
+};
+
+interface StoredEntity {
+  pk: string;
+  sk: string;
+  [key: string]: unknown;
+}
+
+// Simulates real DynamoDB behaviour needed to exercise genuine concurrency:
+// - the SEQ counter is a plain atomic ADD (never conflicts, matching real DynamoDB UpdateItem semantics)
+// - BILL/CLAIM puts enforce uniqueness (ConditionalCheckFailed -> DUPLICATE)
+// - all successful claims briefly hold a single shared "AGG lock" (mirroring contention on the
+//   shared AGG/TOTAL, AGG/DATE#, AGG/PRIZE# items), so concurrent unique claims genuinely race
+//   and some must be classified TRANSIENT and retried, exactly like the real defect being fixed.
+class ConcurrencySimulatingDocClient {
+  private aggLocked = false;
+  private sequence = 0;
+  private readonly billItems = new Map<string, StoredEntity>();
+  private readonly claimItems = new Map<string, StoredEntity>();
+  public transactWriteAttempts = 0;
+
+  public async send(command: unknown): Promise<unknown> {
+    if (command instanceof UpdateCommand && (command.input.Key as { pk?: string })?.pk === 'SEQ') {
+      this.sequence += 1;
+      return { Attributes: { value: this.sequence } };
+    }
+
+    if (command instanceof GetCommand) {
+      const key = command.input.Key as { pk: string; sk: string };
+      if (key.pk === 'BILL') {
+        return { Item: this.billItems.get(key.sk) };
+      }
+      if (key.pk === 'CLAIM') {
+        return { Item: this.claimItems.get(key.sk) };
+      }
+      return {};
+    }
+
+    if (command instanceof TransactWriteCommand) {
+      this.transactWriteAttempts += 1;
+      const items = command.input.TransactItems as unknown as Array<{ Put?: { Item: StoredEntity } }>;
+      const billItem = items[0]?.Put?.Item;
+      const claimItem = items[1]?.Put?.Item;
+      if (!billItem || !claimItem) {
+        throw new Error('Unexpected transaction shape in test fake.');
+      }
+
+      if (this.billItems.has(billItem.sk) || this.claimItems.has(claimItem.sk)) {
+        throw makeTransactionCanceledException(['ConditionalCheckFailed', 'None', 'None', 'None', 'None']);
+      }
+
+      if (this.aggLocked) {
+        throw makeTransactionCanceledException(['None', 'None', 'TransactionConflict', 'None', 'None']);
+      }
+
+      this.aggLocked = true;
+      await new Promise((resolve) => setTimeout(resolve, 1));
+      this.billItems.set(billItem.sk, billItem);
+      this.claimItems.set(claimItem.sk, claimItem);
+      this.aggLocked = false;
+      return {};
+    }
+
+    return {};
   }
 }
 
@@ -64,7 +138,7 @@ describe('dynamo db draw store persistence', () => {
     const fake = new FakeDocClient();
     fake.enqueue(async () => ({ Attributes: { value: 2 } }));
     fake.enqueue(async () => {
-      throw new Error('Conditional check failed');
+      throw makeTransactionCanceledException(['ConditionalCheckFailed', 'None', 'None', 'None', 'None']);
     });
     fake.enqueue(async () => ({ Item: { pk: 'BILL', sk: 'DB12345', claimId: 'DB26-000001' } }));
     fake.enqueue(async () => ({
@@ -118,6 +192,87 @@ describe('dynamo db draw store persistence', () => {
     expect(result.claim.claimId).toBe('DB26-000001');
     expect(fake.calls[2]).toBeInstanceOf(GetCommand);
     expect(fake.calls[3]).toBeInstanceOf(GetCommand);
+  });
+
+  it('deletes a claim and decrements aggregates via transaction', async () => {
+    const fake = new FakeDocClient();
+    fake.enqueue(async () => ({
+      Item: {
+        pk: 'CLAIM',
+        sk: 'DB26-000001',
+        entityType: 'CLAIM',
+        claimId: 'DB26-000001',
+        claimTimestamp: '2026-08-16T10:30:00.000Z',
+        customerName: 'Arindam Roy',
+        phone: '9876543210',
+        billNumberDisplay: 'DB12345',
+        billNumberNormalized: 'DB12345',
+        prize: {
+          id: 'prize-001',
+          name: 'Electric Kettle',
+          displayName: 'Electric Kettle',
+        },
+        gsi1pk: 'CLAIM',
+        gsi1sk: '2026-08-16T10:30:00.000Z#DB26-000001',
+      },
+    }));
+    fake.enqueue(async () => ({}));
+
+    const store = new DynamoDbDrawStore(fake as never, {
+      tableName: 'draws-table',
+      now: () => new Date('2026-08-16T10:30:00.000Z'),
+    });
+
+    const result = await store.deleteClaim('DB26-000001');
+
+    expect(result.type).toBe('SUCCESS');
+    expect(fake.calls[0]).toBeInstanceOf(GetCommand);
+    expect(fake.calls[1]).toBeInstanceOf(TransactWriteCommand);
+  });
+
+  it('returns NOT_FOUND when deleting a claim that does not exist', async () => {
+    const fake = new FakeDocClient();
+    fake.enqueue(async () => ({}));
+
+    const store = new DynamoDbDrawStore(fake as never, {
+      tableName: 'draws-table',
+      now: () => new Date('2026-08-16T10:30:00.000Z'),
+    });
+
+    const result = await store.deleteClaim('DB26-999999');
+
+    expect(result.type).toBe('NOT_FOUND');
+  });
+
+  it('clears all claims by deleting claim, bill, and aggregate keys', async () => {
+    const fake = new FakeDocClient();
+    fake.enqueue(async () => ({
+      Items: [
+        { pk: 'CLAIM', sk: 'DB26-000001' },
+        { pk: 'CLAIM', sk: 'DB26-000002' },
+      ],
+    }));
+    fake.enqueue(async () => ({
+      Items: [{ pk: 'BILL', sk: 'DB12345' }],
+    }));
+    fake.enqueue(async () => ({
+      Items: [{ pk: 'AGG', sk: 'TOTAL' }],
+    }));
+    fake.enqueue(async () => ({}));
+
+    const store = new DynamoDbDrawStore(fake as never, {
+      tableName: 'draws-table',
+      now: () => new Date('2026-08-16T10:30:00.000Z'),
+    });
+
+    const deletedCount = await store.clearAllClaims();
+
+    expect(deletedCount).toBe(2);
+    expect(fake.calls).toHaveLength(4);
+    expect(fake.calls[0]).toBeInstanceOf(QueryCommand);
+    expect(fake.calls[1]).toBeInstanceOf(QueryCommand);
+    expect(fake.calls[2]).toBeInstanceOf(QueryCommand);
+    expect(fake.calls[3]).toBeInstanceOf(BatchWriteCommand);
   });
 
   it('builds summary from aggregate records', async () => {
@@ -289,7 +444,7 @@ describe('dynamo db draw store persistence', () => {
     const fake = new FakeDocClient();
     fake.enqueue(async () => ({ Attributes: { value: 11 } }));
     fake.enqueue(async () => {
-      throw new Error('Conditional check failed');
+      throw makeTransactionCanceledException(['ConditionalCheckFailed', 'None', 'None', 'None', 'None']);
     });
     fake.enqueue(async () => ({ Item: undefined }));
 
@@ -484,5 +639,324 @@ describe('dynamo db draw store persistence', () => {
       active: 'yes' as never,
     });
     expect(invalidActive.type).toBe('VALIDATION_ERROR');
+  });
+});
+
+describe('dynamo db draw store transient transaction contention retry', () => {
+  const baseClaim = {
+    claimId: '',
+    claimTimestamp: '2026-08-16T10:30:00.000Z',
+    customerName: 'Arindam Roy',
+    phone: '9876543210',
+    billNumberDisplay: 'DB12345',
+    billNumberNormalized: 'DB12345',
+    prize: { id: 'prize-001', name: 'Electric Kettle', displayName: 'Electric Kettle' },
+  };
+
+  it('succeeds on the first attempt without retrying when there is no contention', async () => {
+    const fake = new FakeDocClient();
+    fake.enqueue(async () => ({ Attributes: { value: 1 } }));
+    fake.enqueue(async () => ({}));
+
+    const sleep = vi.fn(async () => {});
+    const store = new DynamoDbDrawStore(fake as never, {
+      tableName: 'draws-table',
+      now: () => new Date('2026-08-16T10:30:00.000Z'),
+      sleep,
+    });
+
+    const result = await store.createClaimAndUpdateAggregatesAtomic({ now: new Date('2026-08-16T10:30:00.000Z'), claim: baseClaim });
+
+    expect(result.type).toBe('CREATED');
+    expect(sleep).not.toHaveBeenCalled();
+    expect(fake.calls.filter((call) => call instanceof TransactWriteCommand)).toHaveLength(1);
+  });
+
+  it('retries once after a single TransactionConflict and then succeeds', async () => {
+    const fake = new FakeDocClient();
+    fake.enqueue(async () => ({ Attributes: { value: 1 } }));
+    fake.enqueue(async () => {
+      throw makeTransactionCanceledException(['None', 'None', 'TransactionConflict', 'None', 'None']);
+    });
+    fake.enqueue(async () => ({}));
+
+    const sleep = vi.fn(async () => {});
+    const store = new DynamoDbDrawStore(fake as never, {
+      tableName: 'draws-table',
+      now: () => new Date('2026-08-16T10:30:00.000Z'),
+      sleep,
+      random: () => 0.5,
+    });
+
+    const result = await store.createClaimAndUpdateAggregatesAtomic({ now: new Date('2026-08-16T10:30:00.000Z'), claim: baseClaim });
+
+    expect(result.type).toBe('CREATED');
+    expect(sleep).toHaveBeenCalledTimes(1);
+    expect(fake.calls.filter((call) => call instanceof TransactWriteCommand)).toHaveLength(2);
+  });
+
+  it('retries multiple times through repeated transient failures before succeeding', async () => {
+    const fake = new FakeDocClient();
+    fake.enqueue(async () => ({ Attributes: { value: 1 } }));
+    fake.enqueue(async () => {
+      throw makeTransactionCanceledException(['None', 'None', 'TransactionConflict', 'None', 'None']);
+    });
+    fake.enqueue(async () => {
+      throw makeTransactionCanceledException(['None', 'None', 'None', 'ProvisionedThroughputExceeded', 'None']);
+    });
+    fake.enqueue(async () => {
+      throw makeTransactionCanceledException(['None', 'None', 'None', 'None', 'ThrottlingError']);
+    });
+    fake.enqueue(async () => ({}));
+
+    const sleep = vi.fn(async () => {});
+    const store = new DynamoDbDrawStore(fake as never, {
+      tableName: 'draws-table',
+      now: () => new Date('2026-08-16T10:30:00.000Z'),
+      sleep,
+      random: () => 0.5,
+      maxTransactionAttempts: 4,
+    });
+
+    const result = await store.createClaimAndUpdateAggregatesAtomic({ now: new Date('2026-08-16T10:30:00.000Z'), claim: baseClaim });
+
+    expect(result.type).toBe('CREATED');
+    expect(sleep).toHaveBeenCalledTimes(3);
+    expect(fake.calls.filter((call) => call instanceof TransactWriteCommand)).toHaveLength(4);
+  });
+
+  it('exhausts retries and throws after repeated transient contention beyond the max attempts', async () => {
+    const fake = new FakeDocClient();
+    fake.enqueue(async () => ({ Attributes: { value: 1 } }));
+    fake.enqueue(async () => {
+      throw makeTransactionCanceledException(['None', 'None', 'TransactionConflict', 'None', 'None']);
+    });
+    fake.enqueue(async () => {
+      throw makeTransactionCanceledException(['None', 'None', 'TransactionConflict', 'None', 'None']);
+    });
+    fake.enqueue(async () => {
+      throw makeTransactionCanceledException(['None', 'None', 'TransactionConflict', 'None', 'None']);
+    });
+
+    const sleep = vi.fn(async () => {});
+    const store = new DynamoDbDrawStore(fake as never, {
+      tableName: 'draws-table',
+      now: () => new Date('2026-08-16T10:30:00.000Z'),
+      sleep,
+      random: () => 0.5,
+      maxTransactionAttempts: 3,
+    });
+
+    await expect(
+      store.createClaimAndUpdateAggregatesAtomic({ now: new Date('2026-08-16T10:30:00.000Z'), claim: baseClaim }),
+    ).rejects.toThrow();
+
+    // Exactly maxTransactionAttempts sends, and retries only between attempts (maxAttempts - 1 sleeps).
+    expect(fake.calls.filter((call) => call instanceof TransactWriteCommand)).toHaveLength(3);
+    expect(sleep).toHaveBeenCalledTimes(2);
+  });
+
+  it('detects a genuine duplicate bill via ConditionalCheckFailed and returns EXISTS without retrying', async () => {
+    const fake = new FakeDocClient();
+    fake.enqueue(async () => ({ Attributes: { value: 1 } }));
+    fake.enqueue(async () => {
+      throw makeTransactionCanceledException(['ConditionalCheckFailed', 'None', 'None', 'None', 'None']);
+    });
+    fake.enqueue(async () => ({ Item: { pk: 'BILL', sk: 'DB12345', claimId: 'DB26-000001' } }));
+    fake.enqueue(async () => ({
+      Item: {
+        pk: 'CLAIM',
+        sk: 'DB26-000001',
+        entityType: 'CLAIM',
+        claimId: 'DB26-000001',
+        claimTimestamp: '2026-08-16T10:30:00.000Z',
+        customerName: 'Arindam Roy',
+        phone: '9876543210',
+        billNumberDisplay: 'DB12345',
+        billNumberNormalized: 'DB12345',
+        prize: { id: 'prize-001', name: 'Electric Kettle', displayName: 'Electric Kettle' },
+      },
+    }));
+
+    const sleep = vi.fn(async () => {});
+    const store = new DynamoDbDrawStore(fake as never, {
+      tableName: 'draws-table',
+      now: () => new Date('2026-08-16T10:30:00.000Z'),
+      sleep,
+    });
+
+    const result = await store.createClaimAndUpdateAggregatesAtomic({ now: new Date('2026-08-16T10:30:00.000Z'), claim: baseClaim });
+
+    expect(result.type).toBe('EXISTS');
+    expect(sleep).not.toHaveBeenCalled();
+    expect(fake.calls.filter((call) => call instanceof TransactWriteCommand)).toHaveLength(1);
+  });
+
+  it('does not mistake a duplicate bill for transient contention even when maxTransactionAttempts > 1', async () => {
+    const fake = new FakeDocClient();
+    fake.enqueue(async () => ({ Attributes: { value: 1 } }));
+    fake.enqueue(async () => {
+      throw makeTransactionCanceledException(['ConditionalCheckFailed', 'None', 'None', 'None', 'None']);
+    });
+    fake.enqueue(async () => ({ Item: { pk: 'BILL', sk: 'DB12345', claimId: 'DB26-000001' } }));
+    fake.enqueue(async () => ({
+      Item: {
+        pk: 'CLAIM',
+        sk: 'DB26-000001',
+        entityType: 'CLAIM',
+        claimId: 'DB26-000001',
+        claimTimestamp: '2026-08-16T10:30:00.000Z',
+        customerName: 'Arindam Roy',
+        phone: '9876543210',
+        billNumberDisplay: 'DB12345',
+        billNumberNormalized: 'DB12345',
+        prize: { id: 'prize-001', name: 'Electric Kettle', displayName: 'Electric Kettle' },
+      },
+    }));
+
+    const sleep = vi.fn(async () => {});
+    const store = new DynamoDbDrawStore(fake as never, {
+      tableName: 'draws-table',
+      now: () => new Date('2026-08-16T10:30:00.000Z'),
+      sleep,
+      maxTransactionAttempts: 5,
+    });
+
+    await store.createClaimAndUpdateAggregatesAtomic({ now: new Date('2026-08-16T10:30:00.000Z'), claim: baseClaim });
+
+    // Only one TransactWriteCommand was ever sent -- duplicate detection short-circuits immediately, never retries.
+    expect(fake.calls.filter((call) => call instanceof TransactWriteCommand)).toHaveLength(1);
+    expect(sleep).not.toHaveBeenCalled();
+  });
+
+  it('throws immediately on an unexpected permanent DynamoDB error without retrying', async () => {
+    const fake = new FakeDocClient();
+    fake.enqueue(async () => ({ Attributes: { value: 1 } }));
+    fake.enqueue(async () => {
+      throw new Error('AccessDeniedException: user is not authorized');
+    });
+
+    const sleep = vi.fn(async () => {});
+    const store = new DynamoDbDrawStore(fake as never, {
+      tableName: 'draws-table',
+      now: () => new Date('2026-08-16T10:30:00.000Z'),
+      sleep,
+      maxTransactionAttempts: 5,
+    });
+
+    await expect(
+      store.createClaimAndUpdateAggregatesAtomic({ now: new Date('2026-08-16T10:30:00.000Z'), claim: baseClaim }),
+    ).rejects.toThrow('AccessDeniedException');
+
+    expect(fake.calls.filter((call) => call instanceof TransactWriteCommand)).toHaveLength(1);
+    expect(sleep).not.toHaveBeenCalled();
+  });
+
+  it('logs safe diagnostic information without leaking customer PII on retry', async () => {
+    const fake = new FakeDocClient();
+    fake.enqueue(async () => ({ Attributes: { value: 1 } }));
+    fake.enqueue(async () => {
+      throw makeTransactionCanceledException(['None', 'None', 'TransactionConflict', 'None', 'None']);
+    });
+    fake.enqueue(async () => ({}));
+
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const store = new DynamoDbDrawStore(fake as never, {
+      tableName: 'draws-table',
+      now: () => new Date('2026-08-16T10:30:00.000Z'),
+      sleep: async () => {},
+      random: () => 0.5,
+    });
+
+    await store.createClaimAndUpdateAggregatesAtomic({
+      now: new Date('2026-08-16T10:30:00.000Z'),
+      claim: baseClaim,
+      correlationId: 'req-123',
+    });
+
+    const loggedPayloads = logSpy.mock.calls.map((call) => String(call[0]));
+    expect(loggedPayloads.some((payload) => payload.includes('TRANSIENT_CONTENTION_RETRY'))).toBe(true);
+    expect(loggedPayloads.some((payload) => payload.includes('req-123'))).toBe(true);
+    for (const payload of loggedPayloads) {
+      expect(payload).not.toContain(baseClaim.phone);
+      expect(payload).not.toContain(baseClaim.customerName);
+    }
+
+    logSpy.mockRestore();
+  });
+});
+
+describe('dynamo db draw store concurrency (10 unique participants, real interleaving)', () => {
+  it('accepts all 10 concurrent unique claims with 0 contention-caused failures', async () => {
+    const fake = new ConcurrencySimulatingDocClient();
+    const store = new DynamoDbDrawStore(fake as never, {
+      tableName: 'draws-table',
+      now: () => new Date('2026-08-21T10:00:00.000Z'),
+      retryBaseDelayMs: 2,
+      retryMaxDelayMs: 20,
+      random: () => 0.5,
+      maxTransactionAttempts: 100,
+    });
+
+    const results = await Promise.all(
+      Array.from({ length: 10 }, (_unused, index) =>
+        store.createClaimAndUpdateAggregatesAtomic({
+          now: new Date('2026-08-21T10:00:00.000Z'),
+          claim: {
+            claimId: '',
+            claimTimestamp: '2026-08-21T10:00:00.000Z',
+            customerName: `Perf Test User ${index}`,
+            phone: `9000000${String(index).padStart(3, '0')}`,
+            billNumberDisplay: `CONC-${index}`,
+            billNumberNormalized: `CONC-${index}`,
+            prize: { id: 'prize-001', name: 'Electric Kettle', displayName: 'Electric Kettle' },
+          },
+        }),
+      ),
+    );
+
+    const created = results.filter((result) => result.type === 'CREATED');
+    expect(created).toHaveLength(10);
+
+    const uniqueClaimIds = new Set(created.map((result) => (result.type === 'CREATED' ? result.claim.claimId : '')));
+    expect(uniqueClaimIds.size).toBe(10);
+
+    expect(fake.transactWriteAttempts).toBeGreaterThanOrEqual(10);
+  });
+
+  it('accepts exactly one claim when 10 concurrent requests use the SAME bill number', async () => {
+    const fake = new ConcurrencySimulatingDocClient();
+    const store = new DynamoDbDrawStore(fake as never, {
+      tableName: 'draws-table',
+      now: () => new Date('2026-08-21T10:00:00.000Z'),
+      retryBaseDelayMs: 2,
+      retryMaxDelayMs: 20,
+      random: () => 0.5,
+      maxTransactionAttempts: 100,
+    });
+
+    const sameClaimInput = {
+      claimId: '',
+      claimTimestamp: '2026-08-21T10:00:00.000Z',
+      customerName: 'Same Participant',
+      phone: '9000000999',
+      billNumberDisplay: 'DUP-BILL',
+      billNumberNormalized: 'DUP-BILL',
+      prize: { id: 'prize-001', name: 'Electric Kettle', displayName: 'Electric Kettle' },
+    };
+
+    const results = await Promise.all(
+      Array.from({ length: 10 }, () =>
+        store.createClaimAndUpdateAggregatesAtomic({ now: new Date('2026-08-21T10:00:00.000Z'), claim: sameClaimInput }),
+      ),
+    );
+
+    const created = results.filter((result) => result.type === 'CREATED');
+    const exists = results.filter((result) => result.type === 'EXISTS');
+    expect(created).toHaveLength(1);
+    expect(exists).toHaveLength(9);
+
+    const uniqueClaimIds = new Set(results.map((result) => result.claim.claimId));
+    expect(uniqueClaimIds.size).toBe(1);
   });
 });

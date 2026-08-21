@@ -69,7 +69,12 @@ describe('aws integration semantics', () => {
     const fake = new FakeDocClient();
     fake.enqueue(async () => ({ Attributes: { value: 2 } }));
     fake.enqueue(async () => {
-      throw new Error('Conditional check failed');
+      const error = new Error('Transaction cancelled');
+      Object.assign(error, {
+        name: 'TransactionCanceledException',
+        CancellationReasons: [{ Code: 'ConditionalCheckFailed' }, { Code: 'None' }, { Code: 'None' }, { Code: 'None' }, { Code: 'None' }],
+      });
+      throw error;
     });
     fake.enqueue(async () => ({ Item: { pk: 'BILL', sk: 'DB12345', claimId: 'DB26-000001' } }));
     fake.enqueue(async () => ({

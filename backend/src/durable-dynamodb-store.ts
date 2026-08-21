@@ -1,4 +1,5 @@
 import {
+  BatchWriteCommand,
   GetCommand,
   PutCommand,
   QueryCommand,
@@ -9,6 +10,7 @@ import {
 import { campaignDateInKolkata, isCampaignActive } from './campaign.js';
 import type { AdminClaimItem, AdminSummaryDistributionItem } from './contracts.js';
 import type { Claim, ConfiguredPrize, Prize } from './domain.js';
+import { classifyTransactionCancellation, computeBackoffDelayMs } from './dynamodb-retry.js';
 import type {
   AddPrizeInput,
   AdminCsvClaimItem,
@@ -38,7 +40,23 @@ interface DynamoLikeClient {
 interface DurableStoreOptions {
   tableName: string;
   now?: () => Date;
+  // Transient DynamoDB transaction-contention retry tuning (all optional, sensible defaults below).
+  maxTransactionAttempts?: number;
+  retryBaseDelayMs?: number;
+  retryMaxDelayMs?: number;
+  random?: () => number;
+  sleep?: (ms: number) => Promise<void>;
 }
+
+const DEFAULT_MAX_TRANSACTION_ATTEMPTS = 4;
+const DEFAULT_RETRY_BASE_DELAY_MS = 25;
+const DEFAULT_RETRY_MAX_DELAY_MS = 400;
+
+// Safe structured log line for transaction diagnostics. Never includes customer
+// name, phone, or bill number -- only operation metadata and error classification.
+const logTransactionOutcome = (event: Record<string, unknown>): void => {
+  console.log(JSON.stringify({ operation: 'createClaimAndUpdateAggregatesAtomic', ...event }));
+};
 
 const DEFAULT_CAMPAIGN: CampaignConfig = {
   id: 'festive-2026',
@@ -113,11 +131,21 @@ export class DynamoDbDrawStore {
   private readonly tableName: string;
   private readonly docClient: DynamoLikeClient;
   private readonly nowProvider: () => Date;
+  private readonly maxTransactionAttempts: number;
+  private readonly retryBaseDelayMs: number;
+  private readonly retryMaxDelayMs: number;
+  private readonly random: () => number;
+  private readonly sleep: (ms: number) => Promise<void>;
 
   public constructor(docClient: DynamoLikeClient, options: DurableStoreOptions) {
     this.docClient = docClient;
     this.tableName = options.tableName;
     this.nowProvider = options.now ?? (() => new Date());
+    this.maxTransactionAttempts = options.maxTransactionAttempts ?? DEFAULT_MAX_TRANSACTION_ATTEMPTS;
+    this.retryBaseDelayMs = options.retryBaseDelayMs ?? DEFAULT_RETRY_BASE_DELAY_MS;
+    this.retryMaxDelayMs = options.retryMaxDelayMs ?? DEFAULT_RETRY_MAX_DELAY_MS;
+    this.random = options.random ?? Math.random;
+    this.sleep = options.sleep ?? ((ms: number) => new Promise((resolve) => setTimeout(resolve, ms)));
   }
 
   public async createClaimAndUpdateAggregatesAtomic(
@@ -159,110 +187,167 @@ export class DynamoDbDrawStore {
       gsi1sk: `${claim.claimTimestamp}#${claim.claimId}`,
     };
 
-    try {
-      await this.docClient.send(
-        new TransactWriteCommand({
-          TransactItems: [
-            {
-              Put: {
-                TableName: this.tableName,
-                Item: billEntity,
-                ConditionExpression: 'attribute_not_exists(pk) AND attribute_not_exists(sk)',
-              },
+    const transactWriteCommand = new TransactWriteCommand({
+      TransactItems: [
+        {
+          Put: {
+            TableName: this.tableName,
+            Item: billEntity,
+            ConditionExpression: 'attribute_not_exists(pk) AND attribute_not_exists(sk)',
+          },
+        },
+        {
+          Put: {
+            TableName: this.tableName,
+            Item: claimEntity,
+            ConditionExpression: 'attribute_not_exists(pk) AND attribute_not_exists(sk)',
+          },
+        },
+        {
+          Update: {
+            TableName: this.tableName,
+            Key: {
+              pk: 'AGG',
+              sk: 'TOTAL',
             },
-            {
-              Put: {
-                TableName: this.tableName,
-                Item: claimEntity,
-                ConditionExpression: 'attribute_not_exists(pk) AND attribute_not_exists(sk)',
-              },
+            UpdateExpression:
+              'SET #entityType = :aggType, #updatedAt = :updatedAt ADD #successfulSpins :one',
+            ExpressionAttributeNames: {
+              '#entityType': 'entityType',
+              '#updatedAt': 'updatedAt',
+              '#successfulSpins': 'successfulSpins',
             },
-            {
-              Update: {
-                TableName: this.tableName,
-                Key: {
-                  pk: 'AGG',
-                  sk: 'TOTAL',
-                },
-                UpdateExpression:
-                  'SET #entityType = :aggType, #updatedAt = :updatedAt ADD #successfulSpins :one',
-                ExpressionAttributeNames: {
-                  '#entityType': 'entityType',
-                  '#updatedAt': 'updatedAt',
-                  '#successfulSpins': 'successfulSpins',
-                },
-                ExpressionAttributeValues: {
-                  ':aggType': 'AGG',
-                  ':updatedAt': timestamp,
-                  ':one': 1,
-                },
-              },
+            ExpressionAttributeValues: {
+              ':aggType': 'AGG',
+              ':updatedAt': timestamp,
+              ':one': 1,
             },
-            {
-              Update: {
-                TableName: this.tableName,
-                Key: {
-                  pk: 'AGG',
-                  sk: `DATE#${dateKey}`,
-                },
-                UpdateExpression:
-                  'SET #entityType = :aggType, #updatedAt = :updatedAt ADD #successfulSpins :one',
-                ExpressionAttributeNames: {
-                  '#entityType': 'entityType',
-                  '#updatedAt': 'updatedAt',
-                  '#successfulSpins': 'successfulSpins',
-                },
-                ExpressionAttributeValues: {
-                  ':aggType': 'AGG',
-                  ':updatedAt': timestamp,
-                  ':one': 1,
-                },
-              },
+          },
+        },
+        {
+          Update: {
+            TableName: this.tableName,
+            Key: {
+              pk: 'AGG',
+              sk: `DATE#${dateKey}`,
             },
-            {
-              Update: {
-                TableName: this.tableName,
-                Key: {
-                  pk: 'AGG',
-                  sk: `PRIZE#${claim.prize.id}`,
-                },
-                UpdateExpression:
-                  'SET #entityType = :aggType, #prizeId = :prizeId, #prizeName = :prizeName, #updatedAt = :updatedAt ADD #successfulSpins :one',
-                ExpressionAttributeNames: {
-                  '#entityType': 'entityType',
-                  '#prizeId': 'prizeId',
-                  '#prizeName': 'prizeName',
-                  '#updatedAt': 'updatedAt',
-                  '#successfulSpins': 'successfulSpins',
-                },
-                ExpressionAttributeValues: {
-                  ':aggType': 'AGG',
-                  ':prizeId': claim.prize.id,
-                  ':prizeName': claim.prize.name,
-                  ':updatedAt': timestamp,
-                  ':one': 1,
-                },
-              },
+            UpdateExpression:
+              'SET #entityType = :aggType, #updatedAt = :updatedAt ADD #successfulSpins :one',
+            ExpressionAttributeNames: {
+              '#entityType': 'entityType',
+              '#updatedAt': 'updatedAt',
+              '#successfulSpins': 'successfulSpins',
             },
-          ],
-        }),
-      );
+            ExpressionAttributeValues: {
+              ':aggType': 'AGG',
+              ':updatedAt': timestamp,
+              ':one': 1,
+            },
+          },
+        },
+        {
+          Update: {
+            TableName: this.tableName,
+            Key: {
+              pk: 'AGG',
+              sk: `PRIZE#${claim.prize.id}`,
+            },
+            UpdateExpression:
+              'SET #entityType = :aggType, #prizeId = :prizeId, #prizeName = :prizeName, #updatedAt = :updatedAt ADD #successfulSpins :one',
+            ExpressionAttributeNames: {
+              '#entityType': 'entityType',
+              '#prizeId': 'prizeId',
+              '#prizeName': 'prizeName',
+              '#updatedAt': 'updatedAt',
+              '#successfulSpins': 'successfulSpins',
+            },
+            ExpressionAttributeValues: {
+              ':aggType': 'AGG',
+              ':prizeId': claim.prize.id,
+              ':prizeName': claim.prize.name,
+              ':updatedAt': timestamp,
+              ':one': 1,
+            },
+          },
+        },
+      ],
+    });
 
-      return {
-        type: 'CREATED',
-        claim,
-      };
-    } catch {
-      const existing = await this.getClaimByNormalizedBill(claim.billNumberNormalized);
-      if (existing) {
+    // TransactItems positions 0 (BILL put) and 1 (CLAIM put) carry the uniqueness
+    // conditions; positions 2-4 are shared aggregate counters that can legitimately
+    // contend with other concurrent, unrelated claims and must be retried, not
+    // misread as a duplicate bill.
+    const DUPLICATE_CHECK_INDEXES = [0, 1];
+
+    for (let attempt = 1; attempt <= this.maxTransactionAttempts; attempt += 1) {
+      try {
+        await this.docClient.send(transactWriteCommand);
         return {
-          type: 'EXISTS',
-          claim: existing,
+          type: 'CREATED',
+          claim,
         };
-      }
+      } catch (error) {
+        const classification = classifyTransactionCancellation(error, DUPLICATE_CHECK_INDEXES);
 
-      throw new Error('Unable to persist claim transaction.');
+        if (classification.category === 'DUPLICATE') {
+          logTransactionOutcome({
+            event: 'DUPLICATE_CLAIM_DETECTED',
+            attempt,
+            reasonCodes: classification.reasonCodes,
+            correlationId: input.correlationId,
+          });
+
+          const existing = await this.getClaimByNormalizedBill(claim.billNumberNormalized);
+          if (existing) {
+            return {
+              type: 'EXISTS',
+              claim: existing,
+            };
+          }
+
+          logTransactionOutcome({
+            event: 'DUPLICATE_CLAIM_UNRESOLVED',
+            attempt,
+            correlationId: input.correlationId,
+          });
+          throw new Error('Unable to persist claim transaction.');
+        }
+
+        const canRetry = classification.category === 'TRANSIENT' && attempt < this.maxTransactionAttempts;
+        if (canRetry) {
+          const delayMs = computeBackoffDelayMs(attempt, {
+            baseDelayMs: this.retryBaseDelayMs,
+            maxDelayMs: this.retryMaxDelayMs,
+            random: this.random,
+          });
+          logTransactionOutcome({
+            event: 'TRANSIENT_CONTENTION_RETRY',
+            attempt,
+            maxAttempts: this.maxTransactionAttempts,
+            delayMs,
+            reasonCodes: classification.reasonCodes,
+            errorName: classification.errorName,
+            correlationId: input.correlationId,
+          });
+          await this.sleep(delayMs);
+          continue;
+        }
+
+        logTransactionOutcome({
+          event: classification.category === 'TRANSIENT' ? 'TRANSIENT_CONTENTION_RETRY_EXHAUSTED' : 'PERMANENT_TRANSACTION_FAILURE',
+          attempt,
+          maxAttempts: this.maxTransactionAttempts,
+          reasonCodes: classification.reasonCodes,
+          errorName: classification.errorName,
+          correlationId: input.correlationId,
+        });
+        throw error instanceof Error ? error : new Error('Unable to persist claim transaction.');
+      }
     }
+
+    // Unreachable: the loop above always returns or throws, but TypeScript
+    // requires an explicit terminal statement for the async function's return type.
+    throw new Error('Unable to persist claim transaction.');
   }
 
   public async listEligiblePrizesForDraw(): Promise<Prize[]> {
@@ -623,6 +708,139 @@ export class DynamoDbDrawStore {
     }
 
     return toClaimFromEntity(entity);
+  }
+
+  public async deleteClaim(claimId: string): Promise<{ type: 'SUCCESS' } | { type: 'NOT_FOUND' }> {
+    const claim = await this.getClaimById(claimId);
+    if (!claim) {
+      return { type: 'NOT_FOUND' };
+    }
+
+    const dateKey = campaignDateInKolkata(new Date(claim.claimTimestamp));
+    const timestamp = this.nowProvider().toISOString();
+
+    await this.docClient.send(
+      new TransactWriteCommand({
+        TransactItems: [
+          {
+            Delete: {
+              TableName: this.tableName,
+              Key: { pk: 'BILL', sk: claim.billNumberNormalized },
+            },
+          },
+          {
+            Delete: {
+              TableName: this.tableName,
+              Key: { pk: 'CLAIM', sk: claim.claimId },
+              ConditionExpression: 'attribute_exists(pk)',
+            },
+          },
+          {
+            Update: {
+              TableName: this.tableName,
+              Key: { pk: 'AGG', sk: 'TOTAL' },
+              UpdateExpression: 'SET #updatedAt = :updatedAt ADD #successfulSpins :minusOne',
+              ExpressionAttributeNames: {
+                '#updatedAt': 'updatedAt',
+                '#successfulSpins': 'successfulSpins',
+              },
+              ExpressionAttributeValues: {
+                ':updatedAt': timestamp,
+                ':minusOne': -1,
+              },
+            },
+          },
+          {
+            Update: {
+              TableName: this.tableName,
+              Key: { pk: 'AGG', sk: `DATE#${dateKey}` },
+              UpdateExpression: 'SET #updatedAt = :updatedAt ADD #successfulSpins :minusOne',
+              ExpressionAttributeNames: {
+                '#updatedAt': 'updatedAt',
+                '#successfulSpins': 'successfulSpins',
+              },
+              ExpressionAttributeValues: {
+                ':updatedAt': timestamp,
+                ':minusOne': -1,
+              },
+            },
+          },
+          {
+            Update: {
+              TableName: this.tableName,
+              Key: { pk: 'AGG', sk: `PRIZE#${claim.prize.id}` },
+              UpdateExpression: 'SET #updatedAt = :updatedAt ADD #successfulSpins :minusOne',
+              ExpressionAttributeNames: {
+                '#updatedAt': 'updatedAt',
+                '#successfulSpins': 'successfulSpins',
+              },
+              ExpressionAttributeValues: {
+                ':updatedAt': timestamp,
+                ':minusOne': -1,
+              },
+            },
+          },
+        ],
+      }),
+    );
+
+    return { type: 'SUCCESS' };
+  }
+
+  public async clearAllClaims(): Promise<number> {
+    const claimKeys = await this.collectKeys('CLAIM');
+    const billKeys = await this.collectKeys('BILL');
+    const aggKeys = await this.collectKeys('AGG');
+
+    await this.batchDelete([...claimKeys, ...billKeys, ...aggKeys]);
+
+    return claimKeys.length;
+  }
+
+  private async collectKeys(pk: 'CLAIM' | 'BILL' | 'AGG'): Promise<Array<{ pk: string; sk: string }>> {
+    const keys: Array<{ pk: string; sk: string }> = [];
+    let exclusiveStartKey: Record<string, unknown> | undefined;
+
+    do {
+      const page = await this.docClient.send(
+        new QueryCommand({
+          TableName: this.tableName,
+          KeyConditionExpression: 'pk = :pk',
+          ExpressionAttributeValues: { ':pk': pk },
+          ProjectionExpression: '#pk, #sk',
+          ExpressionAttributeNames: { '#pk': 'pk', '#sk': 'sk' },
+          ExclusiveStartKey: exclusiveStartKey,
+        }),
+      );
+
+      for (const entry of (page as { Items?: Array<{ pk: string; sk: string }> }).Items ?? []) {
+        keys.push({ pk: entry.pk, sk: entry.sk });
+      }
+
+      exclusiveStartKey = (page as { LastEvaluatedKey?: Record<string, unknown> }).LastEvaluatedKey;
+    } while (exclusiveStartKey);
+
+    return keys;
+  }
+
+  private async batchDelete(keys: Array<{ pk: string; sk: string }>): Promise<void> {
+    const chunkSize = 25;
+    for (let index = 0; index < keys.length; index += chunkSize) {
+      const chunk = keys.slice(index, index + chunkSize);
+      if (chunk.length === 0) {
+        continue;
+      }
+
+      await this.docClient.send(
+        new BatchWriteCommand({
+          RequestItems: {
+            [this.tableName]: chunk.map((key) => ({
+              DeleteRequest: { Key: key },
+            })),
+          },
+        }),
+      );
+    }
   }
 
   private async getClaimByNormalizedBill(billNumberNormalized: string): Promise<Claim | undefined> {

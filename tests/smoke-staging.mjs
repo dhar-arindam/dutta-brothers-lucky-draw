@@ -21,7 +21,9 @@ const main = async () => {
 
   const adminResponse = await assertOk('Admin page', `${frontendUrl.replace(/\/$/, '')}/admin`);
   const adminHtml = await adminResponse.text();
-  if (!adminHtml.includes('Lucky Draw Admin')) {
+  // /admin is a client-rendered SPA route: CloudFront serves the same static shell as '/',
+  // so only the shell markers (not the React-rendered heading) are present before JS executes.
+  if (!adminHtml.includes('<div id="root">')) {
     throw new Error('Admin page content check failed.');
   }
 

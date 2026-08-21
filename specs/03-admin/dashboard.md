@@ -2,10 +2,10 @@
 
 Status: APPROVED  
 Owner: Principal Software Engineer  
-Version: 1.3  
-Last Updated: 2026-08-19
-Change: Final Admin V1 consolidation  
-Reason: Approved no-auth and operations UX decisions
+Version: 1.4
+Last Updated: 2026-08-21
+Change: Claim deletion and responsive action layout
+Reason: Align Admin V1 with destructive operations and responsive controls
 
 ## Route and Access
 
@@ -158,6 +158,8 @@ Phone numbers must be masked by default.
 - Clear all claims in one action
 
 Claims must not be loaded without a bounded page size.
+
+At large desktop widths, the Claims action controls should remain on one row when space permits. At smaller widths, controls may wrap without overlap or horizontal scrolling.
 
 ### Claim Deletion
 

@@ -2,10 +2,10 @@
 
 Status: APPROVED  
 Owner: Principal Software Engineer  
-Version: 1.4  
-Last Updated: 2026-08-19
-Change: Admin UX refinement  
-Reason: Approved admin requirements update
+Version: 1.5
+Last Updated: 2026-08-21
+Change: Admin claim deletion and transactional retry alignment
+Reason: Align API contract with implemented claim lifecycle and concurrency behaviour
 
 This document defines the initial API contract conceptually. It is not an implementation specification.
 
@@ -202,6 +202,8 @@ No fallback prize is awarded.
 
 Internal responses must not expose stack traces, secrets, database details, or AWS internals.
 
+Transient persistence contention during an otherwise valid draw may be retried by the backend with bounded backoff. The API returns only the final business outcome; retries must not create duplicate claims or double-count aggregates. Duplicate-bill conflicts must remain `ALREADY_CLAIMED`, not `INTERNAL_ERROR`.
+
 ### Machine-Readable States
 
 The API must support at least:
@@ -294,6 +296,8 @@ Deletes a single claim and decrements its associated aggregates (total successfu
 
 If `claimId` does not exist, returns `400 Bad Request` with `VALIDATION_ERROR` and message `"Claim was not found."`.
 
+The operation requires explicit confirmation in the admin UI and does not alter prize configuration, campaign dates, or other claims.
+
 ### `DELETE /api/admin/claims`
 
 Deletes all claims and resets all claim-derived aggregates (total successful spins, per-date counts, per-prize `Given` counts) to zero. Prize configuration (name, weight, active status) and campaign dates are unaffected.
@@ -308,6 +312,8 @@ Deletes all claims and resets all claim-derived aggregates (total successful spi
 ```
 
 This is a destructive, irreversible operation. The admin UI must require explicit confirmation before calling this endpoint.
+
+The admin UI must use a stronger confirmation step for this endpoint, such as requiring the administrator to type `CLEAR ALL CLAIMS`.
 
 ### `GET /api/admin/claims.csv`
 

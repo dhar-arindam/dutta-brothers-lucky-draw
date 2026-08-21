@@ -2,10 +2,10 @@
 
 Status: APPROVED  
 Owner: Principal Software Engineer  
-Version: 1.4  
+Version: 1.5
 Last Updated: 2026-08-21
-Change: Infrastructure tagging requirement update  
-Reason: Ensure consistent AWS resource tagging for operations and governance
+Change: Claim lifecycle, contention handling, and deployment provenance
+Reason: Align target architecture with implemented runtime and delivery controls
 
 ## Technology
 
@@ -56,6 +56,8 @@ DynamoDB
 - DynamoDB must enforce bill uniqueness atomically.
 - Claims preserve the historical prize name snapshot.
 - Dashboard totals and prize distribution use lightweight DynamoDB aggregate records or counters updated with successful claim creation.
+- Claim deletion and clear-all operations update or reset claim-derived aggregates and release deleted normalized bills.
+- Transaction cancellation distinguishes duplicate-bill conflicts from transient DynamoDB contention. Only transient contention is retried with bounded backoff.
 - No prize inventory or stock management exists.
 - Prize activation/deactivation is a required V1 capability and affects future draws only.
 - AWS infrastructure is managed using AWS CDK and TypeScript only.
@@ -68,6 +70,7 @@ DynamoDB
 - The S3 bucket must not be publicly readable.
 - CloudFront is the public frontend entry point.
 - API Gateway uses explicit CORS, throttling, and request limits.
+- API Gateway exposes `DELETE /api/admin/claims/{claimId}` and `DELETE /api/admin/claims` for approved admin claim operations.
 - IAM permissions follow least privilege.
 - All taggable AWS resources created by CDK must include tags `project=lucky-draw` and `organization=dutta-brothers`.
 - Customer PII is masked in admin responses and exports.
@@ -81,6 +84,15 @@ DynamoDB
 - Any Tailwind global reset/preflight impact must be isolated so customer UI is unaffected.
 
 IAM permissions are scoped by function and resource. Lambda receives only the minimum permissions required for its responsibilities. DynamoDB permissions remain least-privilege.
+
+## Build and Deployment Provenance
+
+- CI checks out and builds the exact Git SHA that triggered the workflow.
+- CI packages validated source and generated frontend assets as one artifact identified by that SHA.
+- Staging deploys the artifact produced by its associated successful CI run and does not independently rebuild application source.
+- Artifact identity is immutable and is not based only on a reused generic artifact name.
+- Deployment summaries and staging verification record and confirm the deployed Git SHA.
+- Frontend deployments must not leave the SPA entry document serving an older cached bundle.
 
 ## Infrastructure Scope
 

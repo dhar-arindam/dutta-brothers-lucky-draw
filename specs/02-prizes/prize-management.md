@@ -2,10 +2,10 @@
 
 Status: APPROVED  
 Owner: Principal Software Engineer  
-Version: 1.3  
-Last Updated: 2026-08-19
-Change: Final Admin V1 consolidation  
-Reason: Approved source-of-truth alignment across specs
+Version: 1.4
+Last Updated: 2026-08-21
+Change: Admin claim deletion alignment
+Reason: Align prize administration rules with approved claim deletion behaviour
 
 ## Prize Properties
 
@@ -45,14 +45,15 @@ Inactive prizes must remain visible in the prize management view and must not be
 
 The admin cannot:
 
-- Modify historical claims
-- Delete claims
+- Modify the contents of historical claims
 - Change the prize awarded to a customer
 - Rename an existing prize
 - Change the identity of a historical prize in a way that changes historical claims
 - Manage prize inventory
 
 Prize names are immutable once created. Prize identity is fixed after creation and must be enforced by the backend.
+
+An explicitly confirmed admin deletion may remove a claim and its claim-derived `Given` contribution. It must not change prize configuration or alter the prize snapshot of any remaining claim.
 
 ## Historical Claims
 

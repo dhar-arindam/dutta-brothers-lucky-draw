@@ -1,15 +1,13 @@
 # Acceptance Criteria
 
 Status: APPROVED  
-Change: Envelope/Wheel (historical) -> Festive Gift Box Reveal (active)  
-Reason: Finalized UX redesign approval  
 Backend impact: None  
 API impact: None  
 Owner: Principal Software Engineer  
-Version: 1.7  
+Version: 1.8
 Last Updated: 2026-08-21
-Change: Infrastructure tagging requirement update  
-Reason: Ensure consistent AWS resource tagging for operations and governance
+Change: Claim deletion, contention retry, and deployment provenance
+Reason: Align acceptance criteria with implemented runtime and delivery behaviour
 
 These criteria define the Definition of Done for the initial product scope.
 
@@ -141,7 +139,11 @@ These criteria define the Definition of Done for the initial product scope.
 - [ ] Weight is clearly described as relative (not percentage) with a simple ratio example.
 - [ ] Invalid/negative weight is rejected.
 - [ ] Inactive prizes do not participate in selection.
-- [ ] Historical claims and awarded prizes cannot be modified or deleted.
+- [ ] Historical claim contents and awarded prizes cannot be modified.
+- [ ] Admin can delete one claim after explicit confirmation.
+- [ ] Admin can clear all claims after stronger typed confirmation.
+- [ ] Deleting a claim decrements total, daily, and prize `Given` aggregates and releases its normalized bill.
+- [ ] Clearing all claims resets claim-derived aggregates while preserving prize and campaign configuration.
 - [ ] Admin can view successful claims, bounded pagination, date filtering, prize filtering, and approved search fields.
 - [ ] Claims default to all results when no prize card filter is selected.
 - [ ] Selecting a prize card applies that prize as active claims filter.
@@ -222,6 +224,8 @@ These criteria define the Definition of Done for the initial product scope.
 - [ ] Validation failures do not create claims or increment counters.
 - [ ] Internal errors do not expose implementation, database, AWS, or secret details.
 - [ ] Aggregate counters increment exactly once per successful claim and never for failed or duplicate requests.
+- [ ] Transient DynamoDB transaction contention is retried with bounded backoff without duplicate claims or double-counting aggregates.
+- [ ] Duplicate-bill transaction cancellation returns `ALREADY_CLAIMED`, not `INTERNAL_ERROR`.
 
 ## 11. API Request Size (APPROVED)
 

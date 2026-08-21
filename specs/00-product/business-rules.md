@@ -2,10 +2,10 @@
 
 Status: APPROVED  
 Owner: Principal Software Engineer  
-Version: 1.3  
-Last Updated: 2026-08-19
-Change: Final Admin V1 consolidation  
-Reason: Approved source-of-truth alignment across specs
+Version: 1.4
+Last Updated: 2026-08-21
+Change: Admin claim deletion and concurrency consistency
+Reason: Align business rules with approved claim deletion and transactional retry behaviour
 
 These are the confirmed business rules for the Dutta Brothers Festive Lucky Draw.
 
@@ -173,15 +173,16 @@ Prize weight and active status are the only controls.
 - Add new prizes
 - Change the weight of existing prizes
 - Activate/deactivate prizes
+- Delete an individual claim
+- Clear all claims
 
 **Admin cannot:**
 
-- Modify historical claims
+- Modify the contents of historical claims
 - Change a prize awarded to a customer
-- Delete claims
 - Restore or rollback historical draws
 
-Historical claims are immutable.
+Historical claim contents are immutable after creation. An explicitly confirmed admin deletion removes a claim and its claim-derived aggregate contributions; it does not rewrite the contents of any remaining claim.
 
 ## BR-007 — Campaign Period (Date-Only Configuration)
 
@@ -268,6 +269,16 @@ The following must not increment aggregate counters:
 - a retry of an already-created claim
 
 Claim creation and the corresponding counter updates must use atomic or transactional persistence semantics where appropriate. If claim creation fails because the bill already exists, no aggregate counter may increment.
+
+Transient contention while atomically creating a claim and updating aggregates must be retried with bounded backoff. A retry must repeat the original transaction and must not create a duplicate claim or increment aggregates more than once. Duplicate-bill cancellation must be distinguished from transient transaction contention and must return `ALREADY_CLAIMED`, not `INTERNAL_ERROR`.
+
+### Claim Deletion
+
+- Deleting one claim removes that claim, decrements its prize `Given` count, decrements total successful claims, and decrements the applicable `Asia/Kolkata` daily count.
+- Clearing all claims removes all claims and resets claim-derived aggregate counts to zero.
+- Both operations require explicit admin confirmation in the user interface.
+- Deleting a claim releases its normalized bill for future participation.
+- Prize configuration and campaign configuration are unaffected.
 
 ## BR-011 — Campaign Reporting Timezone
 

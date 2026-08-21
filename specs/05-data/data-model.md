@@ -2,10 +2,10 @@
 
 Status: APPROVED  
 Owner: Principal Software Engineer  
-Version: 1.2  
-Last Updated: 2026-08-19
-Change: Admin UX refinement  
-Reason: Approved admin requirements update
+Version: 1.3
+Last Updated: 2026-08-21
+Change: Claim deletion and atomic contention handling
+Reason: Align the conceptual model with implemented claim lifecycle behaviour
 
 This document defines the conceptual model only. The Principal Software Engineer must determine the final DynamoDB partition/sort key strategy.
 
@@ -85,6 +85,8 @@ The data model must support these logical operations without prescribing the phy
 12. Retrieve the successful spin count for a specific `Asia/Kolkata` campaign date.
 13. Retrieve prize distribution for the campaign.
 14. Retrieve date-based dashboard reporting without scanning all claims into the browser or requiring a full DynamoDB scan.
+15. Delete a claim by claim ID and atomically release its normalized bill and decrement claim-derived aggregates.
+16. Clear all claims and reset claim-derived aggregates without changing prize or campaign configuration.
 
 The Principal Software Engineer will determine the final DynamoDB key and index design during implementation design. The physical design must preserve the atomic uniqueness and immutable-claim requirements.
 
@@ -92,7 +94,7 @@ The Principal Software Engineer will determine the final DynamoDB key and index 
 
 The claim must preserve the prize awarded at the time of the draw. Later prize changes must not alter historical claims.
 
-Claims are immutable after creation.
+Claim contents are immutable after creation. An explicitly confirmed admin deletion may remove a claim and its claim-derived aggregate contributions; it must not rewrite any remaining claim.
 
 ## 4. Dashboard Summary Aggregates
 
@@ -125,6 +127,8 @@ The following must never increment counters:
 - no-eligible-prize results
 - internal failures before claim creation
 - retries of already-created claims
+
+Transient transaction contention during claim creation may be retried with bounded backoff. Retries must preserve exactly-once claim and aggregate behaviour. Duplicate-bill conflicts must remain distinct from transient contention.
 
 ## Scope Boundary
 

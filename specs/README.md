@@ -1,13 +1,17 @@
 # Specifications
 
 Status: APPROVED  
-Last Updated: 2026-08-19
+Last Updated: 2026-08-21
 
 Specifications are the source of truth for product behaviour.
 
 Active customer reveal: Festive Gift Box Reveal.
 
 Active Admin V1 model: direct `/admin` operational page with no authentication and no token/session bootstrap.
+
+Admin V1 supports explicitly confirmed deletion of individual claims and clearing all claims. These operations are destructive and update claim-derived aggregates consistently.
+
+The active delivery model builds a validated source artifact from an exact Git SHA and deploys staging from that artifact. Staging deployment provenance must be verifiable before production promotion.
 
 Admin UI technology constraint: Tailwind CSS is approved for Admin only and must remain isolated from customer-facing UI styling.
 

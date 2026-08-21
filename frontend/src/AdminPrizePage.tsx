@@ -65,6 +65,12 @@ interface CampaignFormErrors {
 
 type CampaignTone = 'not-configured' | 'not-started' | 'active' | 'ended';
 
+type ConfirmDialogState =
+  | { type: 'DELETE_CLAIM'; claimId: string }
+  | { type: 'CLEAR_ALL_CLAIMS' };
+
+const CLEAR_ALL_CONFIRMATION_PHRASE = 'CLEAR ALL CLAIMS';
+
 const defaultAddPrizeForm: AddPrizeForm = {
   name: '',
   weight: '',
@@ -95,6 +101,8 @@ export const AdminPrizePage = () => {
   const [campaign, setCampaign] = useState<AdminCampaignResponse['campaign'] | null>(null);
   const [lastCsvExport, setLastCsvExport] = useState('');
   const [copiedClaimId, setCopiedClaimId] = useState<string | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
+  const [clearAllConfirmationText, setClearAllConfirmationText] = useState('');
 
   const [filters, setFilters] = useState<ClaimsFilters>(defaultFilters);
   const [addForm, setAddForm] = useState<AddPrizeForm>(defaultAddPrizeForm);
@@ -600,14 +608,12 @@ export const AdminPrizePage = () => {
     }
   };
 
-  const onDeleteClaim = async (claimId: string) => {
-    const confirmed = window.confirm(
-      `Delete claim ${claimId}? This permanently removes the claim and adjusts prize and summary counts. This cannot be undone.`,
-    );
-    if (!confirmed) {
-      return;
-    }
+  const onDeleteClaim = (claimId: string) => {
+    setConfirmDialog({ type: 'DELETE_CLAIM', claimId });
+  };
 
+  const onConfirmDeleteClaim = async (claimId: string) => {
+    setConfirmDialog(null);
     setBusyAction('CLAIM_DELETE');
     setFeedback('Deleting claim...');
 
@@ -627,14 +633,13 @@ export const AdminPrizePage = () => {
     }
   };
 
-  const onClearAllClaims = async () => {
-    const typedConfirmation = window.prompt(
-      'This permanently deletes ALL claims and resets prize and summary counts to zero. This cannot be undone.\n\nType CLEAR ALL CLAIMS to confirm.',
-    );
-    if (typedConfirmation !== 'CLEAR ALL CLAIMS') {
-      return;
-    }
+  const onClearAllClaims = () => {
+    setConfirmDialog({ type: 'CLEAR_ALL_CLAIMS' });
+    setClearAllConfirmationText('');
+  };
 
+  const onConfirmClearAllClaims = async () => {
+    setConfirmDialog(null);
     setBusyAction('CLAIMS_CLEAR');
     setFeedback('Clearing all claims...');
 
@@ -1388,6 +1393,74 @@ export const AdminPrizePage = () => {
               }`}
             >
               {statusMessage}
+            </div>
+          </div>
+        ) : null}
+
+        {confirmDialog ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4" role="presentation">
+            <div
+              className={`grid w-full max-w-md gap-3 rounded-2xl border p-5 shadow-xl ${surfaceClass}`}
+              role="alertdialog"
+              aria-modal="true"
+              aria-labelledby="confirm-dialog-title"
+            >
+              {confirmDialog.type === 'DELETE_CLAIM' ? (
+                <>
+                  <h2 id="confirm-dialog-title" className={`m-0 text-lg font-semibold ${headingTextClass}`}>
+                    Delete claim {confirmDialog.claimId}?
+                  </h2>
+                  <p className={`m-0 text-sm ${mutedTextClass}`}>
+                    This permanently removes the claim and adjusts prize and summary counts. This cannot be undone.
+                  </p>
+                  <div className="mt-2 flex flex-wrap justify-end gap-2">
+                    <button type="button" className={secondaryButtonClass} onClick={() => setConfirmDialog(null)}>
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className={dangerButtonClass}
+                      onClick={() => void onConfirmDeleteClaim(confirmDialog.claimId)}
+                    >
+                      Delete Claim
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <h2 id="confirm-dialog-title" className={`m-0 text-lg font-semibold ${headingTextClass}`}>
+                    Clear all claims?
+                  </h2>
+                  <p className={`m-0 text-sm ${mutedTextClass}`}>
+                    This permanently deletes ALL claims and resets prize and summary counts to zero. This cannot be
+                    undone.
+                  </p>
+                  <label htmlFor="clear-all-confirmation" className={`text-sm font-medium ${headingTextClass}`}>
+                    Type {CLEAR_ALL_CONFIRMATION_PHRASE} to confirm
+                  </label>
+                  <input
+                    id="clear-all-confirmation"
+                    type="text"
+                    className={inputClass}
+                    value={clearAllConfirmationText}
+                    onChange={(event) => setClearAllConfirmationText(event.target.value)}
+                    autoComplete="off"
+                  />
+                  <div className="mt-2 flex flex-wrap justify-end gap-2">
+                    <button type="button" className={secondaryButtonClass} onClick={() => setConfirmDialog(null)}>
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className={dangerButtonClass}
+                      disabled={clearAllConfirmationText !== CLEAR_ALL_CONFIRMATION_PHRASE}
+                      onClick={() => void onConfirmClearAllClaims()}
+                    >
+                      Clear All Claims
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         ) : null}

@@ -193,12 +193,12 @@ describe('admin operations page', () => {
       .mockResolvedValueOnce(successJson({ status: 'SUCCESS', items: [], nextPageToken: null }));
 
     vi.stubGlobal('fetch', mockFetch);
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
 
     render(<AdminPrizePage />);
     await waitForAutoLoad();
 
     fireEvent.click(screen.getAllByRole('button', { name: 'Delete claim CLM-20260816-000001' })[0] as HTMLElement);
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete Claim' }));
 
     const status = await screen.findByRole('status');
     expect(status).toHaveTextContent('Claim CLM-20260816-000001 deleted.');
@@ -208,13 +208,13 @@ describe('admin operations page', () => {
   it('does not delete a claim when confirmation is cancelled', async () => {
     enqueueDashboardSuccess();
     vi.stubGlobal('fetch', mockFetch);
-    vi.spyOn(window, 'confirm').mockReturnValue(false);
 
     render(<AdminPrizePage />);
     await waitForAutoLoad();
 
     const callCountBefore = mockFetch.mock.calls.length;
     fireEvent.click(screen.getAllByRole('button', { name: 'Delete claim CLM-20260816-000001' })[0] as HTMLElement);
+    fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }));
 
     expect(mockFetch.mock.calls.length).toBe(callCountBefore);
     expect(screen.getAllByText('Amit Das').length).toBeGreaterThan(0);
@@ -263,12 +263,15 @@ describe('admin operations page', () => {
       .mockResolvedValueOnce(successJson({ status: 'SUCCESS', items: [], nextPageToken: null }));
 
     vi.stubGlobal('fetch', mockFetch);
-    vi.spyOn(window, 'prompt').mockReturnValue('CLEAR ALL CLAIMS');
 
     render(<AdminPrizePage />);
     await waitForAutoLoad();
 
     fireEvent.click(screen.getByRole('button', { name: 'Clear All Claims' }));
+    fireEvent.change(await screen.findByLabelText('Type CLEAR ALL CLAIMS to confirm'), {
+      target: { value: 'CLEAR ALL CLAIMS' },
+    });
+    fireEvent.click(screen.getAllByRole('button', { name: 'Clear All Claims' })[1] as HTMLElement);
 
     const status = await screen.findByRole('status');
     expect(status).toHaveTextContent('Cleared 1 claim(s).');
@@ -278,14 +281,17 @@ describe('admin operations page', () => {
   it('does not clear claims when typed confirmation phrase is incorrect', async () => {
     enqueueDashboardSuccess();
     vi.stubGlobal('fetch', mockFetch);
-    vi.spyOn(window, 'prompt').mockReturnValue('nope');
 
     render(<AdminPrizePage />);
     await waitForAutoLoad();
 
     const callCountBefore = mockFetch.mock.calls.length;
     fireEvent.click(screen.getByRole('button', { name: 'Clear All Claims' }));
+    fireEvent.change(await screen.findByLabelText('Type CLEAR ALL CLAIMS to confirm'), {
+      target: { value: 'nope' },
+    });
 
+    expect(screen.getAllByRole('button', { name: 'Clear All Claims' })[1]).toBeDisabled();
     expect(mockFetch.mock.calls.length).toBe(callCountBefore);
     expect(screen.getAllByText('Amit Das').length).toBeGreaterThan(0);
   });

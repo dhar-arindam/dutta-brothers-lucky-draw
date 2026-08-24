@@ -1,4 +1,4 @@
-import { FormEvent, KeyboardEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
 
 import type {
   AdminCampaignResponse,
@@ -50,7 +50,6 @@ interface ClaimsFilters {
   prizeId: string;
   from: string;
   to: string;
-  pageSize: string;
 }
 
 interface CampaignForm {
@@ -82,10 +81,7 @@ const defaultFilters: ClaimsFilters = {
   prizeId: '',
   from: '',
   to: '',
-  pageSize: '25',
 };
-
-const claimsPageSizeOptions = ['25', '50', '75', '100', '125', '150'];
 
 export const AdminPrizePage = () => {
   const [isLightTheme, setIsLightTheme] = useState(true);
@@ -97,6 +93,8 @@ export const AdminPrizePage = () => {
   const [claims, setClaims] = useState<AdminClaimItem[]>([]);
   const [nextPageToken, setNextPageToken] = useState<string | null>(null);
   const [pageTokens, setPageTokens] = useState<string[]>([]);
+  const claimsLoadMoreRef = useRef<HTMLDivElement>(null);
+  const isLoadingMoreClaimsRef = useRef(false);
   const [summary, setSummary] = useState<AdminSummaryResponse | null>(null);
   const [campaign, setCampaign] = useState<AdminCampaignResponse['campaign'] | null>(null);
   const [lastCsvExport, setLastCsvExport] = useState('');
@@ -212,7 +210,7 @@ export const AdminPrizePage = () => {
         getAdminSummary(),
         getAdminCampaign(),
         listAdminPrizes(),
-        listAdminClaims({ pageSize: Number(filters.pageSize) || 25 }),
+        listAdminClaims({}),
       ]);
 
       const failure = firstError(summaryResponse, campaignResponse, prizesResponse, claimsResponse);
@@ -255,7 +253,7 @@ export const AdminPrizePage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const loadClaims = async (query: AdminClaimsQuery, trackToken = true) => {
+  const loadClaims = async (query: AdminClaimsQuery, trackToken = true, append = false) => {
     setBusyAction('CLAIMS');
     setFeedback('Loading claims...');
 
@@ -275,22 +273,43 @@ export const AdminPrizePage = () => {
         setPageTokens((current) => [...current, query.pageToken as string]);
       }
 
-      setClaims(response.items);
+      setClaims((current) => (append ? [...current, ...response.items] : response.items));
       setNextPageToken(response.nextPageToken);
       setState({ type: 'READY' });
     } catch {
       setErrorState('We could not complete the admin request. Please try again.');
     } finally {
       setBusyAction('NONE');
+      isLoadingMoreClaimsRef.current = false;
     }
   };
+
+  useEffect(() => {
+    const sentinel = claimsLoadMoreRef.current;
+    if (!sentinel || !nextPageToken || isBusy || typeof IntersectionObserver === 'undefined') {
+      return;
+    }
+
+    const observer = new IntersectionObserver(([entry]) => {
+      if (!entry?.isIntersecting || isLoadingMoreClaimsRef.current || !nextPageToken) {
+        return;
+      }
+
+      isLoadingMoreClaimsRef.current = true;
+      void loadClaims(buildClaimsQuery(nextPageToken), true, true);
+    });
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+    // The observer must be recreated when the cursor or loading state changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nextPageToken, isBusy]);
 
   const buildClaimsQuery = (pageToken?: string, sourceFilters: ClaimsFilters = filters): AdminClaimsQuery => {
     const fromDate = sourceFilters.from.trim();
     const toDate = sourceFilters.to.trim();
 
     return {
-      pageSize: Number(sourceFilters.pageSize) || 25,
       pageToken,
       from: toUtcRangeBoundary(fromDate, 'start'),
       to: toUtcRangeBoundary(toDate, 'end'),
@@ -343,7 +362,7 @@ export const AdminPrizePage = () => {
       return;
     }
 
-    await loadClaims(buildClaimsQuery(nextPageToken));
+    await loadClaims(buildClaimsQuery(nextPageToken), true, true);
   };
 
   const onPreviousPage = async () => {
@@ -1080,7 +1099,7 @@ export const AdminPrizePage = () => {
 
         <section className={`mt-4 border-t pt-4 ${sectionBorderClass}`}>
           <h2 className={`m-0 text-base font-semibold uppercase tracking-[0.04em] ${headingTextClass}`}>Claims</h2>
-          <form className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-5" onSubmit={(event) => void onApplyFilters(event)}>
+          <form className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4" onSubmit={(event) => void onApplyFilters(event)}>
             <div className="grid content-start gap-1">
               <label htmlFor="claims-search" className={`text-sm font-medium ${headingTextClass}`}>
                 Search
@@ -1158,30 +1177,7 @@ export const AdminPrizePage = () => {
               />
             </div>
 
-            <div className="grid content-start gap-1">
-              <label htmlFor="claims-page-size" className={`text-sm font-medium ${headingTextClass}`}>
-                Page Size
-              </label>
-              <select
-                id="claims-page-size"
-                value={filters.pageSize}
-                className={inputClass}
-                onChange={(event) =>
-                  setFilters((current) => ({
-                    ...current,
-                    pageSize: event.target.value,
-                  }))
-                }
-              >
-                {claimsPageSizeOptions.map((size) => (
-                  <option key={size} value={size}>
-                    {size}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="grid gap-2 sm:col-span-2 sm:grid-cols-3 lg:col-span-5 lg:w-full lg:grid-cols-4">
+            <div className="grid gap-2 sm:col-span-2 sm:grid-cols-3 lg:col-span-4 lg:w-full lg:grid-cols-4">
               <button
                 type="submit"
                 className={primaryButtonClass}
@@ -1353,6 +1349,15 @@ export const AdminPrizePage = () => {
               </div>
             )}
           </div>
+
+          {nextPageToken ? (
+            <div
+              ref={claimsLoadMoreRef}
+              className="min-h-8"
+              aria-label="Load more claims"
+              role="status"
+            />
+          ) : null}
 
           <div className="mt-3 flex flex-wrap gap-2">
             <button

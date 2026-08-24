@@ -319,10 +319,10 @@ export class InMemoryDrawStore {
         const searchLower = search.toLowerCase();
 
         return (
-          claim.claimId.startsWith(search) ||
-          customerName.startsWith(searchLower) ||
-          claim.billNumberNormalized.startsWith(normalizedSearch) ||
-          prizeName.startsWith(searchLower)
+          claim.claimId.toLowerCase().includes(searchLower) ||
+          customerName.includes(searchLower) ||
+          claim.billNumberNormalized.includes(normalizedSearch) ||
+          prizeName.includes(searchLower)
         );
       });
 

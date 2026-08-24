@@ -419,6 +419,60 @@ describe('dynamo db draw store persistence', () => {
     expect(secondPage.items).toEqual([]);
   });
 
+  it('keeps filtered pages newest-first without skipping matches between DynamoDB batches', async () => {
+    const fake = new FakeDocClient();
+    const store = new DynamoDbDrawStore(fake as never, {
+      tableName: 'draws-table',
+      now: () => new Date('2026-08-16T10:30:00.000Z'),
+    });
+
+    fake.enqueue(async () => ({
+      Items: [
+        {
+          pk: 'CLAIM',
+          sk: 'DB26-000002',
+          entityType: 'CLAIM',
+          claimId: 'DB26-000002',
+          claimTimestamp: '2026-08-17T10:30:00.000Z',
+          customerName: 'Riya Sen',
+          phone: '9876543210',
+          billNumberDisplay: 'XY100',
+          billNumberNormalized: 'XY100',
+          prize: { id: 'prize-001', name: 'Kettle', displayName: 'Kettle' },
+          gsi1pk: 'CLAIM',
+          gsi1sk: '2026-08-17T10:30:00.000Z#DB26-000002',
+        },
+      ],
+      LastEvaluatedKey: { pk: 'CLAIM', sk: 'DB26-000002' },
+    }));
+
+    fake.enqueue(async () => ({
+      Items: [
+        {
+          pk: 'CLAIM',
+          sk: 'DB26-000001',
+          entityType: 'CLAIM',
+          claimId: 'DB26-000001',
+          claimTimestamp: '2026-08-16T10:30:00.000Z',
+          customerName: 'Amit Das',
+          phone: '9876543210',
+          billNumberDisplay: 'AB1',
+          billNumberNormalized: 'AB1',
+          prize: { id: 'prize-001', name: 'Kettle', displayName: 'Kettle' },
+          gsi1pk: 'CLAIM',
+          gsi1sk: '2026-08-16T10:30:00.000Z#DB26-000001',
+        },
+      ],
+    }));
+
+    const firstPage = await store.listAdminClaims({ pageSize: 1, search: 'Amit' });
+
+    expect(firstPage.items[0]?.claimId).toBe('DB26-000001');
+    expect(firstPage.nextPageToken).toBeNull();
+    expect((fake.calls[0] as QueryCommand).input.Limit).toBe(1);
+    expect((fake.calls[0] as QueryCommand).input.ScanIndexForward).toBe(false);
+  });
+
   it('gets and updates campaign with fallback defaults and validation', async () => {
     const fake = new FakeDocClient();
     const store = new DynamoDbDrawStore(fake as never, {
@@ -550,6 +604,28 @@ describe('dynamo db draw store persistence', () => {
     expect(response.items).toHaveLength(1);
     expect(response.items[0]?.claimId).toBe('DB26-000001');
     expect(response.items[0]?.maskedPhone).toBe('*****3210');
+
+    fake.enqueue(async () => ({
+      Items: [
+        {
+          pk: 'CLAIM',
+          sk: 'DB26-000002',
+          entityType: 'CLAIM',
+          claimId: 'DB26-000002',
+          claimTimestamp: '2026-08-17T10:30:00.000Z',
+          customerName: 'Riya Sen',
+          phone: '9999999999',
+          billNumberDisplay: 'CD2',
+          billNumberNormalized: 'CD2',
+          prize: { id: 'prize-002', name: 'Coffee', displayName: 'Coffee' },
+          gsi1pk: 'CLAIM',
+          gsi1sk: '2026-08-17T10:30:00.000Z#DB26-000002',
+        },
+      ],
+    }));
+
+    const patternResponse = await store.listAdminClaims({ pageSize: 10, search: 'iya' });
+    expect(patternResponse.items[0]?.claimId).toBe('DB26-000002');
   });
 
   it('throws when PRIZE sequence is invalid', async () => {

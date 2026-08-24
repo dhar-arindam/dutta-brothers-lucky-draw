@@ -6,7 +6,7 @@ on:
 
 permissions:
   contents: read
-  pull-requests: write
+  pull-requests: read
   issues: write
 
 concurrency:
@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   review:
-    if: ${{ github.actor == 'dependabot[bot]' }}
+    if: ${{ github.event.pull_request.user.login == 'dependabot[bot]' && github.event.pull_request.state == 'open' && github.event.pull_request.base.ref == 'main' }}
     runs-on: ubuntu-latest
 
     steps:
@@ -34,6 +34,34 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Validate dependency update scope
+        id: scope
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const files = await github.paginate(github.rest.pulls.listFiles, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pr.number,
+              per_page: 100,
+            });
+
+            const allowed = /^(package\.json|package-lock\.json|npm-shrinkwrap\.json|(frontend|backend|infrastructure|shared)\/package\.json)$/;
+            const invalid = files.map((file) => file.filename).filter((filename) => !allowed.test(filename));
+            const dependencyNames = (process.env.DEPENDENCY_NAMES || '').trim();
+
+            core.setOutput('changed_files', files.map((file) => file.filename).join(', '));
+            core.setOutput('invalid_files', invalid.join(', '));
+
+            if (!dependencyNames) {
+              core.setFailed('Dependabot metadata did not identify a dependency update.');
+            } else if (invalid.length > 0) {
+              core.setFailed(`Unsupported files changed by Dependabot PR: ${invalid.join(', ')}`);
+            }
+        continue-on-error: true
+        env:
+          DEPENDENCY_NAMES: ${{ steps.metadata.outputs.dependency-names }}
       - name: Resolve release notes/changelog links (best effort)
         id: depinfo
         shell: bash
@@ -223,6 +251,8 @@ jobs:
           BUILD: ${{ steps.build.outcome }}
           SYNTH: ${{ steps.synth.outcome }}
           AUDIT_POLICY: ${{ steps.audit_policy.outcome }}
+          SCOPE: ${{ steps.scope.outcome }}
+          INVALID_FILES: ${{ steps.scope.outputs.invalid_files }}
         run: |
           set -euo pipefail
 
@@ -256,21 +286,32 @@ jobs:
             unresolved_high_critical=true
           fi
 
-          recommendation="SAFE TO MERGE"
-          reason="All validation gates passed with no unresolved high/critical vulnerability findings."
+          if [ "${SCOPE}" != "success" ]; then
+            classification="INFRASTRUCTURE_OR_SCOPE_ESCALATION"
+            causality="UNKNOWN - changed files exceed the dependency-only allowlist"
+          elif [ "$unresolved_high_critical" = true ]; then
+            classification="SECURITY_ESCALATION"
+            causality="SECURITY FINDING - no unsafe remediation permitted"
+          elif [ "$gates_ok" != true ]; then
+            classification="DEPENDENCY_COMPATIBILITY_OR_PRE_EXISTING_FAILURE"
+            causality="UNKNOWN - dependency causality requires comparison with a passing base-branch run"
+          else
+            classification="DEPENDENCY_UPDATE_VALIDATED"
+            causality="VALIDATED - all repository gates passed"
+          fi
+
+          recommendation="READY FOR HUMAN REVIEW"
+          reason="All validation gates passed with no unresolved high/critical vulnerability findings. Automatic merge is disabled."
 
           if [ "$unresolved_high_critical" = true ]; then
-            recommendation="DO NOT MERGE"
+            recommendation="ESCALATE - DO NOT MERGE"
             reason="High/critical vulnerability findings remain unresolved."
           elif [ "$gates_ok" != true ]; then
-            recommendation="DO NOT MERGE"
+            recommendation="ESCALATE - DO NOT MERGE"
             reason="One or more required quality gates failed (lint/typecheck/tests/coverage/build/synth)."
-          elif [ "$major_update" = true ]; then
-            recommendation="HUMAN REVIEW REQUIRED"
-            reason="Major dependency update detected; potential breaking-change risk requires human review."
-          elif [ "$SECURITY_RELATED" = "true" ]; then
-            recommendation="SAFE TO MERGE — SECURITY UPDATE"
-            reason="Security-related update with passing quality/security validation and no unresolved high/critical findings."
+          elif [ "$SCOPE" != "success" ]; then
+            recommendation="ESCALATE - DO NOT MERGE"
+            reason="Changed files exceed the dependency-only allowlist; infrastructure or application changes require human review."
           fi
 
           {
@@ -282,6 +323,10 @@ jobs:
             echo "low=${low}"
             echo "major_update=${major_update}"
             echo "gates_ok=${gates_ok}"
+            echo "classification=${classification}"
+            echo "causality=${causality}"
+            echo "invalid_files=${INVALID_FILES}"
+            echo "remediation=NOT_APPLIED - human review required for any fix"
             echo "high_critical_details=${high_critical_details}"
           } >> "$GITHUB_OUTPUT"
 
@@ -307,6 +352,11 @@ jobs:
           BUILD: ${{ steps.build.outcome }}
           SYNTH: ${{ steps.synth.outcome }}
           AUDIT_POLICY: ${{ steps.audit_policy.outcome }}
+          SCOPE: ${{ steps.scope.outcome }}
+          CLASSIFICATION: ${{ steps.verdict.outputs.classification }}
+          CAUSALITY: ${{ steps.verdict.outputs.causality }}
+          INVALID_FILES: ${{ steps.verdict.outputs.invalid_files }}
+          REMEDIATION: ${{ steps.verdict.outputs.remediation }}
           RECOMMENDATION: ${{ steps.verdict.outputs.recommendation }}
           REASON: ${{ steps.verdict.outputs.reason }}
           CRITICAL: ${{ steps.verdict.outputs.critical }}
@@ -348,6 +398,9 @@ jobs:
               `Dependency: ${process.env.DEPENDENCY_NAMES || 'Unknown'} (${process.env.DEPENDENCY_TYPE || 'Unknown'}, ${process.env.UPDATE_TYPE || 'Unknown'})`,
               `Version: ${process.env.PREVIOUS_VERSION || 'Unknown'} -> ${process.env.NEW_VERSION || 'Unknown'}`,
               `Security: ${securityLine}${highCriticalDetails}`,
+              `Classification: ${process.env.CLASSIFICATION || 'UNKNOWN'}`,
+              `Causality: ${process.env.CAUSALITY || 'UNKNOWN'}`,
+              `Scope gate: ${formatOutcome(process.env.SCOPE)}${process.env.INVALID_FILES ? ` (invalid files: ${process.env.INVALID_FILES})` : ''}`,
               `Breaking change risk: ${(process.env.UPDATE_TYPE || '').includes('semver-major') ? 'High (major update)' : 'Low/Medium (non-major update)'}`,
               `Tests: ${formatOutcome(process.env.TESTS)}`,
               `Coverage: ${formatOutcome(process.env.COVERAGE)}`,
@@ -356,7 +409,9 @@ jobs:
               `Lockfile changes: ${process.env.LOCKFILE_CHANGED === 'true' ? 'Yes' : 'No'}`,
               `Release notes/changelog refs: ${process.env.RELEASE_REFS || 'N/A'}`,
               '',
-              `Recommendation: ${process.env.RECOMMENDATION || 'HUMAN REVIEW REQUIRED'}`,
+              `Recommendation: ${process.env.RECOMMENDATION || 'READY FOR HUMAN REVIEW'}`,
+              `Remediation: ${process.env.REMEDIATION || 'NOT_APPLIED - human review required for any fix'}`,
+              'Automatic merge is disabled. No security or quality gate is bypassed.',
               '',
               `Reason: ${process.env.REASON || 'No reason provided'}`,
               '',

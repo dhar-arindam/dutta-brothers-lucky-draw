@@ -150,14 +150,16 @@ Phone numbers must be masked by default.
 - Search
 - Date filtering
 - Prize filtering
-- Pagination
+- Infinite scrolling for claims
 - CSV export
 - Prize-based claim drill-down from prize rows/counts
 - Manual refresh of operational data
 - Delete an individual claim
 - Clear all claims in one action
 
-Claims must not be loaded without a bounded page size.
+Claims must not be loaded without a bounded server-side page size. The page-size value is an internal API concern and is not user-configurable in the Admin UI.
+
+Claims are loaded newest-first. When the user reaches the end of the loaded claims, the next cursor page is fetched automatically and appended. Applying or clearing filters resets the loaded list and cursor. Manual next/previous controls may remain available as an accessible fallback when automatic observation is unavailable.
 
 At large desktop widths, the Claims action controls should remain on one row when space permits. At smaller widths, controls may wrap without overlap or horizontal scrolling.
 
@@ -213,12 +215,12 @@ The awarded/given information per prize provides a shortcut into the Claims Repo
 
 ### Search
 
-Search supports only these fields:
+Search supports pattern matching only across these fields:
 
-- Claim ID: exact match or prefix match.
-- Customer name: case-insensitive prefix match after trimming.
-- Normalized bill number: exact match or prefix match after normalization.
-- Prize name: case-insensitive prefix match.
+- Claim ID: case-insensitive substring match.
+- Customer name: case-insensitive substring match after trimming.
+- Normalized bill number: substring match after normalization.
+- Prize name: case-insensitive substring match.
 
 Arbitrary full-text search is not required. The implementation must use an efficient DynamoDB-compatible strategy and must not introduce OpenSearch or another search service.
 

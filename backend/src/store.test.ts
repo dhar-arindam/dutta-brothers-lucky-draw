@@ -81,6 +81,9 @@ describe('in-memory store admin claims query and pagination', () => {
     expect(filtered.items).toHaveLength(1);
     expect(filtered.items[0]?.claimId).toBe('DB26-000002');
 
+    const patternMatch = store.listAdminClaims({ pageSize: 10, search: 'iya' });
+    expect(patternMatch.items.map((item) => item.claimId)).toContain('DB26-000002');
+
     const firstPage = store.listAdminClaims({ pageSize: 1 });
     const secondPage = firstPage.nextPageToken
       ? store.listAdminClaims({ pageSize: 1, pageToken: firstPage.nextPageToken })

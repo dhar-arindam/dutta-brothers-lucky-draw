@@ -11,7 +11,7 @@ const successJson = (payload: unknown) => ({
   text: async () => (typeof payload === 'string' ? payload : JSON.stringify(payload)),
 });
 
-const enqueueDashboardSuccess = () => {
+const enqueueDashboardSuccess = (nextPageToken: string | null = null) => {
   mockFetch
     .mockResolvedValueOnce(
       successJson({
@@ -71,7 +71,7 @@ const enqueueDashboardSuccess = () => {
             prize: 'Electric Kettle',
           },
         ],
-        nextPageToken: null,
+        nextPageToken,
       }),
     );
 };
@@ -938,6 +938,41 @@ describe('admin operations page', () => {
     });
   });
 
+  it('loads and appends the next claims page when the scroll sentinel is visible', async () => {
+    enqueueDashboardSuccess('token-1');
+    mockFetch.mockResolvedValueOnce(
+      successJson({
+        status: 'SUCCESS',
+        items: [
+          {
+            claimId: 'CLM-20260815-000001',
+            claimTimestamp: '2026-08-15T10:30:00.000Z',
+            customerName: 'Riya Sen',
+            maskedPhone: '*****5678',
+            billNumber: 'XY100',
+            prize: 'Electric Kettle',
+          },
+        ],
+        nextPageToken: null,
+      }),
+    );
+    vi.stubGlobal(
+      'IntersectionObserver',
+      vi.fn().mockImplementation((callback: IntersectionObserverCallback) => ({
+        observe: () => callback([{ isIntersecting: true } as IntersectionObserverEntry], {} as IntersectionObserver),
+        disconnect: vi.fn(),
+      })),
+    );
+    vi.stubGlobal('fetch', mockFetch);
+
+    render(<AdminPrizePage />);
+    await waitForAutoLoad();
+
+    expect((await screen.findAllByText('Riya Sen')).length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Amit Das').length).toBeGreaterThan(0);
+    expect(mockFetch).toHaveBeenCalledTimes(5);
+  });
+
   it('exports all data and renders last preview', async () => {
     enqueueDashboardSuccess();
     mockFetch.mockResolvedValueOnce(
@@ -1044,13 +1079,11 @@ describe('admin operations page', () => {
     fireEvent.change(screen.getByLabelText('To Date (Filter)'), {
       target: { value: '2026-08-16' },
     });
-    fireEvent.change(screen.getByLabelText('Page Size'), { target: { value: '150' } });
-
     expect(screen.getByLabelText('Search')).toHaveValue('Amit');
     expect(screen.getByLabelText('Prize')).toHaveValue('prize-001');
     expect(screen.getByLabelText('From Date (Filter)')).toHaveValue('2026-08-16');
     expect(screen.getByLabelText('To Date (Filter)')).toHaveValue('2026-08-16');
-    expect(screen.getByLabelText('Page Size')).toHaveValue('150');
+    expect(screen.queryByLabelText('Page Size')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Apply Filters' }));
 

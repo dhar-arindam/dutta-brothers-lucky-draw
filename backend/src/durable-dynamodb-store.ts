@@ -489,7 +489,7 @@ export class DynamoDbDrawStore {
           },
           ExclusiveStartKey: exclusiveStartKey ?? undefined,
           ScanIndexForward: false,
-          Limit: 100,
+          Limit: pageSize,
         }),
       );
 
@@ -1071,10 +1071,10 @@ const passesClaimFilter = (
   const prizeName = claim.prize.name.trim().toLowerCase();
 
   return (
-    claim.claimId.startsWith(search) ||
-    customerName.startsWith(searchLower) ||
-    claim.billNumberNormalized.startsWith(normalizedSearch) ||
-    prizeName.startsWith(searchLower)
+    claim.claimId.toLowerCase().includes(searchLower) ||
+    customerName.includes(searchLower) ||
+    claim.billNumberNormalized.includes(normalizedSearch) ||
+    prizeName.includes(searchLower)
   );
 };
 

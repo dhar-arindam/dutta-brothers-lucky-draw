@@ -833,7 +833,7 @@ describe('admin operations page', () => {
     expect(alert).toHaveTextContent('We could not complete the admin request. Please try again.');
   });
 
-  it('supports next and previous claim pagination', async () => {
+  it('does not render previous and next pagination buttons', async () => {
     mockFetch
       .mockResolvedValueOnce(
         successJson({
@@ -886,56 +886,14 @@ describe('admin operations page', () => {
           ],
           nextPageToken: 'token-1',
         }),
-      )
-      .mockResolvedValueOnce(
-        successJson({
-          status: 'SUCCESS',
-          items: [
-            {
-              claimId: 'CLM-20260816-000002',
-              claimTimestamp: '2026-08-16T11:30:00.000Z',
-              customerName: 'Riya Sen',
-              maskedPhone: '*****7788',
-              billNumber: 'AB124',
-              prize: 'Electric Kettle',
-            },
-          ],
-          nextPageToken: null,
-        }),
-      )
-      .mockResolvedValueOnce(
-        successJson({
-          status: 'SUCCESS',
-          items: [
-            {
-              claimId: 'CLM-20260816-000001',
-              claimTimestamp: '2026-08-16T10:30:00.000Z',
-              customerName: 'Amit Das',
-              maskedPhone: '*****1234',
-              billNumber: 'AB123',
-              prize: 'Electric Kettle',
-            },
-          ],
-          nextPageToken: 'token-1',
-        }),
       );
     vi.stubGlobal('fetch', mockFetch);
 
     render(<AdminPrizePage />);
     await waitForAutoLoad();
 
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled();
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
-    await waitFor(() => {
-      expect(screen.getAllByText('Riya Sen').length).toBeGreaterThan(0);
-    });
-
-    fireEvent.click(screen.getByRole('button', { name: 'Previous' }));
-    await waitFor(() => {
-      expect(screen.getAllByText('Amit Das').length).toBeGreaterThan(0);
-    });
+    expect(screen.queryByRole('button', { name: 'Next' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Previous' })).not.toBeInTheDocument();
   });
 
   it('loads and appends the next claims page when the scroll sentinel is visible', async () => {

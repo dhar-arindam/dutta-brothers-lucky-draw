@@ -92,7 +92,6 @@ export const AdminPrizePage = () => {
   const [prizes, setPrizes] = useState<AdminPrize[]>([]);
   const [claims, setClaims] = useState<AdminClaimItem[]>([]);
   const [nextPageToken, setNextPageToken] = useState<string | null>(null);
-  const [pageTokens, setPageTokens] = useState<string[]>([]);
   const claimsLoadMoreRef = useRef<HTMLDivElement>(null);
   const isLoadingMoreClaimsRef = useRef(false);
   const [summary, setSummary] = useState<AdminSummaryResponse | null>(null);
@@ -237,7 +236,6 @@ export const AdminPrizePage = () => {
       const claimsPayload = claimsResponse as AdminClaimsListResponse;
       setClaims(claimsPayload.items);
       setNextPageToken(claimsPayload.nextPageToken);
-      setPageTokens([]);
 
       setState({ type: 'READY' });
       setFeedback('Admin data loaded.');
@@ -253,7 +251,7 @@ export const AdminPrizePage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const loadClaims = async (query: AdminClaimsQuery, trackToken = true, append = false) => {
+  const loadClaims = async (query: AdminClaimsQuery, append = false) => {
     setBusyAction('CLAIMS');
     setFeedback('Loading claims...');
 
@@ -267,10 +265,6 @@ export const AdminPrizePage = () => {
       if (!('items' in response)) {
         setErrorState('We could not complete the admin request. Please try again.');
         return;
-      }
-
-      if (trackToken && query.pageToken) {
-        setPageTokens((current) => [...current, query.pageToken as string]);
       }
 
       setClaims((current) => (append ? [...current, ...response.items] : response.items));
@@ -296,7 +290,7 @@ export const AdminPrizePage = () => {
       }
 
       isLoadingMoreClaimsRef.current = true;
-      void loadClaims(buildClaimsQuery(nextPageToken), true, true);
+      void loadClaims(buildClaimsQuery(nextPageToken), true);
     });
 
     observer.observe(sentinel);
@@ -321,15 +315,13 @@ export const AdminPrizePage = () => {
   const onApplyFilters = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    setPageTokens([]);
-    await loadClaims(buildClaimsQuery(), false);
+    await loadClaims(buildClaimsQuery());
     setFeedback('Filters applied.');
   };
 
   const onClearFilters = async () => {
     setFilters(defaultFilters);
-    setPageTokens([]);
-    await loadClaims(buildClaimsQuery(undefined, defaultFilters), false);
+    await loadClaims(buildClaimsQuery(undefined, defaultFilters));
     setFeedback('Filters cleared.');
   };
 
@@ -340,8 +332,7 @@ export const AdminPrizePage = () => {
     };
 
     setFilters(nextFilters);
-    setPageTokens([]);
-    await loadClaims(buildClaimsQuery(undefined, nextFilters), false);
+    await loadClaims(buildClaimsQuery(undefined, nextFilters));
     setFeedback(prizeId ? 'Prize filter applied.' : 'Showing all prize claims.');
   };
 
@@ -355,48 +346,6 @@ export const AdminPrizePage = () => {
 
     event.preventDefault();
     void onSelectPrizeFilter(prizeId);
-  };
-
-  const onNextPage = async () => {
-    if (!nextPageToken) {
-      return;
-    }
-
-    await loadClaims(buildClaimsQuery(nextPageToken), true, true);
-  };
-
-  const onPreviousPage = async () => {
-    if (pageTokens.length === 0) {
-      return;
-    }
-
-    const previousTokens = [...pageTokens];
-    previousTokens.pop();
-    const previousToken = previousTokens.at(-1);
-
-    setBusyAction('CLAIMS');
-    setFeedback('Loading previous claims page...');
-    try {
-      const response = await listAdminClaims(buildClaimsQuery(previousToken));
-      if (response.status === 'ERROR') {
-        setErrorState(response.message);
-        return;
-      }
-
-      if (!('items' in response)) {
-        setErrorState('We could not complete the admin request. Please try again.');
-        return;
-      }
-
-      setClaims(response.items);
-      setNextPageToken(response.nextPageToken);
-      setPageTokens(previousTokens);
-      setState({ type: 'READY' });
-    } catch {
-      setErrorState('We could not complete the admin request. Please try again.');
-    } finally {
-      setBusyAction('NONE');
-    }
   };
 
   const onExportCsv = async () => {
@@ -1358,25 +1307,6 @@ export const AdminPrizePage = () => {
               role="status"
             />
           ) : null}
-
-          <div className="mt-3 flex flex-wrap gap-2">
-            <button
-              type="button"
-              className={primaryButtonClass}
-              disabled={isBusy || pageTokens.length === 0}
-              onClick={() => void onPreviousPage()}
-            >
-              Previous
-            </button>
-            <button
-              type="button"
-              className={primaryButtonClass}
-              disabled={isBusy || !nextPageToken}
-              onClick={() => void onNextPage()}
-            >
-              Next
-            </button>
-          </div>
 
           {lastCsvExport ? (
             <details className={csvPanelClass}>

@@ -926,7 +926,10 @@ describe('admin operations page', () => {
     render(<AdminPrizePage />);
     await waitForAutoLoad();
 
-    expect((await screen.findAllByText('Riya Sen')).length).toBeGreaterThan(0);
+    await waitFor(() => {
+      expect(screen.getAllByText('Riya Sen').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('Loaded 2 of 2 claims.').length).toBeGreaterThan(0);
+    });
     expect(screen.getAllByText('Amit Das').length).toBeGreaterThan(0);
     expect(mockFetch).toHaveBeenCalledTimes(5);
   });

@@ -267,9 +267,13 @@ export const AdminPrizePage = () => {
         return;
       }
 
+      const loadedClaimsCount = append ? claims.length + response.items.length : response.items.length;
       setClaims((current) => (append ? [...current, ...response.items] : response.items));
       setNextPageToken(response.nextPageToken);
       setState({ type: 'READY' });
+      if (append) {
+        setFeedback(`Loaded ${loadedClaimsCount} of ${summary?.totalSuccessfulSpins ?? loadedClaimsCount} claims.`);
+      }
     } catch {
       setErrorState('We could not complete the admin request. Please try again.');
     } finally {

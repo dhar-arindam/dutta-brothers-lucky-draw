@@ -203,6 +203,7 @@ These criteria define the Definition of Done for the initial product scope.
 - [ ] Admin claims search matches case-insensitive partial patterns across claim ID, customer name, normalized bill number, and prize name.
 - [ ] Claims do not expose a user-configurable page-size control.
 - [ ] Claims load newest-first and automatically append the next bounded cursor page when the list end is reached.
+- [ ] Infinite-scroll loading displays a status message with the number of loaded claims out of the total successful claims.
 - [ ] Applying or clearing claims filters resets the loaded claims list and cursor.
 - [ ] Landing and form screens avoid unnecessary initial scrolling where feasible.
 - [ ] The reveal area fits the available content width at all target widths.

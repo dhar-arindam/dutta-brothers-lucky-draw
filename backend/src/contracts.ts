@@ -1,4 +1,5 @@
-export type AdminErrorCode = 'VALIDATION_ERROR' | 'REQUEST_TOO_LARGE' | 'INTERNAL_ERROR';
+export type AdminErrorCode =
+  'VALIDATION_ERROR' | 'REQUEST_TOO_LARGE' | 'EXPORT_TOO_LARGE' | 'INTERNAL_ERROR';
 
 export interface AdminPrize {
   id: string;

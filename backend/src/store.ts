@@ -87,6 +87,20 @@ export interface AdminCsvClaimItem {
   prize: string;
 }
 
+// The export is built in memory and returned in a single Lambda response, so it is bounded well
+// below the API Gateway payload limit rather than being allowed to exhaust memory or time out.
+export const CSV_EXPORT_MAX_ROWS = 20000;
+
+export class CsvExportTooLargeError extends Error {
+  public readonly limit: number;
+
+  public constructor(limit: number) {
+    super(`Claim export exceeds the maximum of ${limit} rows.`);
+    this.name = 'CsvExportTooLargeError';
+    this.limit = limit;
+  }
+}
+
 export interface CampaignUpdateInput {
   fromDate?: string;
   toDate?: string;
@@ -343,6 +357,10 @@ export class InMemoryDrawStore {
   }
 
   public listAdminClaimsForCsv(): AdminCsvClaimItem[] {
+    if (this.claimsInCreatedOrder.length > CSV_EXPORT_MAX_ROWS) {
+      throw new CsvExportTooLargeError(CSV_EXPORT_MAX_ROWS);
+    }
+
     return [...this.claimsInCreatedOrder].reverse().map((claim): AdminCsvClaimItem => {
       return {
         claimId: claim.claimId,

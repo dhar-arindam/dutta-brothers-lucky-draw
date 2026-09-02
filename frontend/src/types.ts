@@ -120,7 +120,10 @@ export interface AdminErrorResponse {
   code: 'VALIDATION_ERROR' | 'REQUEST_TOO_LARGE' | 'INTERNAL_ERROR';
   message: string;
   fieldErrors?: Partial<
-    Record<'name' | 'weight' | 'active' | 'pageSize' | 'from' | 'to' | 'fromDate' | 'toDate', string>
+    Record<
+      'name' | 'weight' | 'active' | 'pageSize' | 'from' | 'to' | 'fromDate' | 'toDate',
+      string
+    >
   >;
 }
 

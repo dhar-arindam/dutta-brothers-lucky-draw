@@ -1,0 +1,21 @@
+commit_msg_file="$1"
+header="$(head -n 1 "$commit_msg_file")"
+
+# Allow git-generated merge/revert/fixup headers through unchanged.
+case "$header" in
+  "Merge "* | "Revert "* | "fixup!"* | "squash!"*) exit 0 ;;
+esac
+
+pattern='^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\([a-z0-9._/-]+\))?!?: .{1,}$'
+
+if ! printf '%s' "$header" | grep -Eq "$pattern"; then
+  echo "Invalid commit message header:"
+  echo "  $header"
+  echo
+  echo "Expected Conventional Commits format, for example:"
+  echo "  feat(draw): enforce single claim per phone number"
+  echo "  chore(deps-dev): bump vitest to 4.1.11"
+  echo
+  echo "Allowed types: build, chore, ci, docs, feat, fix, perf, refactor, revert, style, test"
+  exit 1
+fi

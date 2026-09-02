@@ -218,8 +218,14 @@ describe('campaign enforcement parity across local and lambda runtimes', () => {
           code: 'DRAW_ENDED',
         });
         expect(local.snapshot.claimCount, `${item.name} local claim count`).toBe(0);
-        expect(local.snapshot.aggregate.totalSuccessfulSpins, `${item.name} local aggregate total`).toBe(0);
-        expect(Object.keys(local.snapshot.aggregate.byPrizeId), `${item.name} local prize aggregate`).toHaveLength(0);
+        expect(
+          local.snapshot.aggregate.totalSuccessfulSpins,
+          `${item.name} local aggregate total`,
+        ).toBe(0);
+        expect(
+          Object.keys(local.snapshot.aggregate.byPrizeId),
+          `${item.name} local prize aggregate`,
+        ).toHaveLength(0);
 
         expect(lambda.response.statusCode, `${item.name} lambda`).toBe(409);
         expect(lambdaBody).toMatchObject({
@@ -238,7 +244,10 @@ describe('campaign enforcement parity across local and lambda runtimes', () => {
 
     const localBefore = evaluateLocalRuntime(justBeforeIstMidnight);
     const lambdaBefore = await evaluateLambdaRuntime(justBeforeIstMidnight);
-    const lambdaBeforeBody = JSON.parse(lambdaBefore.response.body) as { status: string; code?: string };
+    const lambdaBeforeBody = JSON.parse(lambdaBefore.response.body) as {
+      status: string;
+      code?: string;
+    };
 
     expect(localBefore.response.statusCode).toBe(409);
     expect(localBefore.response.body).toMatchObject({ status: 'ERROR', code: 'DRAW_ENDED' });
@@ -278,7 +287,8 @@ describe('campaign enforcement parity across local and lambda runtimes', () => {
     expect(localResponse.body).toMatchObject({
       status: 'ERROR',
       code: 'DRAW_ENDED',
-      message: 'The lucky draw has ended for this festive season. Please visit the Dutta Brothers counter.',
+      message:
+        'The lucky draw has ended for this festive season. Please visit the Dutta Brothers counter.',
     });
     expect(localSnapshot.claimCount).toBe(0);
     expect(localSnapshot.aggregate.totalSuccessfulSpins).toBe(0);
@@ -307,13 +317,18 @@ describe('campaign enforcement parity across local and lambda runtimes', () => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(drawRequest),
     });
-    const lambdaBody = JSON.parse(lambdaResponse.body) as { status: string; code?: string; message?: string };
+    const lambdaBody = JSON.parse(lambdaResponse.body) as {
+      status: string;
+      code?: string;
+      message?: string;
+    };
 
     expect(lambdaResponse.statusCode).toBe(409);
     expect(lambdaBody).toMatchObject({
       status: 'ERROR',
       code: 'DRAW_ENDED',
-      message: 'The lucky draw has ended for this festive season. Please visit the Dutta Brothers counter.',
+      message:
+        'The lucky draw has ended for this festive season. Please visit the Dutta Brothers counter.',
     });
     expect(mockLambdaState.listEligibleCalls).toBe(0);
     expect(mockLambdaState.createClaimCalls).toBe(0);
@@ -323,20 +338,26 @@ describe('campaign enforcement parity across local and lambda runtimes', () => {
     const nowIso = '2026-08-20T18:30:00.000Z';
     const local = evaluateLocalRuntime(nowIso);
     const lambda = await evaluateLambdaRuntime(nowIso);
-    const lambdaBody = JSON.parse(lambda.response.body) as { status: string; code?: string; message?: string };
+    const lambdaBody = JSON.parse(lambda.response.body) as {
+      status: string;
+      code?: string;
+      message?: string;
+    };
 
     expect(local.response.statusCode).toBe(409);
     expect(local.response.body).toMatchObject({
       status: 'ERROR',
       code: 'DRAW_ENDED',
-      message: 'The lucky draw has ended for this festive season. Please visit the Dutta Brothers counter.',
+      message:
+        'The lucky draw has ended for this festive season. Please visit the Dutta Brothers counter.',
     });
 
     expect(lambda.response.statusCode).toBe(409);
     expect(lambdaBody).toMatchObject({
       status: 'ERROR',
       code: 'DRAW_ENDED',
-      message: 'The lucky draw has ended for this festive season. Please visit the Dutta Brothers counter.',
+      message:
+        'The lucky draw has ended for this festive season. Please visit the Dutta Brothers counter.',
     });
   });
 });

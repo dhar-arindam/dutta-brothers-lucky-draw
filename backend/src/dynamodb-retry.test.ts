@@ -13,47 +13,95 @@ const makeTransactionCanceledException = (reasonCodes: Array<string | undefined>
 
 describe('classifyTransactionCancellation', () => {
   it('classifies a ConditionalCheckFailed on the bill/claim uniqueness positions as DUPLICATE', () => {
-    const error = makeTransactionCanceledException(['ConditionalCheckFailed', 'None', 'None', 'None', 'None']);
+    const error = makeTransactionCanceledException([
+      'ConditionalCheckFailed',
+      'None',
+      'None',
+      'None',
+      'None',
+    ]);
     const result = classifyTransactionCancellation(error, [0, 1]);
     expect(result.category).toBe('DUPLICATE');
   });
 
   it('classifies a ConditionalCheckFailed on the claim-id position as DUPLICATE', () => {
-    const error = makeTransactionCanceledException(['None', 'ConditionalCheckFailed', 'None', 'None', 'None']);
+    const error = makeTransactionCanceledException([
+      'None',
+      'ConditionalCheckFailed',
+      'None',
+      'None',
+      'None',
+    ]);
     const result = classifyTransactionCancellation(error, [0, 1]);
     expect(result.category).toBe('DUPLICATE');
   });
 
   it('classifies TransactionConflict on a shared aggregate item as TRANSIENT, not DUPLICATE', () => {
-    const error = makeTransactionCanceledException(['None', 'None', 'TransactionConflict', 'None', 'None']);
+    const error = makeTransactionCanceledException([
+      'None',
+      'None',
+      'TransactionConflict',
+      'None',
+      'None',
+    ]);
     const result = classifyTransactionCancellation(error, [0, 1]);
     expect(result.category).toBe('TRANSIENT');
     expect(result.reasonCodes).toContain('TransactionConflict');
   });
 
   it('classifies ProvisionedThroughputExceeded as TRANSIENT', () => {
-    const error = makeTransactionCanceledException(['None', 'None', 'ProvisionedThroughputExceeded', 'None', 'None']);
+    const error = makeTransactionCanceledException([
+      'None',
+      'None',
+      'ProvisionedThroughputExceeded',
+      'None',
+      'None',
+    ]);
     expect(classifyTransactionCancellation(error, [0, 1]).category).toBe('TRANSIENT');
   });
 
   it('classifies ThrottlingError as TRANSIENT', () => {
-    const error = makeTransactionCanceledException(['None', 'None', 'None', 'ThrottlingError', 'None']);
+    const error = makeTransactionCanceledException([
+      'None',
+      'None',
+      'None',
+      'ThrottlingError',
+      'None',
+    ]);
     expect(classifyTransactionCancellation(error, [0, 1]).category).toBe('TRANSIENT');
   });
 
   it('never misclassifies a duplicate-position failure as transient, even alongside a transient reason elsewhere', () => {
-    const error = makeTransactionCanceledException(['ConditionalCheckFailed', 'None', 'TransactionConflict', 'None', 'None']);
+    const error = makeTransactionCanceledException([
+      'ConditionalCheckFailed',
+      'None',
+      'TransactionConflict',
+      'None',
+      'None',
+    ]);
     // Duplicate takes priority: a genuine duplicate must never be retried.
     expect(classifyTransactionCancellation(error, [0, 1]).category).toBe('DUPLICATE');
   });
 
   it('classifies a ConditionalCheckFailed outside the known duplicate-check positions as PERMANENT (not silently retried, not silently treated as duplicate)', () => {
-    const error = makeTransactionCanceledException(['None', 'None', 'ConditionalCheckFailed', 'None', 'None']);
+    const error = makeTransactionCanceledException([
+      'None',
+      'None',
+      'ConditionalCheckFailed',
+      'None',
+      'None',
+    ]);
     expect(classifyTransactionCancellation(error, [0, 1]).category).toBe('PERMANENT');
   });
 
   it('classifies an unrecognized cancellation reason as PERMANENT', () => {
-    const error = makeTransactionCanceledException(['None', 'None', 'ValidationError', 'None', 'None']);
+    const error = makeTransactionCanceledException([
+      'None',
+      'None',
+      'ValidationError',
+      'None',
+      'None',
+    ]);
     expect(classifyTransactionCancellation(error, [0, 1]).category).toBe('PERMANENT');
   });
 
@@ -82,7 +130,9 @@ describe('computeBackoffDelayMs', () => {
   it('applies full jitter: delay is always between 0 and the exponential cap', () => {
     const seenDelays = new Set<number>();
     for (const random of [0, 0.25, 0.5, 0.75, 0.999]) {
-      seenDelays.add(computeBackoffDelayMs(3, { baseDelayMs: 25, maxDelayMs: 400, random: () => random }));
+      seenDelays.add(
+        computeBackoffDelayMs(3, { baseDelayMs: 25, maxDelayMs: 400, random: () => random }),
+      );
     }
     expect(seenDelays.size).toBeGreaterThan(1);
     for (const delay of seenDelays) {

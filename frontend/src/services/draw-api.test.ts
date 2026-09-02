@@ -130,7 +130,9 @@ describe('draw api idempotency header behavior', () => {
         phone: '9876543210',
         billNumber: 'DB12345',
       }),
-    ).rejects.toEqual(expect.objectContaining({ name: 'DrawApiError', code: 'API_ERROR', message: 'upstream' }));
+    ).rejects.toEqual(
+      expect.objectContaining({ name: 'DrawApiError', code: 'API_ERROR', message: 'upstream' }),
+    );
   });
 
   it('maps generic fetch failures to NETWORK_ERROR', async () => {

@@ -1,8 +1,4 @@
-import {
-  QueryCommand,
-  TransactWriteCommand,
-  UpdateCommand,
-} from '@aws-sdk/lib-dynamodb';
+import { QueryCommand, TransactWriteCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { describe, expect, it } from 'vitest';
 
 import { DynamoDbDrawStore } from './durable-dynamodb-store.js';
@@ -61,8 +57,12 @@ describe('aws integration semantics', () => {
     expect(transaction.input.TransactItems).toBeDefined();
     expect(transaction.input.TransactItems?.length).toBeGreaterThanOrEqual(5);
 
-    const billGuard = transaction.input.TransactItems?.find((item) => item.Put?.Item?.pk === 'BILL');
-    expect(billGuard?.Put?.ConditionExpression).toBe('attribute_not_exists(pk) AND attribute_not_exists(sk)');
+    const billGuard = transaction.input.TransactItems?.find(
+      (item) => item.Put?.Item?.pk === 'BILL',
+    );
+    expect(billGuard?.Put?.ConditionExpression).toBe(
+      'attribute_not_exists(pk) AND attribute_not_exists(sk)',
+    );
   });
 
   it('handles duplicate-claim race by returning existing claim without second write', async () => {
@@ -72,7 +72,13 @@ describe('aws integration semantics', () => {
       const error = new Error('Transaction cancelled');
       Object.assign(error, {
         name: 'TransactionCanceledException',
-        CancellationReasons: [{ Code: 'ConditionalCheckFailed' }, { Code: 'None' }, { Code: 'None' }, { Code: 'None' }, { Code: 'None' }],
+        CancellationReasons: [
+          { Code: 'ConditionalCheckFailed' },
+          { Code: 'None' },
+          { Code: 'None' },
+          { Code: 'None' },
+          { Code: 'None' },
+        ],
       });
       throw error;
     });

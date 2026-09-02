@@ -47,7 +47,10 @@ describe('node handler admin and routing coverage', () => {
     openServers.length = 0;
   });
 
-  const start = async (drawApiHandler: DrawApiHandler, adminPrizeApiHandler: AdminPrizeApiHandler) => {
+  const start = async (
+    drawApiHandler: DrawApiHandler,
+    adminPrizeApiHandler: AdminPrizeApiHandler,
+  ) => {
     const nodeHandler = createNodeHandler({ drawApiHandler, adminPrizeApiHandler });
     const server = createServer((req, res) => {
       void nodeHandler(req, res);
@@ -77,7 +80,10 @@ describe('node handler admin and routing coverage', () => {
     }));
     const addPrize = vi.fn<AdminPrizeApiHandler['addPrize']>(() => ({
       statusCode: 201,
-      body: { status: 'SUCCESS', item: { ...adminPrizeItem, id: 'prize-010', name: 'Mixer Grinder' } },
+      body: {
+        status: 'SUCCESS',
+        item: { ...adminPrizeItem, id: 'prize-010', name: 'Mixer Grinder' },
+      },
     }));
     const updatePrize = vi.fn<AdminPrizeApiHandler['updatePrize']>(() => ({
       statusCode: 200,
@@ -152,15 +158,41 @@ describe('node handler admin and routing coverage', () => {
     const baseUrl = await start(drawHandler, adminHandler);
 
     expect((await fetch(`${baseUrl}/api/admin/prizes`)).status).toBe(200);
-    expect((await fetch(`${baseUrl}/api/admin/prizes`, { method: 'POST', body: '{}', headers: { 'content-type': 'application/json' } })).status).toBe(201);
-    expect((await fetch(`${baseUrl}/api/admin/prizes/prize-001`, { method: 'PATCH', body: '{}', headers: { 'content-type': 'application/json' } })).status).toBe(200);
+    expect(
+      (
+        await fetch(`${baseUrl}/api/admin/prizes`, {
+          method: 'POST',
+          body: '{}',
+          headers: { 'content-type': 'application/json' },
+        })
+      ).status,
+    ).toBe(201);
+    expect(
+      (
+        await fetch(`${baseUrl}/api/admin/prizes/prize-001`, {
+          method: 'PATCH',
+          body: '{}',
+          headers: { 'content-type': 'application/json' },
+        })
+      ).status,
+    ).toBe(200);
     expect((await fetch(`${baseUrl}/api/admin/claims?pageSize=25`)).status).toBe(200);
-    expect((await fetch(`${baseUrl}/api/admin/claims/DB26-000001`, { method: 'DELETE' })).status).toBe(200);
+    expect(
+      (await fetch(`${baseUrl}/api/admin/claims/DB26-000001`, { method: 'DELETE' })).status,
+    ).toBe(200);
     expect((await fetch(`${baseUrl}/api/admin/claims`, { method: 'DELETE' })).status).toBe(200);
     expect((await fetch(`${baseUrl}/api/admin/claims.csv?pageSize=999`)).status).toBe(200);
     expect((await fetch(`${baseUrl}/api/admin/summary`)).status).toBe(200);
     expect((await fetch(`${baseUrl}/api/admin/campaign`)).status).toBe(200);
-    expect((await fetch(`${baseUrl}/api/admin/campaign`, { method: 'PATCH', body: '{}', headers: { 'content-type': 'application/json' } })).status).toBe(200);
+    expect(
+      (
+        await fetch(`${baseUrl}/api/admin/campaign`, {
+          method: 'PATCH',
+          body: '{}',
+          headers: { 'content-type': 'application/json' },
+        })
+      ).status,
+    ).toBe(200);
 
     const notFound = await fetch(`${baseUrl}/api/unknown`);
     expect(notFound.status).toBe(404);

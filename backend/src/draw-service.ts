@@ -55,7 +55,8 @@ export class DrawService {
         body: {
           status: 'ERROR',
           code: 'DRAW_ENDED',
-          message: 'The lucky draw has ended for this festive season. Please visit the Dutta Brothers counter.',
+          message:
+            'The lucky draw has ended for this festive season. Please visit the Dutta Brothers counter.',
         },
       };
     }
@@ -71,7 +72,8 @@ export class DrawService {
         body: {
           status: 'ERROR',
           code: 'NO_ELIGIBLE_PRIZE',
-          message: 'The lucky draw has ended for this festive season. Please visit the Dutta Brothers counter.',
+          message:
+            'The lucky draw has ended for this festive season. Please visit the Dutta Brothers counter.',
         },
       };
     }

@@ -86,7 +86,9 @@ describe('foundation stack aws configuration', () => {
     template.resourceCountIs('AWS::S3::Bucket', 1);
     template.resourceCountIs('AWS::CloudFront::Distribution', 1);
     template.resourceCountIs('AWS::ApiGatewayV2::Api', 1);
-    expect(Object.keys(template.findResources('AWS::Lambda::Function')).length).toBeGreaterThanOrEqual(2);
+    expect(
+      Object.keys(template.findResources('AWS::Lambda::Function')).length,
+    ).toBeGreaterThanOrEqual(2);
     template.resourceCountIs('AWS::DynamoDB::Table', 1);
   }, 30000);
 
@@ -98,7 +100,15 @@ describe('foundation stack aws configuration', () => {
         CacheBehaviors: Match.arrayWith([
           Match.objectLike({
             PathPattern: '/api/*',
-            AllowedMethods: Match.arrayWith(['GET', 'HEAD', 'OPTIONS', 'PUT', 'PATCH', 'POST', 'DELETE']),
+            AllowedMethods: Match.arrayWith([
+              'GET',
+              'HEAD',
+              'OPTIONS',
+              'PUT',
+              'PATCH',
+              'POST',
+              'DELETE',
+            ]),
           }),
         ]),
         Origins: Match.arrayWith([
@@ -161,39 +171,27 @@ describe('foundation stack aws configuration', () => {
     const template = devTemplate;
 
     template.hasResourceProperties('AWS::S3::Bucket', {
-      Tags: Match.arrayWith([
-        { Key: 'project', Value: 'lucky-draw' },
-      ]),
+      Tags: Match.arrayWith([{ Key: 'project', Value: 'lucky-draw' }]),
     });
 
     template.hasResourceProperties('AWS::S3::Bucket', {
-      Tags: Match.arrayWith([
-        { Key: 'organization', Value: 'dutta-brothers' },
-      ]),
+      Tags: Match.arrayWith([{ Key: 'organization', Value: 'dutta-brothers' }]),
     });
 
     template.hasResourceProperties('AWS::DynamoDB::Table', {
-      Tags: Match.arrayWith([
-        { Key: 'project', Value: 'lucky-draw' },
-      ]),
+      Tags: Match.arrayWith([{ Key: 'project', Value: 'lucky-draw' }]),
     });
 
     template.hasResourceProperties('AWS::DynamoDB::Table', {
-      Tags: Match.arrayWith([
-        { Key: 'organization', Value: 'dutta-brothers' },
-      ]),
+      Tags: Match.arrayWith([{ Key: 'organization', Value: 'dutta-brothers' }]),
     });
 
     template.hasResourceProperties('AWS::Lambda::Function', {
-      Tags: Match.arrayWith([
-        { Key: 'project', Value: 'lucky-draw' },
-      ]),
+      Tags: Match.arrayWith([{ Key: 'project', Value: 'lucky-draw' }]),
     });
 
     template.hasResourceProperties('AWS::Lambda::Function', {
-      Tags: Match.arrayWith([
-        { Key: 'organization', Value: 'dutta-brothers' },
-      ]),
+      Tags: Match.arrayWith([{ Key: 'organization', Value: 'dutta-brothers' }]),
     });
 
     template.hasResourceProperties('AWS::ApiGatewayV2::Api', {
@@ -210,8 +208,8 @@ describe('foundation stack aws configuration', () => {
     const policies = template.findResources('AWS::IAM::Policy');
     const cloudFrontInvalidationStatements = Object.values(policies)
       .flatMap((policy) => {
-        const statements = (policy as { Properties: { PolicyDocument: { Statement: unknown[] } } }).Properties
-          .PolicyDocument.Statement;
+        const statements = (policy as { Properties: { PolicyDocument: { Statement: unknown[] } } })
+          .Properties.PolicyDocument.Statement;
         return statements;
       })
       .filter((statement) => {

@@ -20,7 +20,11 @@ export interface ClassifiedTransactionFailure {
 // transient capacity pressure -- both are safe to retry without risking a
 // duplicate claim, since the whole transaction (including the bill/claim
 // uniqueness conditions) is retried atomically as a unit.
-const TRANSIENT_REASON_CODES = new Set(['TransactionConflict', 'ThrottlingError', 'ProvisionedThroughputExceeded']);
+const TRANSIENT_REASON_CODES = new Set([
+  'TransactionConflict',
+  'ThrottlingError',
+  'ProvisionedThroughputExceeded',
+]);
 
 // Reason codes that indicate a genuine business-rule condition failed
 // (the bill number or claim ID already exists) -- must never be retried,
@@ -52,14 +56,20 @@ export const classifyTransactionCancellation = (
   }
 
   const reasons = error.CancellationReasons ?? [];
-  const reasonCodes = reasons.map((reason) => reason.Code ?? 'None').filter((code) => code !== 'None');
+  const reasonCodes = reasons
+    .map((reason) => reason.Code ?? 'None')
+    .filter((code) => code !== 'None');
 
-  const hasDuplicateConflict = duplicateCheckIndexes.some((index) => reasons[index]?.Code === 'ConditionalCheckFailed');
+  const hasDuplicateConflict = duplicateCheckIndexes.some(
+    (index) => reasons[index]?.Code === 'ConditionalCheckFailed',
+  );
   if (hasDuplicateConflict) {
     return { category: 'DUPLICATE', reasonCodes, errorName };
   }
 
-  const hasKnownDuplicateCodeElsewhere = reasonCodes.some((code) => DUPLICATE_REASON_CODES.has(code));
+  const hasKnownDuplicateCodeElsewhere = reasonCodes.some((code) =>
+    DUPLICATE_REASON_CODES.has(code),
+  );
   if (hasKnownDuplicateCodeElsewhere && !hasDuplicateConflict) {
     // A ConditionalCheckFailed outside the known duplicate-check positions is unexpected;
     // treat conservatively as permanent rather than silently reclassifying it.

@@ -114,7 +114,9 @@ const isDrawRequest = (value: unknown): value is DrawRequest => {
   );
 };
 
-const isCreatePrizeRequest = (value: unknown): value is { name: string; weight: number; active: boolean } => {
+const isCreatePrizeRequest = (
+  value: unknown,
+): value is { name: string; weight: number; active: boolean } => {
   if (!value || typeof value !== 'object') {
     return false;
   }
@@ -151,7 +153,9 @@ const isUpdatePrizeRequest = (value: unknown): value is { weight?: number; activ
   return true;
 };
 
-const isCampaignUpdateRequest = (value: unknown): value is { fromDate?: string; toDate?: string } => {
+const isCampaignUpdateRequest = (
+  value: unknown,
+): value is { fromDate?: string; toDate?: string } => {
   if (!value || typeof value !== 'object') {
     return false;
   }
@@ -193,7 +197,17 @@ const safeParseJson = (value: string | undefined): { ok: true; value: unknown } 
 const parseClaimsQuery = (
   query: URLSearchParams,
 ):
-  | { ok: true; value: { pageSize?: number; pageToken?: string; from?: string; to?: string; prizeId?: string; search?: string } }
+  | {
+      ok: true;
+      value: {
+        pageSize?: number;
+        pageToken?: string;
+        from?: string;
+        to?: string;
+        prizeId?: string;
+        search?: string;
+      };
+    }
   | { ok: false; fieldErrors: Partial<Record<'pageSize' | 'from' | 'to', string>> } => {
   const fieldErrors: Partial<Record<'pageSize' | 'from' | 'to', string>> = {};
   const pageSizeRaw = query.get('pageSize');
@@ -297,7 +311,8 @@ const buildDrawResponse = async (
       body: {
         status: 'ERROR',
         code: 'DRAW_ENDED',
-        message: 'The lucky draw has ended for this festive season. Please visit the Dutta Brothers counter.',
+        message:
+          'The lucky draw has ended for this festive season. Please visit the Dutta Brothers counter.',
       },
     };
   }
@@ -309,7 +324,8 @@ const buildDrawResponse = async (
       body: {
         status: 'ERROR',
         code: 'NO_ELIGIBLE_PRIZE',
-        message: 'The lucky draw has ended for this festive season. Please visit the Dutta Brothers counter.',
+        message:
+          'The lucky draw has ended for this festive season. Please visit the Dutta Brothers counter.',
       },
     };
   }
@@ -522,7 +538,10 @@ export const handler = async (event: {
           name: result.prize.name,
           weight: result.prize.weight,
           active: result.prize.active,
-          givenCount: (await store.summary()).prizeDistribution.find((item) => item.prizeId === result.prize.id)?.givenCount ?? 0,
+          givenCount:
+            (await store.summary()).prizeDistribution.find(
+              (item) => item.prizeId === result.prize.id,
+            )?.givenCount ?? 0,
           createdAt: result.prize.createdAt,
           updatedAt: result.prize.updatedAt,
         },
@@ -532,7 +551,10 @@ export const handler = async (event: {
     if (method === 'GET' && path === '/api/admin/claims') {
       const parsed = parseClaimsQuery(query);
       if (!parsed.ok) {
-        const response = validationErrorResponse('Please check the form and try again.', parsed.fieldErrors);
+        const response = validationErrorResponse(
+          'Please check the form and try again.',
+          parsed.fieldErrors,
+        );
         return responseJson(response.statusCode, response.body);
       }
 

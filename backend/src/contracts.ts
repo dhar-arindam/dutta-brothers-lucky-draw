@@ -1,7 +1,4 @@
-export type AdminErrorCode =
-  | 'VALIDATION_ERROR'
-  | 'REQUEST_TOO_LARGE'
-  | 'INTERNAL_ERROR';
+export type AdminErrorCode = 'VALIDATION_ERROR' | 'REQUEST_TOO_LARGE' | 'INTERNAL_ERROR';
 
 export interface AdminPrize {
   id: string;
@@ -84,7 +81,10 @@ export interface AdminErrorResponse {
   code: AdminErrorCode;
   message: string;
   fieldErrors?: Partial<
-    Record<'name' | 'weight' | 'active' | 'pageSize' | 'from' | 'to' | 'fromDate' | 'toDate', string>
+    Record<
+      'name' | 'weight' | 'active' | 'pageSize' | 'from' | 'to' | 'fromDate' | 'toDate',
+      string
+    >
   >;
 }
 
@@ -103,11 +103,7 @@ export interface AdminHttpResponse {
   body: AdminPrizeResponse;
 }
 export type DrawErrorCode =
-  | 'VALIDATION_ERROR'
-  | 'DRAW_ENDED'
-  | 'NO_ELIGIBLE_PRIZE'
-  | 'REQUEST_TOO_LARGE'
-  | 'INTERNAL_ERROR';
+  'VALIDATION_ERROR' | 'DRAW_ENDED' | 'NO_ELIGIBLE_PRIZE' | 'REQUEST_TOO_LARGE' | 'INTERNAL_ERROR';
 
 export interface DrawRequest {
   name: string;

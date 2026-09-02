@@ -69,11 +69,14 @@ describe('customer journey e2e gift box flow', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'PLAY NOW' }));
 
-    await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalledTimes(1);
-      expect(screen.getByTestId('anticipation-view')).toBeInTheDocument();
-      expect(screen.getByTestId('reveal-overlay')).toBeInTheDocument();
-    }, { timeout: 1500 });
+    await waitFor(
+      () => {
+        expect(mockFetch).toHaveBeenCalledTimes(1);
+        expect(screen.getByTestId('anticipation-view')).toBeInTheDocument();
+        expect(screen.getByTestId('reveal-overlay')).toBeInTheDocument();
+      },
+      { timeout: 1500 },
+    );
 
     await waitFor(
       () => {
@@ -113,9 +116,12 @@ describe('customer journey e2e gift box flow', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'PLAY NOW' }));
 
-    await waitFor(() => {
-      expect(screen.getByTestId('reveal-view')).toBeInTheDocument();
-    }, { timeout: 2500 });
+    await waitFor(
+      () => {
+        expect(screen.getByTestId('reveal-view')).toBeInTheDocument();
+      },
+      { timeout: 2500 },
+    );
 
     expect(screen.queryByText('CONGRATULATIONS!')).not.toBeInTheDocument();
 
@@ -144,7 +150,9 @@ describe('customer journey e2e gift box flow', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'PLAY NOW' }));
 
-    expect(await screen.findByText('Phone number must contain exactly 10 digits.')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Phone number must contain exactly 10 digits.'),
+    ).toBeInTheDocument();
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
@@ -154,7 +162,8 @@ describe('customer journey e2e gift box flow', () => {
       json: async () => ({
         status: 'ERROR',
         code: 'DRAW_ENDED',
-        message: 'The lucky draw has ended for this festive season. Please visit the Dutta Brothers counter.',
+        message:
+          'The lucky draw has ended for this festive season. Please visit the Dutta Brothers counter.',
       }),
     });
     vi.stubGlobal('fetch', mockFetch);
@@ -179,7 +188,8 @@ describe('customer journey e2e gift box flow', () => {
       json: async () => ({
         status: 'ERROR',
         code: 'NO_ELIGIBLE_PRIZE',
-        message: 'The lucky draw has ended for this festive season. Please visit the Dutta Brothers counter.',
+        message:
+          'The lucky draw has ended for this festive season. Please visit the Dutta Brothers counter.',
       }),
     });
     vi.stubGlobal('fetch', mockFetch);
@@ -214,27 +224,27 @@ describe('customer journey e2e gift box flow', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'PLAY NOW' }));
 
-    expect(await screen.findByText('Service temporarily unavailable. Please retry.')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Service temporarily unavailable. Please retry.'),
+    ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
   });
 
   it('E2E-09 Lost Response and Retry', async () => {
     setupMatchMedia();
-    mockFetch
-      .mockRejectedValueOnce(new Error('lost response'))
-      .mockResolvedValueOnce({
-        json: async () => ({
-          status: 'ALREADY_CLAIMED',
-          claimId: 'DB26-900001',
-          claimTimestamp: '2026-08-16T10:30:00.000Z',
-          prize: {
-            id: 'prize-002',
-            name: 'Coffee Maker',
-            displayName: 'Coffee Maker',
-          },
-          message: 'This bill has already been used for the lucky draw.',
-        }),
-      });
+    mockFetch.mockRejectedValueOnce(new Error('lost response')).mockResolvedValueOnce({
+      json: async () => ({
+        status: 'ALREADY_CLAIMED',
+        claimId: 'DB26-900001',
+        claimTimestamp: '2026-08-16T10:30:00.000Z',
+        prize: {
+          id: 'prize-002',
+          name: 'Coffee Maker',
+          displayName: 'Coffee Maker',
+        },
+        message: 'This bill has already been used for the lucky draw.',
+      }),
+    });
     vi.stubGlobal('fetch', mockFetch);
 
     render(<App />);
@@ -243,7 +253,9 @@ describe('customer journey e2e gift box flow', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'PLAY NOW' }));
     expect(
-      await screen.findByText('We could not complete the draw. Please check your connection and retry.'),
+      await screen.findByText(
+        'We could not complete the draw. Please check your connection and retry.',
+      ),
     ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
@@ -255,4 +267,3 @@ describe('customer journey e2e gift box flow', () => {
     expect(mockFetch).toHaveBeenCalledTimes(2);
   });
 });
-

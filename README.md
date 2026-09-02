@@ -36,6 +36,8 @@ Do not commit credentials, tokens, or `.env` files containing secrets.
 npm install
 ```
 
+`npm install` also installs the Git hooks described in [Git Hooks](#git-hooks).
+
 ## Run Frontend Locally
 
 ```bash
@@ -86,6 +88,20 @@ npm run cdk:synth
 ```
 
 CDK synth validates the generated CloudFormation template and does not deploy resources.
+
+## Git Hooks
+
+Hooks are managed by Husky and installed automatically by the `prepare` script on `npm install`.
+
+| Hook         | Runs                                                                           | Purpose                                                                    |
+| ------------ | ------------------------------------------------------------------------------ | -------------------------------------------------------------------------- |
+| `pre-commit` | `lint-staged` (Prettier + ESLint `--fix` on staged files), `npm run typecheck` | Keeps formatting and lint clean, and blocks commits that break TypeScript. |
+| `commit-msg` | Conventional Commits header check                                              | Keeps history machine-readable and consistent with Dependabot commits.     |
+| `pre-push`   | `npm run lint`, `npm run build`, `npm test`                                    | Catches CI failures before they reach a pull request.                      |
+
+Hooks mirror the CI quality gate; they do not replace it. Run `npm run quality:gate` for the full gate including coverage.
+
+To bypass hooks in an emergency, use `git commit --no-verify` or `git push --no-verify` and explain why in the pull request.
 
 ## Development Workflow
 

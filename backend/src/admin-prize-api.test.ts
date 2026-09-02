@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  createAdminPrizeApiHandler,
-  createDrawApiHandler,
-} from './app.js';
+import { createAdminPrizeApiHandler, createDrawApiHandler } from './app.js';
 import { ClaimIdGenerator } from './claim-id.js';
 import type { Campaign } from './domain.js';
 import { DrawService } from './draw-service.js';
@@ -197,10 +194,7 @@ describe('weight and activation updates', () => {
 
     const claimId = drawResponse.body.claimId;
 
-    const weightUpdate = adminApiHandler.updatePrize(
-      'prize-001',
-      JSON.stringify({ weight: 12 }),
-    );
+    const weightUpdate = adminApiHandler.updatePrize('prize-001', JSON.stringify({ weight: 12 }));
     const activeUpdate = adminApiHandler.updatePrize(
       'prize-001',
       JSON.stringify({ active: false }),
@@ -229,12 +223,8 @@ describe('weight and activation updates', () => {
     const { adminApiHandler } = createHarness();
 
     const [a, b] = await Promise.all([
-      Promise.resolve(
-        adminApiHandler.updatePrize('prize-001', JSON.stringify({ weight: 7 })),
-      ),
-      Promise.resolve(
-        adminApiHandler.updatePrize('prize-001', JSON.stringify({ weight: 9 })),
-      ),
+      Promise.resolve(adminApiHandler.updatePrize('prize-001', JSON.stringify({ weight: 7 }))),
+      Promise.resolve(adminApiHandler.updatePrize('prize-001', JSON.stringify({ weight: 9 }))),
     ]);
 
     expect(a.statusCode).toBe(200);
@@ -371,11 +361,15 @@ describe('campaign, summary, and claims endpoints', () => {
       }),
     );
 
-    const response = adminApiHandler.exportClaimsCsv(new URLSearchParams({ search: 'Amit', pageSize: '1' }));
+    const response = adminApiHandler.exportClaimsCsv(
+      new URLSearchParams({ search: 'Amit', pageSize: '1' }),
+    );
 
     expect(response.statusCode).toBe(200);
     expect(response.headers['content-type']).toContain('text/csv');
-    expect(response.body).toContain('"date/time","claim ID","customer name","bill number","prize","phone"');
+    expect(response.body).toContain(
+      '"date/time","claim ID","customer name","bill number","prize","phone"',
+    );
     expect(response.body).toContain('Amit Das');
     expect(response.body).toContain('Riya Sen');
     expect(response.body).toContain('9123456789');
@@ -398,7 +392,9 @@ describe('campaign, summary, and claims endpoints', () => {
 
     const claimsBefore = adminApiHandler.listClaims(new URLSearchParams());
     const claimId =
-      'items' in claimsBefore.body && claimsBefore.body.items[0] && 'claimId' in claimsBefore.body.items[0]
+      'items' in claimsBefore.body &&
+      claimsBefore.body.items[0] &&
+      'claimId' in claimsBefore.body.items[0]
         ? claimsBefore.body.items[0].claimId
         : undefined;
     expect(claimId).toBeDefined();
@@ -442,7 +438,9 @@ describe('campaign, summary, and claims endpoints', () => {
 
     const claimsBefore = adminApiHandler.listClaims(new URLSearchParams());
     const claimId =
-      'items' in claimsBefore.body && claimsBefore.body.items[0] && 'claimId' in claimsBefore.body.items[0]
+      'items' in claimsBefore.body &&
+      claimsBefore.body.items[0] &&
+      'claimId' in claimsBefore.body.items[0]
         ? claimsBefore.body.items[0].claimId
         : undefined;
 

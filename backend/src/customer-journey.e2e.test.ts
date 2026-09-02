@@ -21,31 +21,29 @@ const createService = (options?: {
   random?: () => number;
 }) => {
   const store = new InMemoryDrawStore({
-    initialPrizes:
-      options?.prizes ??
-      [
-        {
-          id: 'prize-001',
-          name: 'Electric Kettle',
-          displayName: 'Electric Kettle',
-          weight: 1,
-          active: true,
-        },
-        {
-          id: 'prize-002',
-          name: 'Coffee Maker',
-          displayName: 'Coffee Maker',
-          weight: 3,
-          active: true,
-        },
-        {
-          id: 'prize-003',
-          name: 'Mixer Grinder',
-          displayName: 'Mixer Grinder',
-          weight: 6,
-          active: true,
-        },
-      ],
+    initialPrizes: options?.prizes ?? [
+      {
+        id: 'prize-001',
+        name: 'Electric Kettle',
+        displayName: 'Electric Kettle',
+        weight: 1,
+        active: true,
+      },
+      {
+        id: 'prize-002',
+        name: 'Coffee Maker',
+        displayName: 'Coffee Maker',
+        weight: 3,
+        active: true,
+      },
+      {
+        id: 'prize-003',
+        name: 'Mixer Grinder',
+        displayName: 'Mixer Grinder',
+        weight: 6,
+        active: true,
+      },
+    ],
     now: () => now,
   });
 
@@ -60,7 +58,11 @@ const createService = (options?: {
   return { service, store };
 };
 
-const requestForBill = (billNumber: string, name = 'Arindam Roy', phone = '9876543210'): DrawRequest => {
+const requestForBill = (
+  billNumber: string,
+  name = 'Arindam Roy',
+  phone = '9876543210',
+): DrawRequest => {
   return {
     name,
     phone,

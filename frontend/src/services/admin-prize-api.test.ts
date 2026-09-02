@@ -42,8 +42,12 @@ describe('admin prize api client', () => {
 
   it('adds and updates prize using expected endpoints', async () => {
     mockFetch
-      .mockResolvedValueOnce({ json: async () => ({ status: 'SUCCESS', item: { id: 'prize-004' } }) })
-      .mockResolvedValueOnce({ json: async () => ({ status: 'SUCCESS', item: { id: 'prize-004' } }) });
+      .mockResolvedValueOnce({
+        json: async () => ({ status: 'SUCCESS', item: { id: 'prize-004' } }),
+      })
+      .mockResolvedValueOnce({
+        json: async () => ({ status: 'SUCCESS', item: { id: 'prize-004' } }),
+      });
     vi.stubGlobal('fetch', mockFetch);
 
     const created = await addAdminPrize({ name: 'Mixer', weight: 3, active: true });
@@ -83,8 +87,12 @@ describe('admin prize api client', () => {
 
   it('gets and patches campaign', async () => {
     mockFetch
-      .mockResolvedValueOnce({ json: async () => ({ status: 'SUCCESS', campaign: { id: 'festive' } }) })
-      .mockResolvedValueOnce({ json: async () => ({ status: 'SUCCESS', campaign: { id: 'festive' } }) });
+      .mockResolvedValueOnce({
+        json: async () => ({ status: 'SUCCESS', campaign: { id: 'festive' } }),
+      })
+      .mockResolvedValueOnce({
+        json: async () => ({ status: 'SUCCESS', campaign: { id: 'festive' } }),
+      });
     vi.stubGlobal('fetch', mockFetch);
 
     const current = await getAdminCampaign();

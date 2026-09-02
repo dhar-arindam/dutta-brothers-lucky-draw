@@ -1,0 +1,17 @@
+# Normalize to LF in the repository and in working copies so Prettier's
+# endOfLine check behaves the same on Windows, macOS, Linux and CI.
+* text=auto eol=lf
+
+# Husky hooks are executed by sh and must never be checked out with CRLF.
+.husky/** text eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+
+package-lock.json linguist-generated=true -diff

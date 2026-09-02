@@ -9,6 +9,7 @@
     "shared"
   ],
   "scripts": {
+    "prepare": "husky",
     "dev:frontend": "npm run dev --workspace frontend",
     "dev:backend": "npm run dev --workspace backend",
     "build": "npm run build --workspaces --if-present",
@@ -38,9 +39,14 @@
     "perf:dry-run": "node tests/performance/run.mjs all --dry-run"
   },
   "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
     "prettier": "^3.6.2",
     "typescript": "^5.9.3",
     "vitest": "^4.1.11"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,css,html,json,md}": "prettier --write"
   },
   "engines": {
     "node": ">=22.0.0",

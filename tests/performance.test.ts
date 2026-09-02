@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 import { runWithConcurrency } from './performance/lib/concurrency-pool.mjs';
 import { chiSquareGoodnessOfFit, computeLatencyStats } from './performance/lib/stats.mjs';
-import { generateParticipant, generateParticipants, isSyntheticBillNumber } from './performance/lib/synthetic-data.mjs';
+import {
+  generateParticipant,
+  generateParticipants,
+  isSyntheticBillNumber,
+} from './performance/lib/synthetic-data.mjs';
 import { resolveTarget, UnsafeTargetError } from './performance/lib/target.mjs';
 
 describe('performance test framework: target safety gate', () => {
@@ -149,7 +153,11 @@ describe('performance test framework: bounded concurrency pool', () => {
       inFlight -= 1;
     };
 
-    await runWithConcurrency(Array.from({ length: 40 }, (_unused, index) => index), worker, 5);
+    await runWithConcurrency(
+      Array.from({ length: 40 }, (_unused, index) => index),
+      worker,
+      5,
+    );
 
     expect(maxObservedConcurrency).toBeLessThanOrEqual(5);
   });
@@ -164,6 +172,8 @@ describe('performance test framework: bounded concurrency pool', () => {
       7,
     );
 
-    expect(processed.sort((a, b) => a - b)).toEqual(Array.from({ length: 25 }, (_unused, index) => index));
+    expect(processed.sort((a, b) => a - b)).toEqual(
+      Array.from({ length: 25 }, (_unused, index) => index),
+    );
   });
 });

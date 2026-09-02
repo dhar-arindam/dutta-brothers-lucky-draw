@@ -133,14 +133,12 @@ export class InMemoryDrawStore {
     this.nowProvider = options?.now ?? (() => new Date());
 
     const nowIso = this.nowProvider().toISOString();
-    this.campaign =
-      options?.initialCampaign ??
-      {
-        id: 'festive-2026',
-        timezone: 'Asia/Kolkata',
-        fromDate: '2026-08-01',
-        toDate: '2026-11-01',
-      };
+    this.campaign = options?.initialCampaign ?? {
+      id: 'festive-2026',
+      timezone: 'Asia/Kolkata',
+      fromDate: '2026-08-01',
+      toDate: '2026-11-01',
+    };
     const seedPrizes = options?.initialPrizes ?? [
       {
         id: 'prize-001',
@@ -294,50 +292,46 @@ export class InMemoryDrawStore {
     const fromMillis = parseIsoTimestamp(query.from);
     const toMillis = parseIsoTimestamp(query.to);
 
-    const filtered = [...this.claimsInCreatedOrder]
-      .reverse()
-      .filter((claim) => {
-        const claimMillis = new Date(claim.claimTimestamp).getTime();
-        if (fromMillis !== null && claimMillis < fromMillis) {
-          return false;
-        }
+    const filtered = [...this.claimsInCreatedOrder].reverse().filter((claim) => {
+      const claimMillis = new Date(claim.claimTimestamp).getTime();
+      if (fromMillis !== null && claimMillis < fromMillis) {
+        return false;
+      }
 
-        if (toMillis !== null && claimMillis > toMillis) {
-          return false;
-        }
+      if (toMillis !== null && claimMillis > toMillis) {
+        return false;
+      }
 
-        if (query.prizeId && claim.prize.id !== query.prizeId) {
-          return false;
-        }
+      if (query.prizeId && claim.prize.id !== query.prizeId) {
+        return false;
+      }
 
-        if (!search) {
-          return true;
-        }
+      if (!search) {
+        return true;
+      }
 
-        const customerName = claim.customerName.trim().toLowerCase();
-        const prizeName = claim.prize.name.trim().toLowerCase();
-        const searchLower = search.toLowerCase();
+      const customerName = claim.customerName.trim().toLowerCase();
+      const prizeName = claim.prize.name.trim().toLowerCase();
+      const searchLower = search.toLowerCase();
 
-        return (
-          claim.claimId.toLowerCase().includes(searchLower) ||
-          customerName.includes(searchLower) ||
-          claim.billNumberNormalized.includes(normalizedSearch) ||
-          prizeName.includes(searchLower)
-        );
-      });
+      return (
+        claim.claimId.toLowerCase().includes(searchLower) ||
+        customerName.includes(searchLower) ||
+        claim.billNumberNormalized.includes(normalizedSearch) ||
+        prizeName.includes(searchLower)
+      );
+    });
 
-    const items = filtered
-      .slice(startIndex, startIndex + pageSize)
-      .map((claim): AdminClaimItem => {
-        return {
-          claimId: claim.claimId,
-          claimTimestamp: claim.claimTimestamp,
-          customerName: claim.customerName,
-          maskedPhone: maskPhone(claim.phone),
-          billNumber: claim.billNumberDisplay,
-          prize: claim.prize.name,
-        };
-      });
+    const items = filtered.slice(startIndex, startIndex + pageSize).map((claim): AdminClaimItem => {
+      return {
+        claimId: claim.claimId,
+        claimTimestamp: claim.claimTimestamp,
+        customerName: claim.customerName,
+        maskedPhone: maskPhone(claim.phone),
+        billNumber: claim.billNumberDisplay,
+        prize: claim.prize.name,
+      };
+    });
 
     const nextIndex = startIndex + items.length;
     const nextPageToken = nextIndex < filtered.length ? encodePageToken(nextIndex) : null;
@@ -349,18 +343,16 @@ export class InMemoryDrawStore {
   }
 
   public listAdminClaimsForCsv(): AdminCsvClaimItem[] {
-    return [...this.claimsInCreatedOrder]
-      .reverse()
-      .map((claim): AdminCsvClaimItem => {
-        return {
-          claimId: claim.claimId,
-          claimTimestamp: claim.claimTimestamp,
-          customerName: claim.customerName,
-          phone: claim.phone,
-          billNumber: claim.billNumberDisplay,
-          prize: claim.prize.name,
-        };
-      });
+    return [...this.claimsInCreatedOrder].reverse().map((claim): AdminCsvClaimItem => {
+      return {
+        claimId: claim.claimId,
+        claimTimestamp: claim.claimTimestamp,
+        customerName: claim.customerName,
+        phone: claim.phone,
+        billNumber: claim.billNumberDisplay,
+        prize: claim.prize.name,
+      };
+    });
   }
 
   public summary(): AdminSummaryData {
@@ -411,7 +403,12 @@ export class InMemoryDrawStore {
       fieldErrors.toDate = 'To Date must be a valid calendar date.';
     }
 
-    if (Object.keys(fieldErrors).length === 0 && fromMillis !== null && toMillis !== null && fromMillis > toMillis) {
+    if (
+      Object.keys(fieldErrors).length === 0 &&
+      fromMillis !== null &&
+      toMillis !== null &&
+      fromMillis > toMillis
+    ) {
       fieldErrors.toDate = 'To Date must be on or after From Date.';
     }
 

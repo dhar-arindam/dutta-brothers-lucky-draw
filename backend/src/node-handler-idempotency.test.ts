@@ -42,20 +42,47 @@ describe('node handler idempotency header propagation', () => {
     const nodeHandler = createNodeHandler({
       drawApiHandler,
       adminPrizeApiHandler: {
-        listPrizes: () => ({ statusCode: 500, body: { status: 'ERROR', code: 'INTERNAL_ERROR', message: 'n/a' } }),
-        addPrize: () => ({ statusCode: 500, body: { status: 'ERROR', code: 'INTERNAL_ERROR', message: 'n/a' } }),
-        updatePrize: () => ({ statusCode: 500, body: { status: 'ERROR', code: 'INTERNAL_ERROR', message: 'n/a' } }),
-        listClaims: () => ({ statusCode: 500, body: { status: 'ERROR', code: 'INTERNAL_ERROR', message: 'n/a' } }),
-        deleteClaim: () => ({ statusCode: 500, body: { status: 'ERROR', code: 'INTERNAL_ERROR', message: 'n/a' } }),
-        clearAllClaims: () => ({ statusCode: 500, body: { status: 'ERROR', code: 'INTERNAL_ERROR', message: 'n/a' } }),
+        listPrizes: () => ({
+          statusCode: 500,
+          body: { status: 'ERROR', code: 'INTERNAL_ERROR', message: 'n/a' },
+        }),
+        addPrize: () => ({
+          statusCode: 500,
+          body: { status: 'ERROR', code: 'INTERNAL_ERROR', message: 'n/a' },
+        }),
+        updatePrize: () => ({
+          statusCode: 500,
+          body: { status: 'ERROR', code: 'INTERNAL_ERROR', message: 'n/a' },
+        }),
+        listClaims: () => ({
+          statusCode: 500,
+          body: { status: 'ERROR', code: 'INTERNAL_ERROR', message: 'n/a' },
+        }),
+        deleteClaim: () => ({
+          statusCode: 500,
+          body: { status: 'ERROR', code: 'INTERNAL_ERROR', message: 'n/a' },
+        }),
+        clearAllClaims: () => ({
+          statusCode: 500,
+          body: { status: 'ERROR', code: 'INTERNAL_ERROR', message: 'n/a' },
+        }),
         exportClaimsCsv: () => ({
           statusCode: 500,
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ status: 'ERROR', code: 'INTERNAL_ERROR', message: 'n/a' }),
         }),
-        getSummary: () => ({ statusCode: 500, body: { status: 'ERROR', code: 'INTERNAL_ERROR', message: 'n/a' } }),
-        getCampaign: () => ({ statusCode: 500, body: { status: 'ERROR', code: 'INTERNAL_ERROR', message: 'n/a' } }),
-        updateCampaign: () => ({ statusCode: 500, body: { status: 'ERROR', code: 'INTERNAL_ERROR', message: 'n/a' } }),
+        getSummary: () => ({
+          statusCode: 500,
+          body: { status: 'ERROR', code: 'INTERNAL_ERROR', message: 'n/a' },
+        }),
+        getCampaign: () => ({
+          statusCode: 500,
+          body: { status: 'ERROR', code: 'INTERNAL_ERROR', message: 'n/a' },
+        }),
+        updateCampaign: () => ({
+          statusCode: 500,
+          body: { status: 'ERROR', code: 'INTERNAL_ERROR', message: 'n/a' },
+        }),
       },
     });
 

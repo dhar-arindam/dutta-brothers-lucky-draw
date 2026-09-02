@@ -110,9 +110,15 @@ describe('admin operations page', () => {
     expect(screen.getAllByText('Amit Das').length).toBeGreaterThan(0);
     expect(screen.getAllByText('ACTIVE').length).toBeGreaterThan(0);
     expect(screen.getByText('Total Winners')).toBeInTheDocument();
-    expect(screen.getByText('Today\'s Winners')).toBeInTheDocument();
-    expect(screen.getByText('Prize names are fixed after creation and cannot be renamed.')).toBeInTheDocument();
-    expect(screen.getByText('Weight is relative: for example, weight 10 has twice the draw chance of weight 5.')).toBeInTheDocument();
+    expect(screen.getByText("Today's Winners")).toBeInTheDocument();
+    expect(
+      screen.getByText('Prize names are fixed after creation and cannot be renamed.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Weight is relative: for example, weight 10 has twice the draw chance of weight 5.',
+      ),
+    ).toBeInTheDocument();
   });
 
   it('adds prize successfully and updates list', async () => {
@@ -197,7 +203,9 @@ describe('admin operations page', () => {
     render(<AdminPrizePage />);
     await waitForAutoLoad();
 
-    fireEvent.click(screen.getAllByRole('button', { name: 'Delete claim CLM-20260816-000001' })[0] as HTMLElement);
+    fireEvent.click(
+      screen.getAllByRole('button', { name: 'Delete claim CLM-20260816-000001' })[0] as HTMLElement,
+    );
     fireEvent.click(await screen.findByRole('button', { name: 'Delete Claim' }));
 
     const status = await screen.findByRole('status');
@@ -213,7 +221,9 @@ describe('admin operations page', () => {
     await waitForAutoLoad();
 
     const callCountBefore = mockFetch.mock.calls.length;
-    fireEvent.click(screen.getAllByRole('button', { name: 'Delete claim CLM-20260816-000001' })[0] as HTMLElement);
+    fireEvent.click(
+      screen.getAllByRole('button', { name: 'Delete claim CLM-20260816-000001' })[0] as HTMLElement,
+    );
     fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }));
 
     expect(mockFetch.mock.calls.length).toBe(callCountBefore);
@@ -338,7 +348,9 @@ describe('admin operations page', () => {
     fireEvent.click(screen.getAllByRole('button', { name: 'Save Weight' })[0]);
 
     const status = await screen.findByRole('status');
-    expect(status).toHaveTextContent('Weight updated. Weight is relative probability, not a percentage.');
+    expect(status).toHaveTextContent(
+      'Weight updated. Weight is relative probability, not a percentage.',
+    );
   });
 
   it('toggles active status', async () => {
@@ -579,7 +591,10 @@ describe('admin operations page', () => {
       expect(screen.getByLabelText('Prize')).toHaveValue('prize-001');
     });
     expect(screen.getAllByText('Riya Sen').length).toBeGreaterThan(0);
-    expect(screen.getByRole('radio', { name: 'Filter claims by Electric Kettle' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('radio', { name: 'Filter claims by Electric Kettle' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
   });
 
   it('supports keyboard card selection and preserves filter when toggling active state', async () => {
@@ -633,7 +648,10 @@ describe('admin operations page', () => {
     await waitFor(() => {
       expect(screen.getByLabelText('Prize')).toHaveValue('prize-001');
     });
-    expect(screen.getByRole('radio', { name: 'Filter claims by Electric Kettle' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('radio', { name: 'Filter claims by Electric Kettle' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
     expect(screen.getAllByText('Keyboard User').length).toBeGreaterThan(0);
   });
 
@@ -701,9 +719,11 @@ describe('admin operations page', () => {
     });
 
     render(<AdminPrizePage />);
-  await waitForAutoLoad();
+    await waitForAutoLoad();
 
-    fireEvent.click(screen.getAllByRole('button', { name: /Copy claim ID CLM-20260816-000001/i })[0]);
+    fireEvent.click(
+      screen.getAllByRole('button', { name: /Copy claim ID CLM-20260816-000001/i })[0],
+    );
 
     await waitFor(() => {
       expect(writeText).toHaveBeenCalledWith('CLM-20260816-000001');
@@ -728,7 +748,9 @@ describe('admin operations page', () => {
     render(<AdminPrizePage />);
     await waitForAutoLoad();
 
-    fireEvent.click(screen.getAllByRole('button', { name: /Copy claim ID CLM-20260816-000001/i })[0]);
+    fireEvent.click(
+      screen.getAllByRole('button', { name: /Copy claim ID CLM-20260816-000001/i })[0],
+    );
 
     await waitFor(() => {
       expect(execCommand).toHaveBeenCalledWith('copy');
@@ -796,7 +818,9 @@ describe('admin operations page', () => {
     expect(screen.getByText('No claims yet.')).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('Search'), { target: { value: 'NoMatch' } });
-    fireEvent.submit(screen.getByRole('button', { name: 'Apply Filters' }).closest('form') as HTMLFormElement);
+    fireEvent.submit(
+      screen.getByRole('button', { name: 'Apply Filters' }).closest('form') as HTMLFormElement,
+    );
 
     expect(await screen.findByText('No claims match your filters.')).toBeInTheDocument();
   });
@@ -922,10 +946,7 @@ describe('admin operations page', () => {
           observe: () => {
             callback([], observer);
             callback([{ isIntersecting: false } as IntersectionObserverEntry], observer);
-            callback(
-              [{ isIntersecting: true } as IntersectionObserverEntry],
-              observer,
-            );
+            callback([{ isIntersecting: true } as IntersectionObserverEntry], observer);
             callback([{ isIntersecting: true } as IntersectionObserverEntry], observer);
           },
           disconnect: vi.fn(),
@@ -1022,7 +1043,9 @@ describe('admin operations page', () => {
     render(<AdminPrizePage />);
     await waitForAutoLoad();
 
-    fireEvent.submit(screen.getByRole('button', { name: 'Apply Filters' }).closest('form') as HTMLFormElement);
+    fireEvent.submit(
+      screen.getByRole('button', { name: 'Apply Filters' }).closest('form') as HTMLFormElement,
+    );
 
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('We could not complete the admin request. Please try again.');
@@ -1075,37 +1098,40 @@ describe('admin operations page', () => {
     expect(clearedMessages.length).toBeGreaterThan(0);
   });
 
-  it.each([360, 375, 390, 430])('supports prize card filter flow at mobile width %ipx', async (width) => {
-    Object.defineProperty(window, 'innerWidth', { value: width, configurable: true });
-    window.dispatchEvent(new Event('resize'));
+  it.each([360, 375, 390, 430])(
+    'supports prize card filter flow at mobile width %ipx',
+    async (width) => {
+      Object.defineProperty(window, 'innerWidth', { value: width, configurable: true });
+      window.dispatchEvent(new Event('resize'));
 
-    enqueueDashboardSuccess();
-    mockFetch.mockResolvedValueOnce(
-      successJson({
-        status: 'SUCCESS',
-        items: [
-          {
-            claimId: 'CLM-20260816-000009',
-            claimTimestamp: '2026-08-16T11:10:00.000Z',
-            customerName: 'Mobile User',
-            maskedPhone: '*****8899',
-            billNumber: 'MB001',
-            prize: 'Electric Kettle',
-          },
-        ],
-        nextPageToken: null,
-      }),
-    );
-    vi.stubGlobal('fetch', mockFetch);
+      enqueueDashboardSuccess();
+      mockFetch.mockResolvedValueOnce(
+        successJson({
+          status: 'SUCCESS',
+          items: [
+            {
+              claimId: 'CLM-20260816-000009',
+              claimTimestamp: '2026-08-16T11:10:00.000Z',
+              customerName: 'Mobile User',
+              maskedPhone: '*****8899',
+              billNumber: 'MB001',
+              prize: 'Electric Kettle',
+            },
+          ],
+          nextPageToken: null,
+        }),
+      );
+      vi.stubGlobal('fetch', mockFetch);
 
-    render(<AdminPrizePage />);
-    await waitForAutoLoad();
+      render(<AdminPrizePage />);
+      await waitForAutoLoad();
 
-    fireEvent.click(screen.getByRole('radio', { name: 'Filter claims by Electric Kettle' }));
+      fireEvent.click(screen.getByRole('radio', { name: 'Filter claims by Electric Kettle' }));
 
-    await waitFor(() => {
-      expect(screen.getByLabelText('Prize')).toHaveValue('prize-001');
-    });
-    expect(screen.getAllByText('Mobile User').length).toBeGreaterThan(0);
-  });
+      await waitFor(() => {
+        expect(screen.getByLabelText('Prize')).toHaveValue('prize-001');
+      });
+      expect(screen.getAllByText('Mobile User').length).toBeGreaterThan(0);
+    },
+  );
 });

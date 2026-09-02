@@ -169,7 +169,13 @@ These criteria define the Definition of Done for the initial product scope.
 - [ ] Frontend maps claims date-only filter values to UTC day-boundary timestamps for API requests.
 - [ ] Search supports claim ID, customer name, normalized bill number, and prize name with the specified matching behaviour.
 - [ ] CSV contains only claim ID, date/time, customer name, unmasked phone, bill number, and prize.
-- [ ] CSV export includes all successful claims regardless of active claims filters.
+- [ ] CSV export is scoped to a single calendar year selected by the admin before exporting.
+- [ ] `GET /api/admin/claims.csv` without a `year` parameter returns `400 VALIDATION_ERROR` and exports nothing.
+- [ ] `GET /api/admin/claims.csv` with a malformed or out-of-range `year` returns `400 VALIDATION_ERROR`.
+- [ ] Claims are assigned to an export year by their claim timestamp interpreted in `Asia/Kolkata`, including claims recorded near the UTC year boundary.
+- [ ] Within the selected year, CSV export includes all successful claims regardless of active claims filters.
+- [ ] The year control offers the calendar years covered by the configured campaign window and defaults to the current `Asia/Kolkata` year when it is in range.
+- [ ] The downloaded file is named `claims-<year>.csv`.
 - [ ] Admin light and dark themes both preserve professional readability with visible keyboard focus states.
 - [ ] Initial admin load failure shows a single actionable error state with retry.
 - [ ] Initial admin load does not render partial operational data when required initial datasets fail.

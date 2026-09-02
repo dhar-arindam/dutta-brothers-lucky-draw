@@ -7,7 +7,7 @@ import {
   UpdateCommand,
 } from '@aws-sdk/lib-dynamodb';
 
-import { campaignDateInKolkata, isCampaignActive } from './campaign.js';
+import { campaignDateInKolkata, campaignYearInKolkata, isCampaignActive } from './campaign.js';
 import type { AdminClaimItem, AdminSummaryDistributionItem } from './contracts.js';
 import type { Claim, ConfiguredPrize, Prize } from './domain.js';
 import { classifyTransactionCancellation, computeBackoffDelayMs } from './dynamodb-retry.js';
@@ -536,7 +536,7 @@ export class DynamoDbDrawStore {
     };
   }
 
-  public async listAdminClaimsForCsv(): Promise<AdminCsvClaimItem[]> {
+  public async listAdminClaimsForCsv(year: number): Promise<AdminCsvClaimItem[]> {
     let exclusiveStartKey: Record<string, unknown> | undefined;
     const claims: AdminCsvClaimItem[] = [];
 
@@ -557,6 +557,10 @@ export class DynamoDbDrawStore {
 
       const pageItems = ((page as { Items?: ClaimEntity[] }).Items ?? []).map(toClaimFromEntity);
       for (const claim of pageItems) {
+        if (campaignYearInKolkata(new Date(claim.claimTimestamp)) !== year) {
+          continue;
+        }
+
         if (claims.length >= CSV_EXPORT_MAX_ROWS) {
           throw new CsvExportTooLargeError(CSV_EXPORT_MAX_ROWS);
         }

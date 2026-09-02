@@ -317,9 +317,44 @@ The admin UI must use a stronger confirmation step for this endpoint, such as re
 
 ### `GET /api/admin/claims.csv`
 
-Exports all successful claims irrespective of active claims filters and returns only the approved CSV fields: date/time, claim ID, customer name, bill number, prize, and unmasked phone number.
+Exports the successful claims for a single calendar year and returns only the approved CSV fields: date/time, claim ID, customer name, bill number, prize, and unmasked phone number.
+
+Query parameters:
+
+| Parameter | Required | Format | Meaning                                    |
+| --------- | -------- | ------ | ------------------------------------------ |
+| `year`    | Yes      | `YYYY` | Calendar year to export, in `Asia/Kolkata` |
+
+`year` is mandatory. The endpoint must never export more than one calendar year in a single request, and must not fall back to a default year, so that an operator cannot export an unintended period by omitting the parameter.
+
+A claim belongs to the year of its claim timestamp interpreted in `Asia/Kolkata`. A claim recorded at `2026-12-31T19:00:00.000Z` falls on `2027-01-01` in `Asia/Kolkata` and therefore belongs to `2027`.
+
+The response filename is `claims-<year>.csv`.
+
+Requests are rejected with `400 Bad Request` and `VALIDATION_ERROR` when `year`:
+
+- is missing or empty,
+- is not exactly four digits,
+- falls outside the range `2000`–`2100`.
+
+The error carries a `year` field error, for example:
+
+```json
+{
+  "status": "ERROR",
+  "code": "VALIDATION_ERROR",
+  "message": "Select a valid year to export.",
+  "fieldErrors": {
+    "year": "Year must be a four-digit calendar year."
+  }
+}
+```
+
+Active claims filters such as `search`, `prizeId`, `from`, and `to` affect dashboard viewing only and must not limit CSV export content. Within the selected year the export includes every successful claim.
 
 For deterministic formula-injection protection, prefix any exported cell beginning with `=`, `+`, `-`, or `@` with a single apostrophe. Apply normal CSV quoting after this transformation for commas, quotes, and line breaks. Quoting alone is not sufficient protection.
+
+A single year that still exceeds the export row limit is rejected with `413 Payload Too Large` and `EXPORT_TOO_LARGE` rather than returning a truncated file. A partial export that appears complete is not acceptable for prize fulfilment.
 
 ### `GET /api/admin/summary`
 
@@ -457,3 +492,4 @@ Admin validation errors return `400` with `VALIDATION_ERROR`; invalid prize or c
 - CORS must allow only approved frontend origins.
 - All API timestamps use ISO 8601 UTC; admin display converts them to `Asia/Kolkata`.
 - CSV exports must contain only approved fields and must protect against spreadsheet formula injection.
+- CSV exports are scoped to one explicitly selected calendar year.

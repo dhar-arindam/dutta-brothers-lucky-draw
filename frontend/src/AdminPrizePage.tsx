@@ -103,8 +103,15 @@ export const AdminPrizePage = () => {
   const [weightDrafts, setWeightDrafts] = useState<Record<string, string>>({});
   const [campaignForm, setCampaignForm] = useState<CampaignForm>({ fromDate: '', toDate: '' });
   const [campaignErrors, setCampaignErrors] = useState<CampaignFormErrors>({});
+  const [exportYear, setExportYear] = useState('');
 
   const isBusy = busyAction !== 'NONE';
+
+  const exportYearOptions = useMemo(() => {
+    return buildExportYearOptions(campaign?.fromDate, campaign?.toDate);
+  }, [campaign?.fromDate, campaign?.toDate]);
+
+  const selectedExportYear = resolveExportYear(exportYear, exportYearOptions);
 
   const sortedPrizes = useMemo(() => {
     return [...prizes].sort((a, b) => a.id.localeCompare(b.id));
@@ -358,11 +365,15 @@ export const AdminPrizePage = () => {
   };
 
   const onExportCsv = async () => {
+    if (!selectedExportYear) {
+      return;
+    }
+
     setBusyAction('CSV');
-    setFeedback('Preparing CSV export...');
+    setFeedback(`Preparing ${selectedExportYear} CSV export...`);
 
     try {
-      const csvText = await exportAdminClaimsCsv(buildClaimsQuery());
+      const csvText = await exportAdminClaimsCsv(Number(selectedExportYear));
       setLastCsvExport(csvText);
 
       if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
@@ -370,13 +381,13 @@ export const AdminPrizePage = () => {
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = 'claims.csv';
+        link.download = `claims-${selectedExportYear}.csv`;
         link.click();
         URL.revokeObjectURL(url);
       }
 
       setState({ type: 'READY' });
-      setFeedback('CSV export generated.');
+      setFeedback(`CSV export generated for ${selectedExportYear}.`);
     } catch {
       setErrorState('We could not complete the admin request. Please try again.');
     } finally {
@@ -1253,6 +1264,25 @@ export const AdminPrizePage = () => {
               />
             </div>
 
+            <div className="grid content-start gap-1">
+              <label htmlFor="export-year" className={`text-sm font-medium ${headingTextClass}`}>
+                Export Year
+              </label>
+              <select
+                id="export-year"
+                value={selectedExportYear}
+                className={inputClass}
+                disabled={isBusy}
+                onChange={(event) => setExportYear(event.target.value)}
+              >
+                {exportYearOptions.map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <div className="grid gap-2 sm:col-span-2 sm:grid-cols-3 lg:col-span-4 lg:w-full lg:grid-cols-4">
               <button type="submit" className={primaryButtonClass} disabled={isBusy}>
                 {busyAction === 'CLAIMS' ? 'Applying...' : 'Apply Filters'}
@@ -1268,10 +1298,10 @@ export const AdminPrizePage = () => {
               <button
                 type="button"
                 className={`justify-self-start sm:justify-self-end ${primaryButtonClass}`}
-                disabled={isBusy}
+                disabled={isBusy || !selectedExportYear}
                 onClick={() => void onExportCsv()}
               >
-                {busyAction === 'CSV' ? 'Exporting...' : 'Export All Data'}
+                {busyAction === 'CSV' ? 'Exporting...' : `Export ${selectedExportYear} Data`}
               </button>
               <button
                 type="button"
@@ -1695,6 +1725,34 @@ const campaignDateInTimezone = (value: Date, timezone: string): string => {
   });
 
   return formatter.format(value);
+};
+
+// Export years come from the configured campaign window so the picker cannot offer a year the
+// draw never ran in. Before the campaign loads, the current year keeps the control usable.
+const buildExportYearOptions = (fromDate?: string, toDate?: string): string[] => {
+  const currentYear = Number(campaignDateInTimezone(new Date(), 'Asia/Kolkata').slice(0, 4));
+
+  const first = Number((fromDate ?? '').slice(0, 4));
+  const last = Number((toDate ?? '').slice(0, 4));
+  if (!Number.isInteger(first) || !Number.isInteger(last) || first === 0 || last < first) {
+    return [String(currentYear)];
+  }
+
+  const years: string[] = [];
+  for (let year = last; year >= first; year -= 1) {
+    years.push(String(year));
+  }
+
+  return years;
+};
+
+const resolveExportYear = (selected: string, options: string[]): string => {
+  if (options.includes(selected)) {
+    return selected;
+  }
+
+  const currentYear = campaignDateInTimezone(new Date(), 'Asia/Kolkata').slice(0, 4);
+  return options.includes(currentYear) ? currentYear : (options[0] ?? '');
 };
 
 const isValidIsoDate = (value: string): boolean => {

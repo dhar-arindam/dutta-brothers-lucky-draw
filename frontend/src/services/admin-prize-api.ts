@@ -180,6 +180,10 @@ export const patchAdminCampaign = async (payload: {
   return response as AdminCampaignResponse | AdminErrorResponse;
 };
 
-export const exportAdminClaimsCsv = async (query: AdminClaimsQuery): Promise<string> => {
-  return requestText(`/api/admin/claims.csv${buildClaimsQuery(query)}`, { method: 'GET' });
+// Exports are scoped to one calendar year, so the year is the only accepted parameter here.
+// Dashboard claim filters deliberately do not narrow the export.
+export const exportAdminClaimsCsv = async (year: number): Promise<string> => {
+  return requestText(`/api/admin/claims.csv?year=${encodeURIComponent(String(year))}`, {
+    method: 'GET',
+  });
 };

@@ -966,7 +966,7 @@ describe('admin operations page', () => {
     expect(mockFetch).toHaveBeenCalledTimes(5);
   });
 
-  it('exports all data and renders last preview', async () => {
+  it('exports the selected year and renders last preview', async () => {
     enqueueDashboardSuccess();
     mockFetch.mockResolvedValueOnce(
       successJson('claimId,customerName\nCLM-20260816-000001,Amit Das'),
@@ -983,13 +983,69 @@ describe('admin operations page', () => {
     render(<AdminPrizePage />);
     await waitForAutoLoad();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Export All Data' }));
+    // The campaign window is 2026-08-01 to 2026-11-01, so 2026 is the only offered year.
+    expect((screen.getByLabelText('Export Year') as HTMLSelectElement).value).toBe('2026');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Export 2026 Data' }));
 
     expect(await screen.findByText('Last CSV Preview')).toBeInTheDocument();
     fireEvent.click(screen.getByText('Last CSV Preview'));
     expect(screen.getByText(/claimId,customerName/)).toBeInTheDocument();
     expect(createObjectURL).toHaveBeenCalled();
     expect(revokeObjectURL).toHaveBeenCalled();
+    expect(mockFetch).toHaveBeenLastCalledWith(
+      '/api/admin/claims.csv?year=2026',
+      expect.objectContaining({ method: 'GET' }),
+    );
+  });
+
+  it('offers every campaign year newest first and exports the year the admin picks', async () => {
+    mockFetch
+      .mockResolvedValueOnce(
+        successJson({
+          status: 'SUCCESS',
+          totalSuccessfulSpins: 0,
+          today: { date: '2026-08-16', successfulSpins: 0 },
+          prizeDistribution: [],
+        }),
+      )
+      .mockResolvedValueOnce(
+        successJson({
+          status: 'SUCCESS',
+          campaign: {
+            id: 'festive-2026',
+            timezone: 'Asia/Kolkata',
+            fromDate: '2024-08-01',
+            toDate: '2026-11-01',
+            status: 'ACTIVE',
+          },
+        }),
+      )
+      .mockResolvedValueOnce(successJson({ status: 'SUCCESS', items: [] }))
+      .mockResolvedValueOnce(successJson({ status: 'SUCCESS', items: [], nextPageToken: null }))
+      .mockResolvedValueOnce(successJson('claimId,customerName'));
+    vi.stubGlobal('fetch', mockFetch);
+    vi.stubGlobal('URL', { createObjectURL: vi.fn(() => 'blob://c'), revokeObjectURL: vi.fn() });
+
+    render(<AdminPrizePage />);
+    await waitForAutoLoad();
+
+    const select = screen.getByLabelText('Export Year') as HTMLSelectElement;
+    expect(Array.from(select.options).map((option) => option.value)).toEqual([
+      '2026',
+      '2025',
+      '2024',
+    ]);
+
+    fireEvent.change(select, { target: { value: '2024' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Export 2024 Data' }));
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenLastCalledWith(
+        '/api/admin/claims.csv?year=2024',
+        expect.objectContaining({ method: 'GET' }),
+      );
+    });
   });
 
   it('shows validation error for invalid inline prize weight save', async () => {

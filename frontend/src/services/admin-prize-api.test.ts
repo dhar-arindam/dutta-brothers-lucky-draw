@@ -109,10 +109,14 @@ describe('admin prize api client', () => {
     vi.stubGlobal('fetch', mockFetch);
 
     const summary = await getAdminSummary();
-    const csv = await exportAdminClaimsCsv({ pageSize: 25 });
+    const csv = await exportAdminClaimsCsv(2026);
 
     expect(summary.status).toBe('SUCCESS');
     expect(csv).toBe('a,b,c');
+    expect(mockFetch).toHaveBeenLastCalledWith(
+      '/api/admin/claims.csv?year=2026',
+      expect.objectContaining({ method: 'GET' }),
+    );
   });
 
   it('throws AdminApiError on invalid response shape', async () => {
@@ -126,6 +130,6 @@ describe('admin prize api client', () => {
     mockFetch.mockResolvedValueOnce({ ok: false, text: async () => 'error' });
     vi.stubGlobal('fetch', mockFetch);
 
-    await expect(exportAdminClaimsCsv({})).rejects.toBeInstanceOf(AdminApiError);
+    await expect(exportAdminClaimsCsv(2026)).rejects.toBeInstanceOf(AdminApiError);
   });
 });

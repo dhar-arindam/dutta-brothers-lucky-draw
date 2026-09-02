@@ -87,3 +87,7 @@ export const campaignDateInKolkata = (now: Date): string => {
   });
   return formatter.format(now);
 };
+
+export const campaignYearInKolkata = (instant: Date): number => {
+  return Number(campaignDateInKolkata(instant).slice(0, 4));
+};

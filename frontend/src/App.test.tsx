@@ -77,6 +77,14 @@ describe('customer draw app gift box reveal flow', () => {
     expect(screen.queryByTestId('lucky-wheel')).not.toBeInTheDocument();
   });
 
+  it('renders when the reduced-motion media query API is unavailable', () => {
+    vi.stubGlobal('matchMedia', undefined);
+
+    render(<App />);
+
+    expect(screen.getByTestId('landing-view')).toBeInTheDocument();
+  });
+
   it('shows validation for invalid phone', async () => {
     setupMatchMedia();
     vi.stubGlobal('fetch', mockFetch);

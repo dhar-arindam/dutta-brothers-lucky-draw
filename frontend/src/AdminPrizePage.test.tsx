@@ -896,7 +896,7 @@ describe('admin operations page', () => {
     expect(screen.queryByRole('button', { name: 'Previous' })).not.toBeInTheDocument();
   });
 
-  it('loads and appends the next claims page when the scroll sentinel is visible', async () => {
+  it('ignores inactive observer notifications and loads the next claims page when visible', async () => {
     enqueueDashboardSuccess('token-1');
     mockFetch.mockResolvedValueOnce(
       successJson({
@@ -916,10 +916,21 @@ describe('admin operations page', () => {
     );
     vi.stubGlobal(
       'IntersectionObserver',
-      vi.fn().mockImplementation((callback: IntersectionObserverCallback) => ({
-        observe: () => callback([{ isIntersecting: true } as IntersectionObserverEntry], {} as IntersectionObserver),
-        disconnect: vi.fn(),
-      })),
+      vi.fn().mockImplementation(function (callback: IntersectionObserverCallback) {
+        const observer = {} as IntersectionObserver;
+        return {
+          observe: () => {
+            callback([], observer);
+            callback([{ isIntersecting: false } as IntersectionObserverEntry], observer);
+            callback(
+              [{ isIntersecting: true } as IntersectionObserverEntry],
+              observer,
+            );
+            callback([{ isIntersecting: true } as IntersectionObserverEntry], observer);
+          },
+          disconnect: vi.fn(),
+        };
+      }),
     );
     vi.stubGlobal('fetch', mockFetch);
 

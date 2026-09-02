@@ -43,6 +43,17 @@ describe('frontend validation', () => {
     expect(result.name).toBe('Name contains unsupported characters.');
   });
 
+  it('rejects control characters in text fields', () => {
+    const result = validateForm({
+      name: 'Arindam\u007fRoy',
+      phone: '9876543210',
+      billNumber: 'DB\u000012345',
+    });
+
+    expect(result.name).toBe('Name contains unsupported characters.');
+    expect(result.billNumber).toBe('Bill number contains unsupported characters.');
+  });
+
   it('rejects non-10-digit phone number', () => {
     const result = validateForm({
       name: 'Arindam Roy',

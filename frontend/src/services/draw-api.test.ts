@@ -72,6 +72,12 @@ describe('draw api idempotency header behavior', () => {
     expect(first).not.toBe(second);
   });
 
+  it('creates a fallback idempotency key when randomUUID is unavailable', () => {
+    vi.stubGlobal('crypto', {});
+
+    expect(createIdempotencyKey()).toMatch(/^\d+-[0-9a-f]+$/);
+  });
+
   it('uses crypto.randomUUID when available', () => {
     const randomUUID = vi.fn(() => 'uuid-123');
     vi.stubGlobal('crypto', { randomUUID });

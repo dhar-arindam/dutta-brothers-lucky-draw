@@ -2,7 +2,7 @@
 // Before running, this scenario inspects the live campaign status via the existing
 // admin campaign endpoint and aborts (without bypassing anything) if the campaign
 // is not ACTIVE. There is no participation-count cap anywhere in the application
-// (confirmed by inspecting backend/src/campaign.ts and /specs), so 5,000 unique
+// (confirmed by inspecting backend/src/campaign.ts and /docs/specs), so 5,000 unique
 // synthetic participants are permitted whenever the campaign is active.
 
 import { runWithConcurrency } from '../lib/concurrency-pool.mjs';

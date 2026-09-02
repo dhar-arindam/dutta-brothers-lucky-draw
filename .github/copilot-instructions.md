@@ -8,7 +8,7 @@ This file is the authoritative engineering instruction for HOW the project is bu
 
 Do not implement a feature unless an approved specification exists for that feature.
 
-Refer to `/specs` for detailed product requirements.
+Refer to `/docs/specs` for detailed product requirements.
 
 Refer to this file for engineering standards and practices.
 
@@ -22,7 +22,7 @@ SPEC → REVIEW → APPROVE → DESIGN → IMPLEMENT → TEST → REVIEW → ACC
 
 Rules:
 
-1. Every significant feature must have a specification in `/specs`.
+1. Every significant feature must have a specification in `/docs/specs`.
 2. The specification must be reviewed by the Principal Software Engineer before implementation.
 3. Implementation must follow the approved specification.
 4. Tests must trace back to acceptance criteria.
@@ -31,7 +31,7 @@ Rules:
 7. Do not silently change a specification to make implementation easier. If a requirement is unclear or contradictory, raise the issue before implementation.
 8. If requirements change, update the specification first, then update implementation and tests.
 9. Specifications must be readable by both technical and non-technical stakeholders.
-10. Keep specifications and implementation separate: business requirements belong in `/specs`, engineering practices belong in this file.
+10. Keep specifications and implementation separate: business requirements belong in `/docs/specs`, engineering practices belong in this file.
 
 ## 2. Technology stack
 
@@ -376,7 +376,7 @@ The UI/UX Designer does not own infrastructure.
 
 ## 10. SPECIFICATION BOUNDARY
 
-Product behaviour is defined only by approved specifications in `/specs`.
+Product behaviour is defined only by approved specifications in `/docs/specs`.
 
 Implementation must follow the approved specification. Do not copy detailed business rules into application code comments, architecture guidance, or unrelated documentation.
 
@@ -386,7 +386,7 @@ When implementation reveals an ambiguity or contradiction in a specification, st
 
 Work incrementally, one feature at a time.
 
-1. Select a feature with an approved specification in `/specs`.
+1. Select a feature with an approved specification in `/docs/specs`.
 2. Review the specification and acceptance criteria.
 3. Design the implementation.
 4. Implement the feature following the specification.
@@ -422,9 +422,9 @@ Keep the `pre-commit` hook fast. Put slower whole-repository checks in `pre-push
 
 Maintain documentation for:
 
-- architecture (in `/specs/06-architecture`)
-- API contracts (in `/specs/04-api`)
-- DynamoDB design (in `/specs/05-data`)
+- architecture (in `/docs/specs/06-architecture`)
+- API contracts (in `/docs/specs/04-api`)
+- DynamoDB design (in `/docs/specs/05-data`)
 - AWS architecture
 - CDK infrastructure
 - deployment
@@ -599,7 +599,7 @@ Do not silently override another agent's architectural or design decision.
 
 ## 18. FILE ORGANIZATION
 
-Business requirements belong in `/specs`.
+Business requirements belong in `/docs/specs`.
 
 Engineering implementation rules belong in `.github/copilot-instructions.md`.
 
@@ -655,9 +655,9 @@ The Senior Backend Developer owns:
 After updating this file and creating specifications:
 
 1. Review the complete .github/copilot-instructions.md.
-2. Review every specification in /specs.
-3. Ensure business requirements are in /specs, not in this file.
-4. Ensure engineering practices are in this file, not in /specs.
+2. Review every specification in /docs/specs.
+3. Ensure business requirements are in /docs/specs, not in this file.
+4. Ensure engineering practices are in this file, not in /docs/specs.
 5. Check for contradictions between specs and instructions.
 6. Check for duplicate requirements across files.
 7. Ensure React + TypeScript is clearly the frontend technology.

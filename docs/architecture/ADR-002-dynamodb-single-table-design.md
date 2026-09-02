@@ -1,6 +1,6 @@
 # ADR-002: Use DynamoDB single-table design for claims, prizes, and reporting
 
-> **Status:** Legacy ADR requiring reconciliation with `/specs`. The final DynamoDB key and access-pattern design is intentionally not approved by the current conceptual data model.
+> **Status:** Legacy ADR requiring reconciliation with `/docs/specs`. The final DynamoDB key and access-pattern design is intentionally not approved by the current conceptual data model.
 
 - Status: Superseded pending reconciliation with approved specifications
 - Date: 2026-08-16

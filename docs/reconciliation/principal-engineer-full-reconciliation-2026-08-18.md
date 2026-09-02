@@ -9,7 +9,7 @@ Constraint: Repository-state review only (no git metadata available in workspace
 Supersession note (2026-08-19):
 
 - This document is retained for historical traceability.
-- Final Admin V1 source of truth is in `/specs`.
+- Final Admin V1 source of truth is in `/docs/specs`.
 - Any references here to `X-Admin-Token` or token-based admin authorization are superseded by the approved no-auth Admin V1 model.
 
 ## A. Repository Change Inventory
@@ -120,39 +120,49 @@ Because `.git` metadata is not available from the current workspace path, this i
 
 This reconciliation updates specification baseline metadata and intent alignment:
 
-1. `specs/04-api/api-contract.md`
+1. `docs/specs/04-api/api-contract.md`
+
 - Status promoted: `DRAFT -> APPROVED`
 - Version incremented to 1.1
 
-2. `specs/05-data/data-model.md`
+2. `docs/specs/05-data/data-model.md`
+
 - Status promoted: `DRAFT -> APPROVED`
 - Version incremented to 1.1
 
-3. `specs/06-architecture/architecture.md`
+3. `docs/specs/06-architecture/architecture.md`
+
 - Status promoted: `DRAFT -> APPROVED`
 - Version incremented to 1.1
 
-4. `specs/01-customer/wheel.md`
+4. `docs/specs/01-customer/wheel.md`
+
 - Status changed to `SUPERSEDED` (historical traceability retained)
 
-5. `specs/01-customer/reveal.md`
+5. `docs/specs/01-customer/reveal.md`
+
 - Confetti wording relaxed from mandatory to optional when used
 
-6. `specs/01-customer/lucky-draw.md`
+6. `docs/specs/01-customer/lucky-draw.md`
+
 - Success presentation wording aligned to optional confetti usage
 
 ## G. Decision Log
 
 1. Decision: Keep gift-box reveal as active customer experience baseline.
+
 - Rationale: Approved UX redesign; backend and API remain authoritative and unchanged.
 
 2. Decision: Keep `ANTICIPATION` as normative requirement.
+
 - Rationale: It is a deliberate UX transition requirement and not an accidental implementation artifact.
 
 3. Decision: Treat confetti as optional visual enhancement.
+
 - Rationale: Recent approved UX iterations removed confetti without harming business behavior.
 
 4. Decision: Promote API/data/architecture specs to approved status.
+
 - Rationale: Implementation has already crossed these boundaries; process baseline must be brought back into SDD compliance.
 
 ## H. Test Gap Analysis

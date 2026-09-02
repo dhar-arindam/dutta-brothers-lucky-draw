@@ -2,9 +2,9 @@
 
 > Historical guidance - Non-authoritative. Active business rules are defined in business-rules.md and reveal.md.
 
-> **Status:** Legacy planning guide. Use the approved specifications in `/specs` as the source of truth. This guide contains superseded phone-plus-bill and inventory assumptions and must be reconciled before backend implementation.
+> **Status:** Legacy planning guide. Use the approved specifications in `/docs/specs` as the source of truth. This guide contains superseded phone-plus-bill and inventory assumptions and must be reconciled before backend implementation.
 
-> **Admin V1 supersession note:** Any legacy references in this guide to private admin URLs, token-based admin access, or inventory/quantity prize models are superseded by the approved Admin V1 and product specs under `/specs`.
+> **Admin V1 supersession note:** Any legacy references in this guide to private admin URLs, token-based admin access, or inventory/quantity prize models are superseded by the approved Admin V1 and product specs under `/docs/specs`.
 
 ## 1. Scope and responsibilities
 
@@ -345,9 +345,7 @@ Use conditional writes and transactions to enforce this at the persistence layer
 ### Implementation guidance
 
 ```ts
-const eligiblePrizes = prizes.filter(
-  (p) => p.active && p.quantity > 0 && p.weight > 0
-);
+const eligiblePrizes = prizes.filter((p) => p.active && p.quantity > 0 && p.weight > 0);
 
 const totalWeight = eligiblePrizes.reduce((sum, prize) => sum + prize.weight, 0);
 const threshold = Math.random() * totalWeight;

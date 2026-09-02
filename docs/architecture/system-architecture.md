@@ -3,7 +3,7 @@
 Visual reference for the **implemented** system. Every diagram is derived from the source
 in `frontend/`, `backend/` and `infrastructure/`.
 
-Product behaviour remains defined by `/specs`. If a diagram here ever contradicts an approved
+Product behaviour remains defined by `/docs/specs`. If a diagram here ever contradicts an approved
 specification, the specification wins and this document must be corrected.
 
 ## Contents

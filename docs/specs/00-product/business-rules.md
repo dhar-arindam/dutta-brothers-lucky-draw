@@ -20,6 +20,7 @@ The same bill cannot be used by another person.
 ### Example
 
 Customer A:
+
 - Name: Arindam
 - Phone: 9876543210
 - Bill: DB12345
@@ -27,6 +28,7 @@ Customer A:
 Result: SUCCESS
 
 Customer B:
+
 - Name: Rahul
 - Phone: 9999999999
 - Bill: DB12345

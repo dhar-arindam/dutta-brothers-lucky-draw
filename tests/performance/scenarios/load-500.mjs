@@ -131,7 +131,7 @@ export const run = async (
     anomalies.push(`Circuit breaker stopped the ramp early: ${stoppedEarly.reason}`);
   }
 
-  // No documented latency SLA exists in /specs; classify by stability/errors, not an invented threshold.
+  // No documented latency SLA exists in /docs/specs; classify by stability/errors, not an invented threshold.
   let gate = 'PASS';
   if (stoppedEarly || status5xxCount > 0) {
     gate = 'FAIL';

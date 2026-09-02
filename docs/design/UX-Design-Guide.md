@@ -2,7 +2,7 @@
 
 > Historical guidance - Non-authoritative. Active business rules are defined in business-rules.md and reveal.md.
 
-> **Status:** Legacy planning guide. Use the approved specifications in `/specs` as the source of truth. This guide contains superseded phone-plus-bill and inventory assumptions and must be reconciled before implementation.
+> **Status:** Legacy planning guide. Use the approved specifications in `/docs/specs` as the source of truth. This guide contains superseded phone-plus-bill and inventory assumptions and must be reconciled before implementation.
 >
 > **Migration note:** Active customer reveal is now the festive gift box reveal (`BOX_REVEAL`). Envelope reveal guidance in older planning drafts is historical/deprecated for active implementation.
 
@@ -141,6 +141,7 @@ The design should feel premium, celebratory, and trustworthy, grounded in a fest
 ### Visual references
 
 Use these as guiding motifs rather than heavy illustration:
+
 - alpana-inspired pattern accents
 - lotus geometry in small decorative elements
 - diya-inspired warm glow accents
@@ -170,6 +171,7 @@ Use these as guiding motifs rather than heavy illustration:
 ### Mobile-first approach
 
 Target sizes:
+
 - 360px
 - 375px
 - 390px
@@ -343,6 +345,7 @@ Target sizes:
 - Use a minimal font pair only
 
 Suggested hierarchy:
+
 - H1: 32–40px, weight 700, tight tracking for campaign title
 - H2: 24–28px, weight 600
 - H3: 20–22px, weight 600
@@ -369,6 +372,7 @@ Suggested hierarchy:
 ### Buttons
 
 Primary button
+
 - Fill: deep maroon or crimson
 - Text: ivory
 - Large tappable height: 52–56px
@@ -376,6 +380,7 @@ Primary button
 - Hover/focus/pressed states clearly distinguished
 
 Secondary button
+
 - Minimal fill or outlined style
 - For less critical actions
 

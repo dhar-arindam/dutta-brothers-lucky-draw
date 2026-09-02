@@ -1,8 +1,9 @@
 # Dutta Brothers Festive Lucky Draw
+
 # Implementation Plan
 
 Status: Planning
-Source of truth: `/specs`
+Source of truth: `/docs/specs`
 Project constraint: One developer
 
 Controlled change notice (post-Phase-7):
@@ -107,7 +108,7 @@ Proposed structure:
   /lib
   /test
 
-/specs
+/docs/specs
 /docs
 /.github
 ```
@@ -129,8 +130,8 @@ Create the minimal React, Node.js, shared-contract, test, and CDK project struct
 
 #### Specifications used
 
-- [product-overview.md](../specs/00-product/product-overview.md)
-- [architecture.md](../specs/06-architecture/architecture.md)
+- [product-overview.md](specs/00-product/product-overview.md)
+- [architecture.md](specs/06-architecture/architecture.md)
 - [copilot-instructions.md](../.github/copilot-instructions.md)
 
 #### Components affected
@@ -174,11 +175,11 @@ Implement the first meaningful customer draw path from validated request through
 
 #### Specifications used
 
-- [business-rules.md](../specs/00-product/business-rules.md)
-- [lucky-draw.md](../specs/01-customer/lucky-draw.md)
-- [api-contract.md](../specs/04-api/api-contract.md)
-- [data-model.md](../specs/05-data/data-model.md)
-- [acceptance-criteria.md](../specs/07-acceptance/acceptance-criteria.md)
+- [business-rules.md](specs/00-product/business-rules.md)
+- [lucky-draw.md](specs/01-customer/lucky-draw.md)
+- [api-contract.md](specs/04-api/api-contract.md)
+- [data-model.md](specs/05-data/data-model.md)
+- [acceptance-criteria.md](specs/07-acceptance/acceptance-criteria.md)
 
 #### Components affected
 
@@ -232,9 +233,9 @@ Connect the mobile-first customer form to the approved draw contract and render 
 
 #### Specifications used
 
-- [lucky-draw.md](../specs/01-customer/lucky-draw.md)
-- [api-contract.md](../specs/04-api/api-contract.md)
-- [acceptance-criteria.md](../specs/07-acceptance/acceptance-criteria.md)
+- [lucky-draw.md](specs/01-customer/lucky-draw.md)
+- [api-contract.md](specs/04-api/api-contract.md)
+- [acceptance-criteria.md](specs/07-acceptance/acceptance-criteria.md)
 
 #### Components affected
 
@@ -281,10 +282,10 @@ Complete the remaining V1 prize configuration and administration capabilities af
 
 #### Specifications used
 
-- [prize-management.md](../specs/02-prizes/prize-management.md)
-- [weighted-selection.md](../specs/02-prizes/weighted-selection.md)
-- [business-rules.md](../specs/00-product/business-rules.md)
-- [api-contract.md](../specs/04-api/api-contract.md)
+- [prize-management.md](specs/02-prizes/prize-management.md)
+- [weighted-selection.md](specs/02-prizes/weighted-selection.md)
+- [business-rules.md](specs/00-product/business-rules.md)
+- [api-contract.md](specs/04-api/api-contract.md)
 
 #### Components affected
 
@@ -328,9 +329,9 @@ This phase is retained for historical traceability and was superseded for active
 
 #### Specifications used
 
-- [wheel.md](../specs/01-customer/wheel.md)
-- [lucky-draw.md](../specs/01-customer/lucky-draw.md)
-- [api-contract.md](../specs/04-api/api-contract.md)
+- [wheel.md](specs/01-customer/wheel.md)
+- [lucky-draw.md](specs/01-customer/lucky-draw.md)
+- [api-contract.md](specs/04-api/api-contract.md)
 
 #### Components affected
 
@@ -383,11 +384,11 @@ Verify failure, retry, and race-condition behaviour across the vertical slice.
 
 #### Specifications used
 
-- [business-rules.md](../specs/00-product/business-rules.md)
-- [lucky-draw.md](../specs/01-customer/lucky-draw.md)
-- [api-contract.md](../specs/04-api/api-contract.md)
-- [data-model.md](../specs/05-data/data-model.md)
-- [acceptance-criteria.md](../specs/07-acceptance/acceptance-criteria.md)
+- [business-rules.md](specs/00-product/business-rules.md)
+- [lucky-draw.md](specs/01-customer/lucky-draw.md)
+- [api-contract.md](specs/04-api/api-contract.md)
+- [data-model.md](specs/05-data/data-model.md)
+- [acceptance-criteria.md](specs/07-acceptance/acceptance-criteria.md)
 
 #### Components affected
 
@@ -434,10 +435,10 @@ Implement bounded admin claims viewing with the approved Admin V1 access model, 
 
 #### Specifications used
 
-- [dashboard.md](../specs/03-admin/dashboard.md)
-- [api-contract.md](../specs/04-api/api-contract.md)
-- [data-model.md](../specs/05-data/data-model.md)
-- [acceptance-criteria.md](../specs/07-acceptance/acceptance-criteria.md)
+- [dashboard.md](specs/03-admin/dashboard.md)
+- [api-contract.md](specs/04-api/api-contract.md)
+- [data-model.md](specs/05-data/data-model.md)
+- [acceptance-criteria.md](specs/07-acceptance/acceptance-criteria.md)
 
 #### Components affected
 
@@ -485,11 +486,11 @@ Replace the active customer-facing reveal mechanism from wheel/envelope presenta
 
 #### Specifications used
 
-- [lucky-draw.md](../specs/01-customer/lucky-draw.md)
-- [reveal.md](../specs/01-customer/reveal.md)
-- [wheel.md](../specs/01-customer/wheel.md) (deprecated historical reference)
-- [api-contract.md](../specs/04-api/api-contract.md)
-- [acceptance-criteria.md](../specs/07-acceptance/acceptance-criteria.md)
+- [lucky-draw.md](specs/01-customer/lucky-draw.md)
+- [reveal.md](specs/01-customer/reveal.md)
+- [wheel.md](specs/01-customer/wheel.md) (deprecated historical reference)
+- [api-contract.md](specs/04-api/api-contract.md)
+- [acceptance-criteria.md](specs/07-acceptance/acceptance-criteria.md)
 
 #### Components affected
 
@@ -575,10 +576,10 @@ Implement aggregate dashboard reporting and campaign configuration.
 
 #### Specifications used
 
-- [dashboard.md](../specs/03-admin/dashboard.md)
-- [api-contract.md](../specs/04-api/api-contract.md)
-- [data-model.md](../specs/05-data/data-model.md)
-- [business-rules.md](../specs/00-product/business-rules.md)
+- [dashboard.md](specs/03-admin/dashboard.md)
+- [api-contract.md](specs/04-api/api-contract.md)
+- [data-model.md](specs/05-data/data-model.md)
+- [business-rules.md](specs/00-product/business-rules.md)
 
 #### Components affected
 
@@ -621,9 +622,9 @@ Define the approved AWS serverless resources and least-privilege access using CD
 
 #### Specifications used
 
-- [architecture.md](../specs/06-architecture/architecture.md)
-- [data-model.md](../specs/05-data/data-model.md)
-- [api-contract.md](../specs/04-api/api-contract.md)
+- [architecture.md](specs/06-architecture/architecture.md)
+- [data-model.md](specs/05-data/data-model.md)
+- [api-contract.md](specs/04-api/api-contract.md)
 - [copilot-instructions.md](../.github/copilot-instructions.md)
 
 #### Components affected
@@ -674,8 +675,8 @@ Verify the complete customer and admin workflows against deployed development in
 
 #### Specifications used
 
-- All approved specifications under `/specs`.
-- [acceptance-criteria.md](../specs/07-acceptance/acceptance-criteria.md)
+- All approved specifications under `/docs/specs`.
+- [acceptance-criteria.md](specs/07-acceptance/acceptance-criteria.md)
 
 #### Components affected
 
@@ -719,8 +720,8 @@ Deploy approved infrastructure and application artifacts through development ver
 
 #### Specifications used
 
-- [architecture.md](../specs/06-architecture/architecture.md)
-- [acceptance-criteria.md](../specs/07-acceptance/acceptance-criteria.md)
+- [architecture.md](specs/06-architecture/architecture.md)
+- [acceptance-criteria.md](specs/07-acceptance/acceptance-criteria.md)
 - [copilot-instructions.md](../.github/copilot-instructions.md)
 
 #### Components affected
@@ -763,17 +764,17 @@ Principal Software Engineer for release approval and infrastructure review; impl
 
 ## 5. API Implementation Map
 
-| Endpoint | Purpose | Frontend | Lambda | Validation | DynamoDB | Response |
-|---|---|---|---|---|---|---|
-| `POST /api/draw` | Customer draw | Form submits approved fields; renders state | Orchestrates validation, campaign, bill, selection, claim, counters | Name, phone, bill, normalization, draw state | Atomic bill claim, claim creation, aggregate updates, prize/campaign reads | `SUCCESS`, `ALREADY_CLAIMED`, `DRAW_ENDED`, `NO_ELIGIBLE_PRIZE`, `VALIDATION_ERROR`, `INTERNAL_ERROR` |
-| `GET /api/admin/claims` | Bounded claims listing | Admin table, filters, search, pagination | Parses query and returns approved data | Page size, dates, prize, search rules | Claim listing and approved filters | Claims, masked phone, opaque next token |
-| `GET /api/admin/claims.csv` | Approved claims export | Download/export action | Queries approved set and sanitizes cells | Filters, CSV field rules | Claim query | Approved CSV only |
-| `GET /api/admin/summary` | Dashboard aggregates | Summary cards and prize distribution | Reads counters and campaign reporting view | Campaign reporting semantics | Overall, daily, and prize counters | Summary object without internal keys |
-| `GET /api/admin/prizes` | Retrieve prizes | Prize list/configuration UI | Reads configuration | Prize rules | Prize records | Prize list |
-| `POST /api/admin/prizes` | Add prize | Prize form submits name, weight, active | Validates and creates prize | Name, positive weight, active status | Conditional prize creation | Created prize and timestamps |
-| `PATCH /api/admin/prizes/{prizeId}` | Change weight/activation | Prize edit action | Validates and updates prize | Positive weight, active status | Conditional immutable-identity update | Updated prize |
-| `GET /api/admin/campaign` | Retrieve campaign | Draw status/configuration view | Reads campaign configuration | Timestamp conversion and date semantics | Campaign record | Campaign status and timestamps |
-| `PATCH /api/admin/campaign` | Update campaign dates | Campaign configuration form | Validates dates and updates campaign | Timezone, start/end rules | Conditional configuration update | Updated campaign |
+| Endpoint                            | Purpose                  | Frontend                                    | Lambda                                                              | Validation                                   | DynamoDB                                                                   | Response                                                                                              |
+| ----------------------------------- | ------------------------ | ------------------------------------------- | ------------------------------------------------------------------- | -------------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `POST /api/draw`                    | Customer draw            | Form submits approved fields; renders state | Orchestrates validation, campaign, bill, selection, claim, counters | Name, phone, bill, normalization, draw state | Atomic bill claim, claim creation, aggregate updates, prize/campaign reads | `SUCCESS`, `ALREADY_CLAIMED`, `DRAW_ENDED`, `NO_ELIGIBLE_PRIZE`, `VALIDATION_ERROR`, `INTERNAL_ERROR` |
+| `GET /api/admin/claims`             | Bounded claims listing   | Admin table, filters, search, pagination    | Parses query and returns approved data                              | Page size, dates, prize, search rules        | Claim listing and approved filters                                         | Claims, masked phone, opaque next token                                                               |
+| `GET /api/admin/claims.csv`         | Approved claims export   | Download/export action                      | Queries approved set and sanitizes cells                            | Filters, CSV field rules                     | Claim query                                                                | Approved CSV only                                                                                     |
+| `GET /api/admin/summary`            | Dashboard aggregates     | Summary cards and prize distribution        | Reads counters and campaign reporting view                          | Campaign reporting semantics                 | Overall, daily, and prize counters                                         | Summary object without internal keys                                                                  |
+| `GET /api/admin/prizes`             | Retrieve prizes          | Prize list/configuration UI                 | Reads configuration                                                 | Prize rules                                  | Prize records                                                              | Prize list                                                                                            |
+| `POST /api/admin/prizes`            | Add prize                | Prize form submits name, weight, active     | Validates and creates prize                                         | Name, positive weight, active status         | Conditional prize creation                                                 | Created prize and timestamps                                                                          |
+| `PATCH /api/admin/prizes/{prizeId}` | Change weight/activation | Prize edit action                           | Validates and updates prize                                         | Positive weight, active status               | Conditional immutable-identity update                                      | Updated prize                                                                                         |
+| `GET /api/admin/campaign`           | Retrieve campaign        | Draw status/configuration view              | Reads campaign configuration                                        | Timestamp conversion and date semantics      | Campaign record                                                            | Campaign status and timestamps                                                                        |
+| `PATCH /api/admin/campaign`         | Update campaign dates    | Campaign configuration form                 | Validates dates and updates campaign                                | Timezone, start/end rules                    | Conditional configuration update                                           | Updated campaign                                                                                      |
 
 ## 6. Data Implementation Map
 
@@ -882,7 +883,7 @@ The roster is ordered by immutable prize ID. The frontend maps the backend prize
 
 The result is synchronized only after the backend result is known. The sector under the pointer, the selected prize ID, and displayed winning text must be the same result. Non-success states do not animate a winning wheel.
 
-Active customer reveal behaviour is now defined in [reveal.md](../specs/01-customer/reveal.md) as festive gift box reveal.
+Active customer reveal behaviour is now defined in [reveal.md](specs/01-customer/reveal.md) as festive gift box reveal.
 
 ## 8. Admin Implementation Map
 
@@ -956,33 +957,33 @@ IAM -> every resource access path
 
 Tests are traced from approved acceptance criteria to the phase that implements them.
 
-| Acceptance area | Test types | Primary phase |
-|---|---|---|
-| Valid customer draw | Backend unit, API integration, frontend test, E2E | 2-3 |
-| Name/phone/bill validation | Validator unit, API tests, frontend tests | 2-3 |
-| Bill normalization | Validator unit and integration tests | 2 |
-| Duplicate bill and different customer/device/browser | Repository integration and API tests | 2, 6 |
-| Concurrent duplicate requests | Concurrency integration tests against persistence | 6 |
-| Retry after lost response | API integration and frontend retry tests | 6 |
-| Relative weighted selection | Backend unit/statistical tests | 4 |
-| Invalid and corrupted prize configuration | Backend unit/API tests | 4 |
-| New, changed, deactivated, and reactivated prizes | Backend integration and admin tests | 4, 8 |
-| No inventory | Data-contract and API schema tests | 4 |
-| Draw-end enforcement | Backend time-boundary tests and API tests | 6, 8 |
-| Claim ID and server timestamp | Backend unit/API tests | 2 |
-| Gift box reveal completion | Frontend integration and E2E tests | 7.5 |
-| Backend-result to reveal/result parity | Frontend integration tests | 7.5 |
-| Non-success no-misleading-reveal behaviour | Frontend integration tests | 7.5 |
-| Reduced-motion reveal behaviour | Frontend accessibility tests | 7.5 |
-| Reveal responsive behaviour | Browser viewport tests at 360/375/390/430px | 7.5, 10 |
-| Customer error states | Frontend and API tests | 3, 6 |
-| Admin authorization | API integration tests | 7, 9 |
-| Claims search/filter/pagination | API and frontend tests | 7 |
-| CSV masking and formula protection | Backend export tests | 7 |
-| Summary counters and no double-counting | Transaction/integration tests | 6, 8 |
-| Prize distribution and daily reporting | API, data-access, and admin tests | 8 |
-| IAM boundaries and logging safety | CDK assertions and deployed smoke tests | 9, 10 |
-| CloudFront/S3/API configuration | CDK assertions and smoke tests | 9-11 |
+| Acceptance area                                      | Test types                                        | Primary phase |
+| ---------------------------------------------------- | ------------------------------------------------- | ------------- |
+| Valid customer draw                                  | Backend unit, API integration, frontend test, E2E | 2-3           |
+| Name/phone/bill validation                           | Validator unit, API tests, frontend tests         | 2-3           |
+| Bill normalization                                   | Validator unit and integration tests              | 2             |
+| Duplicate bill and different customer/device/browser | Repository integration and API tests              | 2, 6          |
+| Concurrent duplicate requests                        | Concurrency integration tests against persistence | 6             |
+| Retry after lost response                            | API integration and frontend retry tests          | 6             |
+| Relative weighted selection                          | Backend unit/statistical tests                    | 4             |
+| Invalid and corrupted prize configuration            | Backend unit/API tests                            | 4             |
+| New, changed, deactivated, and reactivated prizes    | Backend integration and admin tests               | 4, 8          |
+| No inventory                                         | Data-contract and API schema tests                | 4             |
+| Draw-end enforcement                                 | Backend time-boundary tests and API tests         | 6, 8          |
+| Claim ID and server timestamp                        | Backend unit/API tests                            | 2             |
+| Gift box reveal completion                           | Frontend integration and E2E tests                | 7.5           |
+| Backend-result to reveal/result parity               | Frontend integration tests                        | 7.5           |
+| Non-success no-misleading-reveal behaviour           | Frontend integration tests                        | 7.5           |
+| Reduced-motion reveal behaviour                      | Frontend accessibility tests                      | 7.5           |
+| Reveal responsive behaviour                          | Browser viewport tests at 360/375/390/430px       | 7.5, 10       |
+| Customer error states                                | Frontend and API tests                            | 3, 6          |
+| Admin authorization                                  | API integration tests                             | 7, 9          |
+| Claims search/filter/pagination                      | API and frontend tests                            | 7             |
+| CSV masking and formula protection                   | Backend export tests                              | 7             |
+| Summary counters and no double-counting              | Transaction/integration tests                     | 6, 8          |
+| Prize distribution and daily reporting               | API, data-access, and admin tests                 | 8             |
+| IAM boundaries and logging safety                    | CDK assertions and deployed smoke tests           | 9, 10         |
+| CloudFront/S3/API configuration                      | CDK assertions and smoke tests                    | 9-11          |
 
 ### Approved Definition of Done mapping
 
@@ -1068,18 +1069,18 @@ Verify:
 
 ## 15. Risks
 
-| Risk | Mitigation |
-|---|---|
-| DynamoDB check-then-create race | Use conditional/transactional claim creation keyed by normalized bill. Test simultaneous requests. |
-| Dashboard counter double-counting | Couple claim creation and aggregate updates atomically; test every failure and retry path. |
-| Reveal-state mismatch | Keep reveal state transitions deterministic and test result parity against authoritative backend response. |
-| Unauthenticated Admin V1 access risk | Keep explicit CORS, request limits, logging/monitoring, least-privilege IAM, and tight operational routing controls. |
-| Excessive PII logging | Redact or avoid customer PII in CloudWatch logs and export only approved fields. |
-| Mobile layout overflow | Use responsive sizing and test all approved viewport widths. |
-| Weighted selection drift | Keep selection backend-only and test relative ratios and configuration changes. |
-| Retry after lost response | Return original claim details as `ALREADY_CLAIMED`; never create or count a second claim. |
-| Draw end race | Evaluate campaign state server-side at request time using `Asia/Kolkata` semantics. |
-| One-developer complexity | Keep one modular monolith, minimal CDK boundaries, no search/analytics services, and defer physical key choices until justified by access patterns. |
+| Risk                                 | Mitigation                                                                                                                                          |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| DynamoDB check-then-create race      | Use conditional/transactional claim creation keyed by normalized bill. Test simultaneous requests.                                                  |
+| Dashboard counter double-counting    | Couple claim creation and aggregate updates atomically; test every failure and retry path.                                                          |
+| Reveal-state mismatch                | Keep reveal state transitions deterministic and test result parity against authoritative backend response.                                          |
+| Unauthenticated Admin V1 access risk | Keep explicit CORS, request limits, logging/monitoring, least-privilege IAM, and tight operational routing controls.                                |
+| Excessive PII logging                | Redact or avoid customer PII in CloudWatch logs and export only approved fields.                                                                    |
+| Mobile layout overflow               | Use responsive sizing and test all approved viewport widths.                                                                                        |
+| Weighted selection drift             | Keep selection backend-only and test relative ratios and configuration changes.                                                                     |
+| Retry after lost response            | Return original claim details as `ALREADY_CLAIMED`; never create or count a second claim.                                                           |
+| Draw end race                        | Evaluate campaign state server-side at request time using `Asia/Kolkata` semantics.                                                                 |
+| One-developer complexity             | Keep one modular monolith, minimal CDK boundaries, no search/analytics services, and defer physical key choices until justified by access patterns. |
 
 ## 16. Definition of Done
 

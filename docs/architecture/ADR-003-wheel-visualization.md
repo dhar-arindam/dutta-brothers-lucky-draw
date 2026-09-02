@@ -9,9 +9,9 @@ Superseded Reason: Festive Gift Box Reveal became the approved active customer p
 
 Replacement References:
 
-- `specs/01-customer/reveal.md`
-- `specs/01-customer/lucky-draw.md`
-- `specs/07-acceptance/acceptance-criteria.md`
+- `docs/specs/01-customer/reveal.md`
+- `docs/specs/01-customer/lucky-draw.md`
+- `docs/specs/07-acceptance/acceptance-criteria.md`
 
 ## Context
 

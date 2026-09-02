@@ -4,7 +4,7 @@ A mobile-first festive lucky draw application for Dutta Brothers Electronics.
 
 Active customer presentation reveal is the festive gift box reveal, as defined in the approved customer specifications.
 
-Product behaviour is defined by the approved specifications in [`/specs`](specs). Engineering standards are defined in [`.github/copilot-instructions.md`](.github/copilot-instructions.md). The implementation plan is documented in [`docs/implementation-plan.md`](docs/implementation-plan.md).
+Product behaviour is defined by the approved specifications in [`/docs/specs`](docs/specs). Engineering standards are defined in [`.github/copilot-instructions.md`](.github/copilot-instructions.md). The implementation plan is documented in [`docs/implementation-plan.md`](docs/implementation-plan.md).
 
 AWS deployment context and promotion requirements are documented in [`docs/deployment/aws-phase1-environment-contract.md`](docs/deployment/aws-phase1-environment-contract.md).
 
@@ -18,7 +18,7 @@ Diagrams of the implemented architecture and every important flow are in [`docs/
 /shared          Shared TypeScript boundary
 /infrastructure  AWS CDK + TypeScript foundation
 /tests           Repository-level tests
-/specs           Approved product specifications
+/docs/specs      Approved product specifications
 /docs            Architecture and implementation documentation
 /.github         Copilot instructions
 ```

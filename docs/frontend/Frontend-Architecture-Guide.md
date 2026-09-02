@@ -2,11 +2,11 @@
 
 > Historical guidance - Non-authoritative. Active business rules are defined in business-rules.md and reveal.md.
 
-> **Status:** Legacy planning guide. Use the approved specifications in `/specs` as the source of truth. This guide contains superseded inventory assumptions and must be reconciled before frontend implementation.
+> **Status:** Legacy planning guide. Use the approved specifications in `/docs/specs` as the source of truth. This guide contains superseded inventory assumptions and must be reconciled before frontend implementation.
 >
 > **Migration note:** Active customer flow is `LANDING -> FORM -> ANTICIPATION -> BOX_REVEAL -> RESULT`. Gift box reveal is the active presentation mechanism; envelope and wheel reveal guidance is historical/deprecated.
 
-> **Admin V1 supersession note:** Any legacy references in this guide to private/token-based admin access are superseded by the approved no-auth Admin V1 model. Tailwind CSS constraints for Admin-only scope are defined by current `/specs` and must not alter customer UI.
+> **Admin V1 supersession note:** Any legacy references in this guide to private/token-based admin access are superseded by the approved no-auth Admin V1 model. Tailwind CSS constraints for Admin-only scope are defined by current `/docs/specs` and must not alter customer UI.
 
 ## 1. Scope and responsibilities
 
@@ -331,6 +331,7 @@ Use local component state for small, route-scoped forms and simple flow toggles.
 ## 10. Responsive rules
 
 Test thoroughly for:
+
 - 360px
 - 375px
 - 390px

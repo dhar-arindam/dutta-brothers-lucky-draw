@@ -17,10 +17,10 @@ Approved V1 behavior:
 
 This decision is aligned with:
 
-- `specs/03-admin/dashboard.md`
-- `specs/04-api/api-contract.md`
-- `specs/07-acceptance/acceptance-criteria.md`
-- `specs/06-architecture/architecture.md`
+- `docs/specs/03-admin/dashboard.md`
+- `docs/specs/04-api/api-contract.md`
+- `docs/specs/07-acceptance/acceptance-criteria.md`
+- `docs/specs/06-architecture/architecture.md`
 
 ## Decision
 

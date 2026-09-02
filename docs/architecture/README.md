@@ -1,6 +1,6 @@
 # Dutta Brothers Festive Lucky Draw Architecture
 
-> **Status:** Legacy planning document. Product behaviour is defined by the approved specifications in `/specs`. This document must not override them; the bill-only participation rule and no-inventory rule in `/specs/00-product/business-rules.md` take precedence.
+> **Status:** Legacy planning document. Product behaviour is defined by the approved specifications in `/docs/specs`. This document must not override them; the bill-only participation rule and no-inventory rule in `/docs/specs/00-product/business-rules.md` take precedence.
 >
 > **Migration note:** Active customer reveal is now the festive gift box reveal. Historical envelope and wheel references in legacy documents are deprecated for active implementation guidance.
 >

@@ -5,7 +5,7 @@ Owner: Principal Software Engineer
 Date: 2026-08-18
 Scope: Phase 1 Conditional Remediation, Condition 3
 
-Resolution: Policy approved in `specs/04-api/api-contract.md` version 1.2 on 2026-08-18.
+Resolution: Policy approved in `docs/specs/04-api/api-contract.md` version 1.2 on 2026-08-18.
 
 ## Summary
 

@@ -75,13 +75,13 @@ i = 5: Prize F
 `N = 6`, so each sector is `W = 60` degrees wide. With `R_current = 0` and `M = 3`:
 
 | Prize | Index | Centre `C_i` | Adjustment `delta` | Final rotation `R_final` |
-|---|---:|---:|---:|---:|
-| A | 0 | 30 | 150 | 1230 |
-| B | 1 | 90 | 90 | 1170 |
-| C | 2 | 150 | 30 | 1110 |
-| D | 3 | 210 | 330 | 1410 |
-| E | 4 | 270 | 270 | 1350 |
-| F | 5 | 330 | 210 | 1290 |
+| ----- | ----: | -----------: | -----------------: | -----------------------: |
+| A     |     0 |           30 |                150 |                     1230 |
+| B     |     1 |           90 |                 90 |                     1170 |
+| C     |     2 |          150 |                 30 |                     1110 |
+| D     |     3 |          210 |                330 |                     1410 |
+| E     |     4 |          270 |                270 |                     1350 |
+| F     |     5 |          330 |                210 |                     1290 |
 
 For example, if the backend returns Prize F, the frontend maps it to index `5`, calculates `C_5 = 330`, `delta = normalize(180 - 330, 360) = 210`, and animates to `R_final = 3 * 360 + 210 = 1290` degrees.
 

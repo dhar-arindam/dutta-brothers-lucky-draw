@@ -1,6 +1,6 @@
 # ADR-001: Server-authoritative prize selection and atomic uniqueness enforcement
 
-> **Status:** Legacy ADR requiring reconciliation with `/specs`. The approved specifications are authoritative for current product behaviour.
+> **Status:** Legacy ADR requiring reconciliation with `/docs/specs`. The approved specifications are authoritative for current product behaviour.
 
 - Status: Superseded pending reconciliation with approved specifications
 - Date: 2026-08-16

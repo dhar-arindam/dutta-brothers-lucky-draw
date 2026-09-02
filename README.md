@@ -8,6 +8,8 @@ Product behaviour is defined by the approved specifications in [`/specs`](specs)
 
 AWS deployment context and promotion requirements are documented in [`docs/deployment/aws-phase1-environment-contract.md`](docs/deployment/aws-phase1-environment-contract.md).
 
+Diagrams of the implemented architecture and every important flow are in [`docs/architecture/system-architecture.md`](docs/architecture/system-architecture.md).
+
 ## Repository Structure
 
 ```text

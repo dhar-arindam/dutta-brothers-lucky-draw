@@ -5,7 +5,7 @@
       {
         "Effect": "Allow",
         "Principal": {
-          "Federated": "arn:aws:iam::176515272004:oidc-provider/token.actions.githubusercontent.com"
+          "Federated": "arn:aws:iam::<AWS_ACCOUNT_ID>:oidc-provider/token.actions.githubusercontent.com"
         },
         "Action": "sts:AssumeRoleWithWebIdentity",
         "Condition": {
@@ -32,7 +32,7 @@
       {
         "Effect": "Allow",
         "Principal": {
-          "Federated": "arn:aws:iam::176515272004:oidc-provider/token.actions.githubusercontent.com"
+          "Federated": "arn:aws:iam::<AWS_ACCOUNT_ID>:oidc-provider/token.actions.githubusercontent.com"
         },
         "Action": "sts:AssumeRoleWithWebIdentity",
         "Condition": {

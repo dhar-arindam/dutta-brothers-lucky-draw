@@ -43,7 +43,11 @@ Coverage thresholds remain enforced at >= 85 for statements, branches, functions
 
 ## AWS Authentication (OIDC)
 
-All deployment workflows use `aws-actions/configure-aws-credentials@v4` with role assumption.
+All deployment workflows use `aws-actions/configure-aws-credentials` with role assumption.
+
+Required GitHub repository variables:
+
+- `AWS_ACCOUNT_ID` — the target AWS account. Workflows fail before any stack-changing command if this is unset or does not match the assumed role's account.
 
 Required GitHub environment variables:
 
@@ -54,9 +58,23 @@ Required GitHub environment variables:
   - `AWS_ROLE_ARN_PRODUCTION`
   - `PRODUCTION_FRONTEND_ORIGIN`
 
-Reference trust policy templates are provided in `docs/deployment/aws-oidc-role-trust-policy-examples.json`.
+Reference trust policy templates are provided in `docs/deployment/aws-oidc-role-trust-policy-examples.json`. Replace `<AWS_ACCOUNT_ID>` with the real account when applying them.
 
 No `AWS_ACCESS_KEY_ID` or `AWS_SECRET_ACCESS_KEY` secrets are required.
+
+## Third-Party Action Pinning
+
+Every third-party action is pinned to a full commit SHA with the human-readable version in a trailing comment:
+
+```yaml
+uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+```
+
+Floating tags such as `@v4` are mutable and would let a retagged or compromised release reach a workflow that holds OIDC credentials for the AWS account. Do not reintroduce them.
+
+Local reusable workflow references (`uses: ./.github/workflows/ci.yml`) are not pinned, because they resolve within this repository at the triggering commit.
+
+Dependabot is configured for the `github-actions` ecosystem and will propose SHA bumps with the updated version comment.
 
 ## Required GitHub Environments
 
@@ -74,10 +92,10 @@ Configure environment protection:
 
 Before any stack-changing command, workflows verify:
 
-- account ID is `176515272004`
+- account ID matches the `AWS_ACCOUNT_ID` repository variable
 - region is `ap-south-1`
 
-Workflow fails immediately if checks do not match.
+Workflow fails immediately if checks do not match, or if `AWS_ACCOUNT_ID` is unset.
 
 ## Stage Isolation and Stack Names
 

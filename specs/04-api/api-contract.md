@@ -374,9 +374,14 @@ A single year that still exceeds the export row limit is rejected with `413 Payl
       "prizeName": "Coffee Maker",
       "givenCount": 120
     }
-  ]
+  ],
+  "availableExportYears": [2026, 2025]
 }
 ```
+
+`availableExportYears` lists, newest first, every calendar year that currently holds at least one successful claim, determined in `Asia/Kolkata`. It is derived from the same lightweight daily aggregate records as the other counters and must not require a full scan of claims. It is empty when no claims exist.
+
+The admin CSV export year choices come from this list, so an operator is never offered a year that would produce an empty file.
 
 The `today.date` value is the current `Asia/Kolkata` calendar date. API timestamps remain ISO 8601 UTC. The endpoint reads lightweight aggregate records or counters and must not require loading all claims into the browser or performing a full DynamoDB scan. It must not return internal DynamoDB keys.
 

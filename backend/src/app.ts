@@ -330,6 +330,7 @@ export const createAdminPrizeApiHandler = (store: InMemoryDrawStore): AdminPrize
           totalSuccessfulSpins: summary.totalSuccessfulSpins,
           today: summary.today,
           prizeDistribution: summary.prizeDistribution,
+          availableExportYears: summary.availableExportYears,
         },
       };
     },

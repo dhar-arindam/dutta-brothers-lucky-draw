@@ -170,11 +170,15 @@ These criteria define the Definition of Done for the initial product scope.
 - [ ] Search supports claim ID, customer name, normalized bill number, and prize name with the specified matching behaviour.
 - [ ] CSV contains only claim ID, date/time, customer name, unmasked phone, bill number, and prize.
 - [ ] CSV export is scoped to a single calendar year selected by the admin before exporting.
+- [ ] Selecting the export action opens a modal asking which year to download, and no export request is made until the admin confirms.
+- [ ] Dismissing the export modal cancels the export and makes no request.
+- [ ] The export modal offers only years that hold at least one successful claim, newest first, and preselects the most recent.
+- [ ] The export modal explains that there is nothing to export when no claims exist, and offers no year choice.
+- [ ] `GET /api/admin/summary` returns `availableExportYears` newest first, derived from daily aggregates without a full claim scan.
 - [ ] `GET /api/admin/claims.csv` without a `year` parameter returns `400 VALIDATION_ERROR` and exports nothing.
 - [ ] `GET /api/admin/claims.csv` with a malformed or out-of-range `year` returns `400 VALIDATION_ERROR`.
 - [ ] Claims are assigned to an export year by their claim timestamp interpreted in `Asia/Kolkata`, including claims recorded near the UTC year boundary.
 - [ ] Within the selected year, CSV export includes all successful claims regardless of active claims filters.
-- [ ] The year control offers the calendar years covered by the configured campaign window and defaults to the current `Asia/Kolkata` year when it is in range.
 - [ ] The downloaded file is named `claims-<year>.csv`.
 - [ ] Admin light and dark themes both preserve professional readability with visible keyboard focus states.
 - [ ] Initial admin load failure shows a single actionable error state with retry.

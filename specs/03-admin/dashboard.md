@@ -238,15 +238,17 @@ CSV exports must contain only:
 CSV export scope:
 
 - Export is scoped to a single calendar year that the administrator selects before exporting.
-- The administrator selects the year from a year control shown next to the export action.
-- The year control offers every calendar year covered by the configured campaign From Date and To Date, newest first. It defaults to the current year in `Asia/Kolkata` when that year is within the campaign window, and otherwise to the most recent year offered.
+- Selecting the export action opens a modal dialog that asks which year to download. No file is requested until the administrator confirms a year in that dialog.
+- The dialog offers only the calendar years that currently hold at least one successful claim, newest first, as reported by `availableExportYears` on the admin summary. The administrator is never offered a year that would produce an empty file.
+- The most recent available year is preselected.
+- When no claims exist, the dialog explains that there is nothing to export and offers no year choice, and the confirm action is unavailable.
 - A claim belongs to the year of its claim timestamp interpreted in `Asia/Kolkata`.
 - Within the selected year the export includes all successful claims irrespective of active claims filters.
 - Active claims filters affect dashboard viewing only and must not limit CSV export content.
-- The export action must be disabled while no valid year is selected.
+- Dismissing the dialog cancels the export and requests nothing.
 - The downloaded file is named `claims-<year>.csv` so that exports from different years are not confused with each other.
 
-Exporting one year at a time keeps each export small enough to download reliably and makes the period covered by a file unambiguous for prize fulfilment and reconciliation.
+Exporting one year at a time keeps each export small enough to download reliably and makes the period covered by a file unambiguous for prize fulfilment and reconciliation. Asking for the year in a modal at the point of export makes the period an explicit, deliberate choice rather than a filter the operator may not notice.
 
 Bill number is visible to the shop owner because it is required for operational verification. Do not export unnecessary personal information or internal database identifiers. CSV values beginning with `=`, `+`, `-`, or `@` must be prefixed with a single apostrophe before normal CSV quoting.
 

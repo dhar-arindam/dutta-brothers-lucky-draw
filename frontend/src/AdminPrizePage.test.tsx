@@ -28,6 +28,7 @@ const enqueueDashboardSuccess = (nextPageToken: string | null = null) => {
             givenCount: 1,
           },
         ],
+        availableExportYears: [2026],
       }),
     )
     .mockResolvedValueOnce(
@@ -966,7 +967,7 @@ describe('admin operations page', () => {
     expect(mockFetch).toHaveBeenCalledTimes(5);
   });
 
-  it('exports the selected year and renders last preview', async () => {
+  it('asks for the year in a modal and exports the confirmed year', async () => {
     enqueueDashboardSuccess();
     mockFetch.mockResolvedValueOnce(
       successJson('claimId,customerName\nCLM-20260816-000001,Amit Das'),
@@ -983,10 +984,14 @@ describe('admin operations page', () => {
     render(<AdminPrizePage />);
     await waitForAutoLoad();
 
-    // The campaign window is 2026-08-01 to 2026-11-01, so 2026 is the only offered year.
-    expect((screen.getByLabelText('Export Year') as HTMLSelectElement).value).toBe('2026');
+    const callsBeforeDialog = mockFetch.mock.calls.length;
+    fireEvent.click(screen.getByRole('button', { name: 'Export Data' }));
 
-    fireEvent.click(screen.getByRole('button', { name: 'Export 2026 Data' }));
+    expect(await screen.findByText('Select year to download')).toBeInTheDocument();
+    // Opening the dialog must not request anything on its own.
+    expect(mockFetch.mock.calls).toHaveLength(callsBeforeDialog);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Download 2026' }));
 
     expect(await screen.findByText('Last CSV Preview')).toBeInTheDocument();
     fireEvent.click(screen.getByText('Last CSV Preview'));
@@ -999,14 +1004,34 @@ describe('admin operations page', () => {
     );
   });
 
-  it('offers every campaign year newest first and exports the year the admin picks', async () => {
+  it('cancels the export dialog without requesting a file', async () => {
+    enqueueDashboardSuccess();
+    vi.stubGlobal('fetch', mockFetch);
+
+    render(<AdminPrizePage />);
+    await waitForAutoLoad();
+
+    const callsBeforeDialog = mockFetch.mock.calls.length;
+    fireEvent.click(screen.getByRole('button', { name: 'Export Data' }));
+    expect(await screen.findByText('Select year to download')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    await waitFor(() => {
+      expect(screen.queryByText('Select year to download')).not.toBeInTheDocument();
+    });
+    expect(mockFetch.mock.calls).toHaveLength(callsBeforeDialog);
+  });
+
+  it('offers only years that hold claims, newest first, and exports the year the admin picks', async () => {
     mockFetch
       .mockResolvedValueOnce(
         successJson({
           status: 'SUCCESS',
-          totalSuccessfulSpins: 0,
+          totalSuccessfulSpins: 3,
           today: { date: '2026-08-16', successfulSpins: 0 },
           prizeDistribution: [],
+          availableExportYears: [2026, 2024],
         }),
       )
       .mockResolvedValueOnce(
@@ -1030,15 +1055,16 @@ describe('admin operations page', () => {
     render(<AdminPrizePage />);
     await waitForAutoLoad();
 
-    const select = screen.getByLabelText('Export Year') as HTMLSelectElement;
-    expect(Array.from(select.options).map((option) => option.value)).toEqual([
-      '2026',
-      '2025',
-      '2024',
-    ]);
+    fireEvent.click(screen.getByRole('button', { name: 'Export Data' }));
+    expect(await screen.findByText('Select year to download')).toBeInTheDocument();
+
+    const select = screen.getByLabelText('Year') as HTMLSelectElement;
+    // 2025 has no claims, so it must not be offered even though the campaign spans it.
+    expect(Array.from(select.options).map((option) => option.value)).toEqual(['2026', '2024']);
+    expect(select.value).toBe('2026');
 
     fireEvent.change(select, { target: { value: '2024' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Export 2024 Data' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Download 2024' }));
 
     await waitFor(() => {
       expect(mockFetch).toHaveBeenLastCalledWith(
@@ -1046,6 +1072,42 @@ describe('admin operations page', () => {
         expect.objectContaining({ method: 'GET' }),
       );
     });
+  });
+
+  it('tells the admin there is nothing to export when no claims exist', async () => {
+    mockFetch
+      .mockResolvedValueOnce(
+        successJson({
+          status: 'SUCCESS',
+          totalSuccessfulSpins: 0,
+          today: { date: '2026-08-16', successfulSpins: 0 },
+          prizeDistribution: [],
+          availableExportYears: [],
+        }),
+      )
+      .mockResolvedValueOnce(
+        successJson({
+          status: 'SUCCESS',
+          campaign: {
+            id: 'festive-2026',
+            timezone: 'Asia/Kolkata',
+            fromDate: '2026-08-01',
+            toDate: '2026-11-01',
+            status: 'ACTIVE',
+          },
+        }),
+      )
+      .mockResolvedValueOnce(successJson({ status: 'SUCCESS', items: [] }))
+      .mockResolvedValueOnce(successJson({ status: 'SUCCESS', items: [], nextPageToken: null }));
+    vi.stubGlobal('fetch', mockFetch);
+
+    render(<AdminPrizePage />);
+    await waitForAutoLoad();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Export Data' }));
+
+    expect(await screen.findByText('There are no claims to export yet.')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Year')).not.toBeInTheDocument();
   });
 
   it('shows validation error for invalid inline prize weight save', async () => {

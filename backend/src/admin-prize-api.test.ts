@@ -536,9 +536,23 @@ describe('campaign, summary, and claims endpoints', () => {
       status: 'SUCCESS',
       totalSuccessfulSpins: 0,
       prizeDistribution: [],
+      availableExportYears: [],
     });
 
     const claimsAfter = adminApiHandler.listClaims(new URLSearchParams());
     expect(claimsAfter.body).toMatchObject({ status: 'SUCCESS', items: [] });
+  });
+
+  it('reports only years that hold claims as available export years', () => {
+    const { drawApiHandler, adminApiHandler } = createHarness();
+
+    expect(adminApiHandler.getSummary().body).toMatchObject({ availableExportYears: [] });
+
+    drawApiHandler.handle(
+      JSON.stringify({ name: 'Amit Das', phone: '9123456789', billNumber: 'YEARS-001' }),
+    );
+
+    // The harness clock is fixed at 2026-08-16, so only that year becomes available.
+    expect(adminApiHandler.getSummary().body).toMatchObject({ availableExportYears: [2026] });
   });
 });

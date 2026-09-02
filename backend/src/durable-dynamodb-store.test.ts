@@ -441,6 +441,14 @@ describe('dynamo db draw store persistence', () => {
         },
       ],
     }));
+    fake.enqueue(async () => ({
+      Items: [
+        { pk: 'AGG', sk: 'DATE#2026-08-16', successfulSpins: 2 },
+        { pk: 'AGG', sk: 'DATE#2025-11-02', successfulSpins: 7 },
+        // A date whose claims were all deleted must not offer an empty export year.
+        { pk: 'AGG', sk: 'DATE#2024-01-05', successfulSpins: 0 },
+      ],
+    }));
 
     const store = new DynamoDbDrawStore(fake as never, {
       tableName: 'draws-table',
@@ -458,6 +466,7 @@ describe('dynamo db draw store persistence', () => {
         givenCount: 4,
       },
     ]);
+    expect(summary.availableExportYears).toEqual([2026, 2025]);
 
     expect(fake.calls[2]).toBeInstanceOf(QueryCommand);
   });

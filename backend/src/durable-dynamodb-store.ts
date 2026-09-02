@@ -608,6 +608,27 @@ export class DynamoDbDrawStore {
       }),
     );
 
+    // Daily aggregates, not claims, so the year list never costs a table scan.
+    const dailyQuery = await this.docClient.send(
+      new QueryCommand({
+        TableName: this.tableName,
+        KeyConditionExpression: 'pk = :pk AND begins_with(sk, :prefix)',
+        ExpressionAttributeValues: {
+          ':pk': 'AGG',
+          ':prefix': 'DATE#',
+        },
+        ProjectionExpression: '#sk, #successfulSpins',
+        ExpressionAttributeNames: { '#sk': 'sk', '#successfulSpins': 'successfulSpins' },
+      }),
+    );
+
+    const exportYears = new Set<number>();
+    for (const item of (dailyQuery as { Items?: AggregateEntity[] }).Items ?? []) {
+      if (Number(item.successfulSpins ?? 0) > 0) {
+        exportYears.add(Number(item.sk.replace('DATE#', '').slice(0, 4)));
+      }
+    }
+
     const totalSuccessfulSpins = Number(
       (totalItem as { Item?: AggregateEntity }).Item?.successfulSpins ?? 0,
     );
@@ -633,6 +654,7 @@ export class DynamoDbDrawStore {
         successfulSpins: todaySuccessfulSpins,
       },
       prizeDistribution,
+      availableExportYears: [...exportYears].sort((left, right) => right - left),
     };
   }
 

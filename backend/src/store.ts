@@ -143,6 +143,7 @@ export interface AdminSummaryData {
     successfulSpins: number;
   };
   prizeDistribution: AdminSummaryDistributionItem[];
+  availableExportYears: number[];
 }
 
 const MAX_PRIZE_NAME_LENGTH = 100;
@@ -416,7 +417,21 @@ export class InMemoryDrawStore {
         successfulSpins: todayCount,
       },
       prizeDistribution: distribution,
+      availableExportYears: this.availableExportYears(),
     };
+  }
+
+  // Years are derived from the daily aggregate keys rather than the claims themselves so the
+  // admin is only ever offered a year that would produce a non-empty export.
+  private availableExportYears(): number[] {
+    const years = new Set<number>();
+    for (const [date, count] of this.successfulByDate.entries()) {
+      if (count > 0) {
+        years.add(Number(date.slice(0, 4)));
+      }
+    }
+
+    return [...years].sort((left, right) => right - left);
   }
 
   public getCampaign(): CampaignView {

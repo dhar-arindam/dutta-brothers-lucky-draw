@@ -102,6 +102,7 @@ export interface AdminSummaryResponse {
     successfulSpins: number;
   };
   prizeDistribution: AdminSummaryDistributionItem[];
+  availableExportYears?: number[];
 }
 
 export interface AdminCampaignResponse {

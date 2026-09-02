@@ -643,6 +643,7 @@ export const handler = async (event: {
         totalSuccessfulSpins: summary.totalSuccessfulSpins,
         today: summary.today,
         prizeDistribution: summary.prizeDistribution,
+        availableExportYears: summary.availableExportYears,
       });
     }
 

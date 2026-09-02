@@ -20,6 +20,7 @@ import {
   toRequestTooLargeBody,
   utf8ByteLength,
 } from './request-size-policy.js';
+import { CsvExportTooLargeError } from './store.js';
 import { validateDrawRequest } from './validation.js';
 import { resolveRuntimeMode } from './runtime-mode.js';
 
@@ -584,7 +585,21 @@ export const handler = async (event: {
     }
 
     if (method === 'GET' && path === '/api/admin/claims.csv') {
-      const claims = await store.listAdminClaimsForCsv();
+      let claims;
+      try {
+        claims = await store.listAdminClaimsForCsv();
+      } catch (error) {
+        if (error instanceof CsvExportTooLargeError) {
+          return responseJson(413, {
+            status: 'ERROR',
+            code: 'EXPORT_TOO_LARGE',
+            message: `The claim export is limited to ${error.limit} rows. Export from the AWS console or contact engineering for a full extract.`,
+          });
+        }
+
+        throw error;
+      }
+
       const rows = [
         ['date/time', 'claim ID', 'customer name', 'bill number', 'prize', 'phone'],
         ...claims.map((item) => [

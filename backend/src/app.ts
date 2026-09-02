@@ -2,6 +2,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 
 import type {
   AdminCsvResponse,
+  AdminErrorResponse,
   AdminHttpResponse,
   DrawHttpResponse,
   DrawRequest,
@@ -10,6 +11,7 @@ import { createDefaultDrawService, DrawService } from './draw-service.js';
 import {
   type AdminClaimsQuery,
   type CampaignUpdateInput,
+  CsvExportTooLargeError,
   InMemoryDrawStore,
   UpdatePrizeInput,
 } from './store.js';
@@ -235,7 +237,27 @@ export const createAdminPrizeApiHandler = (store: InMemoryDrawStore): AdminPrize
 
     exportClaimsCsv(query: URLSearchParams): AdminCsvResponse {
       void query;
-      const result = store.listAdminClaimsForCsv();
+      let result;
+      try {
+        result = store.listAdminClaimsForCsv();
+      } catch (error) {
+        if (error instanceof CsvExportTooLargeError) {
+          const body: AdminErrorResponse = {
+            status: 'ERROR',
+            code: 'EXPORT_TOO_LARGE',
+            message: `The claim export is limited to ${error.limit} rows. Export from the AWS console or contact engineering for a full extract.`,
+          };
+
+          return {
+            statusCode: 413,
+            headers: jsonHeaders,
+            body: JSON.stringify(body),
+          };
+        }
+
+        throw error;
+      }
+
       const rows = [
         ['date/time', 'claim ID', 'customer name', 'bill number', 'prize', 'phone'],
         ...result.map((item) => [

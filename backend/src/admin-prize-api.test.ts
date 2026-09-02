@@ -4,7 +4,7 @@ import { createAdminPrizeApiHandler, createDrawApiHandler } from './app.js';
 import { ClaimIdGenerator } from './claim-id.js';
 import type { Campaign } from './domain.js';
 import { DrawService } from './draw-service.js';
-import { InMemoryDrawStore } from './store.js';
+import { CsvExportTooLargeError, InMemoryDrawStore } from './store.js';
 
 const now = new Date('2026-08-16T10:30:00.000Z');
 
@@ -377,6 +377,25 @@ describe('campaign, summary, and claims endpoints', () => {
     expect(response.body).not.toContain('*****');
     expect(response.body).toContain('CSV-001');
     expect(response.body).toContain('CSV-002');
+  });
+
+  it('rejects a csv export that exceeds the row limit instead of truncating it', () => {
+    const throwingStore = {
+      listAdminClaimsForCsv: () => {
+        throw new CsvExportTooLargeError(20000);
+      },
+    } as unknown as InMemoryDrawStore;
+
+    const response = createAdminPrizeApiHandler(throwingStore).exportClaimsCsv(
+      new URLSearchParams(),
+    );
+
+    expect(response.statusCode).toBe(413);
+    expect(response.headers['content-type']).toContain('application/json');
+    expect(JSON.parse(response.body)).toMatchObject({
+      status: 'ERROR',
+      code: 'EXPORT_TOO_LARGE',
+    });
   });
 
   it('deletes a single claim and decrements aggregates', () => {

@@ -8,6 +8,7 @@ import {
 import { describe, expect, it, vi } from 'vitest';
 
 import { DynamoDbDrawStore } from './durable-dynamodb-store.js';
+import { CSV_EXPORT_MAX_ROWS, CsvExportTooLargeError } from './store.js';
 
 class FakeDocClient {
   public readonly calls: unknown[] = [];
@@ -270,17 +271,20 @@ describe('dynamo db draw store persistence', () => {
     expect(result.type).toBe('NOT_FOUND');
   });
 
-  it('clears all claims by deleting claim, bill, and aggregate keys', async () => {
+  it('clears all claims by deleting bill keys before claim keys, then aggregates', async () => {
     const fake = new FakeDocClient();
+    // BILL is drained first so an interrupted run leaves bills claimable rather than stranded.
+    fake.enqueue(async () => ({
+      Items: [{ pk: 'BILL', sk: 'DB12345' }],
+    }));
+    fake.enqueue(async () => ({}));
     fake.enqueue(async () => ({
       Items: [
         { pk: 'CLAIM', sk: 'DB26-000001' },
         { pk: 'CLAIM', sk: 'DB26-000002' },
       ],
     }));
-    fake.enqueue(async () => ({
-      Items: [{ pk: 'BILL', sk: 'DB12345' }],
-    }));
+    fake.enqueue(async () => ({}));
     fake.enqueue(async () => ({
       Items: [{ pk: 'AGG', sk: 'TOTAL' }],
     }));
@@ -294,11 +298,99 @@ describe('dynamo db draw store persistence', () => {
     const deletedCount = await store.clearAllClaims();
 
     expect(deletedCount).toBe(2);
-    expect(fake.calls).toHaveLength(4);
+    expect(fake.calls).toHaveLength(6);
     expect(fake.calls[0]).toBeInstanceOf(QueryCommand);
-    expect(fake.calls[1]).toBeInstanceOf(QueryCommand);
-    expect(fake.calls[2]).toBeInstanceOf(QueryCommand);
+    expect((fake.calls[0] as QueryCommand).input.ExpressionAttributeValues).toEqual({
+      ':pk': 'BILL',
+    });
+    expect(fake.calls[1]).toBeInstanceOf(BatchWriteCommand);
+    expect((fake.calls[2] as QueryCommand).input.ExpressionAttributeValues).toEqual({
+      ':pk': 'CLAIM',
+    });
     expect(fake.calls[3]).toBeInstanceOf(BatchWriteCommand);
+    expect((fake.calls[4] as QueryCommand).input.ExpressionAttributeValues).toEqual({
+      ':pk': 'AGG',
+    });
+    expect(fake.calls[5]).toBeInstanceOf(BatchWriteCommand);
+  });
+
+  it('resends unprocessed batch delete items instead of reporting a silent partial delete', async () => {
+    const fake = new FakeDocClient();
+    fake.enqueue(async () => ({ Items: [] }));
+    fake.enqueue(async () => ({
+      Items: [
+        { pk: 'CLAIM', sk: 'DB26-000001' },
+        { pk: 'CLAIM', sk: 'DB26-000002' },
+      ],
+    }));
+    // DynamoDB reports throttled writes here instead of failing the call.
+    fake.enqueue(async () => ({
+      UnprocessedItems: {
+        'draws-table': [{ DeleteRequest: { Key: { pk: 'CLAIM', sk: 'DB26-000002' } } }],
+      },
+    }));
+    fake.enqueue(async () => ({}));
+    fake.enqueue(async () => ({ Items: [] }));
+
+    const store = new DynamoDbDrawStore(fake as never, {
+      tableName: 'draws-table',
+      now: () => new Date('2026-08-16T10:30:00.000Z'),
+      sleep: async () => {},
+    });
+
+    const deletedCount = await store.clearAllClaims();
+
+    expect(deletedCount).toBe(2);
+    const retried = fake.calls[3] as BatchWriteCommand;
+    expect(retried).toBeInstanceOf(BatchWriteCommand);
+    expect(retried.input.RequestItems?.['draws-table']).toEqual([
+      { DeleteRequest: { Key: { pk: 'CLAIM', sk: 'DB26-000002' } } },
+    ]);
+  });
+
+  it('fails loudly when unprocessed batch delete items never drain', async () => {
+    const fake = new FakeDocClient();
+    fake.enqueue(async () => ({ Items: [] }));
+    fake.enqueue(async () => ({ Items: [{ pk: 'CLAIM', sk: 'DB26-000001' }] }));
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      fake.enqueue(async () => ({
+        UnprocessedItems: {
+          'draws-table': [{ DeleteRequest: { Key: { pk: 'CLAIM', sk: 'DB26-000001' } } }],
+        },
+      }));
+    }
+
+    const store = new DynamoDbDrawStore(fake as never, {
+      tableName: 'draws-table',
+      now: () => new Date('2026-08-16T10:30:00.000Z'),
+      sleep: async () => {},
+    });
+
+    await expect(store.clearAllClaims()).rejects.toThrow(/could not process 1 item/);
+  });
+
+  it('refuses a csv export larger than the row limit rather than exhausting the function', async () => {
+    const oversizedPage = Array.from({ length: CSV_EXPORT_MAX_ROWS + 1 }, (_unused, index) => ({
+      pk: 'CLAIM',
+      sk: `DB26-${index}`,
+      claimId: `DB26-${index}`,
+      claimTimestamp: '2026-08-16T10:30:00.000Z',
+      customerName: 'Amit Das',
+      phone: '9123456789',
+      billNumberDisplay: `BILL-${index}`,
+      billNumberNormalized: `BILL-${index}`,
+      prize: { id: 'prize-001', name: 'Electric Kettle', displayName: 'Electric Kettle' },
+    }));
+
+    const fake = new FakeDocClient();
+    fake.enqueue(async () => ({ Items: oversizedPage }));
+
+    const store = new DynamoDbDrawStore(fake as never, {
+      tableName: 'draws-table',
+      now: () => new Date('2026-08-16T10:30:00.000Z'),
+    });
+
+    await expect(store.listAdminClaimsForCsv()).rejects.toBeInstanceOf(CsvExportTooLargeError);
   });
 
   it('builds summary from aggregate records', async () => {

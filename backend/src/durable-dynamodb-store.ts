@@ -11,6 +11,7 @@ import { campaignDateInKolkata, isCampaignActive } from './campaign.js';
 import type { AdminClaimItem, AdminSummaryDistributionItem } from './contracts.js';
 import type { Claim, ConfiguredPrize, Prize } from './domain.js';
 import { classifyTransactionCancellation, computeBackoffDelayMs } from './dynamodb-retry.js';
+import { CSV_EXPORT_MAX_ROWS, CsvExportTooLargeError } from './store.js';
 import type {
   AddPrizeInput,
   AdminCsvClaimItem,
@@ -556,6 +557,10 @@ export class DynamoDbDrawStore {
 
       const pageItems = ((page as { Items?: ClaimEntity[] }).Items ?? []).map(toClaimFromEntity);
       for (const claim of pageItems) {
+        if (claims.length >= CSV_EXPORT_MAX_ROWS) {
+          throw new CsvExportTooLargeError(CSV_EXPORT_MAX_ROWS);
+        }
+
         claims.push({
           claimId: claim.claimId,
           claimTimestamp: claim.claimTimestamp,
@@ -801,21 +806,21 @@ export class DynamoDbDrawStore {
     return { type: 'SUCCESS' };
   }
 
+  // BILL keys are removed before CLAIM keys so that an interrupted run leaves bills claimable
+  // again, matching the intent of a reset. The reverse order would strand BILL guards that
+  // permanently block legitimate customers with no matching claim to explain why.
   public async clearAllClaims(): Promise<number> {
-    const claimKeys = await this.collectKeys('CLAIM');
-    const billKeys = await this.collectKeys('BILL');
-    const aggKeys = await this.collectKeys('AGG');
+    await this.deleteAllByPartition('BILL');
+    const deletedClaims = await this.deleteAllByPartition('CLAIM');
+    await this.deleteAllByPartition('AGG');
 
-    await this.batchDelete([...claimKeys, ...billKeys, ...aggKeys]);
-
-    return claimKeys.length;
+    return deletedClaims;
   }
 
-  private async collectKeys(
-    pk: 'CLAIM' | 'BILL' | 'AGG',
-  ): Promise<Array<{ pk: string; sk: string }>> {
-    const keys: Array<{ pk: string; sk: string }> = [];
+  // Deletes each page as it is read, so memory stays bounded regardless of table size.
+  private async deleteAllByPartition(pk: 'CLAIM' | 'BILL' | 'AGG'): Promise<number> {
     let exclusiveStartKey: Record<string, unknown> | undefined;
+    let deleted = 0;
 
     do {
       const page = await this.docClient.send(
@@ -829,14 +834,17 @@ export class DynamoDbDrawStore {
         }),
       );
 
-      for (const entry of (page as { Items?: Array<{ pk: string; sk: string }> }).Items ?? []) {
-        keys.push({ pk: entry.pk, sk: entry.sk });
-      }
+      const keys = ((page as { Items?: Array<{ pk: string; sk: string }> }).Items ?? []).map(
+        (entry) => ({ pk: entry.pk, sk: entry.sk }),
+      );
+
+      await this.batchDelete(keys);
+      deleted += keys.length;
 
       exclusiveStartKey = (page as { LastEvaluatedKey?: Record<string, unknown> }).LastEvaluatedKey;
     } while (exclusiveStartKey);
 
-    return keys;
+    return deleted;
   }
 
   private async batchDelete(keys: Array<{ pk: string; sk: string }>): Promise<void> {
@@ -847,16 +855,62 @@ export class DynamoDbDrawStore {
         continue;
       }
 
-      await this.docClient.send(
+      await this.sendBatchDeleteWithRetries(chunk.map((key) => ({ DeleteRequest: { Key: key } })));
+    }
+  }
+
+  // BatchWriteItem reports throttled writes in UnprocessedItems instead of failing, so the
+  // leftovers must be resent or the delete silently loses items while reporting success.
+  private async sendBatchDeleteWithRetries(
+    requests: Array<{ DeleteRequest: { Key: { pk: string; sk: string } } }>,
+  ): Promise<void> {
+    let pending = requests;
+
+    for (let attempt = 1; attempt <= this.maxTransactionAttempts; attempt += 1) {
+      const response = await this.docClient.send(
         new BatchWriteCommand({
           RequestItems: {
-            [this.tableName]: chunk.map((key) => ({
-              DeleteRequest: { Key: key },
-            })),
+            [this.tableName]: pending,
           },
         }),
       );
+
+      const unprocessed = (
+        response as {
+          UnprocessedItems?: Record<
+            string,
+            Array<{ DeleteRequest?: { Key: { pk: string; sk: string } } }>
+          >;
+        }
+      ).UnprocessedItems?.[this.tableName];
+
+      if (!unprocessed || unprocessed.length === 0) {
+        return;
+      }
+
+      pending = unprocessed.filter(
+        (item): item is { DeleteRequest: { Key: { pk: string; sk: string } } } =>
+          item.DeleteRequest !== undefined,
+      );
+
+      if (pending.length === 0) {
+        return;
+      }
+
+      if (attempt < this.maxTransactionAttempts) {
+        await this.sleep(
+          computeBackoffDelayMs(attempt, {
+            baseDelayMs: this.retryBaseDelayMs,
+            maxDelayMs: this.retryMaxDelayMs,
+            random: this.random,
+          }),
+        );
+      }
     }
+
+    throw new Error(
+      `Batch delete could not process ${pending.length} item(s) after ${this.maxTransactionAttempts} attempts.`,
+    );
   }
 
   private async getClaimByNormalizedBill(billNumberNormalized: string): Promise<Claim | undefined> {

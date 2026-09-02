@@ -1,8 +1,11 @@
 name: dependabot-pr-review
 
 on:
+  # Deliberately excludes `edited`: Dependabot rewrites the PR body moments after pushing, which
+  # fired a second run that cancel-in-progress then killed, leaving a cancelled check on the PR.
+  # The review reads dependency metadata and the diff, so the description never changes its result.
   pull_request:
-    types: [opened, synchronize, reopened, edited]
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: read

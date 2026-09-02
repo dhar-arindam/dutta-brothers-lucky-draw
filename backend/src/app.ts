@@ -92,9 +92,7 @@ export const createDrawApiHandler = (drawService: DrawService): DrawApiHandler =
   };
 };
 
-export const createAdminPrizeApiHandler = (
-  store: InMemoryDrawStore,
-): AdminPrizeApiHandler => {
+export const createAdminPrizeApiHandler = (store: InMemoryDrawStore): AdminPrizeApiHandler => {
   return {
     listPrizes(): AdminHttpResponse {
       const distributionByPrizeId = new Map(
@@ -152,7 +150,9 @@ export const createAdminPrizeApiHandler = (
             name: result.prize.name,
             weight: result.prize.weight,
             active: result.prize.active,
-            givenCount: store.summary().prizeDistribution.find((item) => item.prizeId === result.prize.id)?.givenCount ?? 0,
+            givenCount:
+              store.summary().prizeDistribution.find((item) => item.prizeId === result.prize.id)
+                ?.givenCount ?? 0,
             createdAt: result.prize.createdAt,
             updatedAt: result.prize.updatedAt,
           },
@@ -198,7 +198,9 @@ export const createAdminPrizeApiHandler = (
             name: result.prize.name,
             weight: result.prize.weight,
             active: result.prize.active,
-            givenCount: store.summary().prizeDistribution.find((item) => item.prizeId === result.prize.id)?.givenCount ?? 0,
+            givenCount:
+              store.summary().prizeDistribution.find((item) => item.prizeId === result.prize.id)
+                ?.givenCount ?? 0,
             createdAt: result.prize.createdAt,
             updatedAt: result.prize.updatedAt,
           },

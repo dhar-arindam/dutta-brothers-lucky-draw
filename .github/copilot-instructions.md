@@ -76,6 +76,7 @@ Code quality:
 AWS CDK is the ONLY approved infrastructure-as-code framework for this project unless the Principal Software Engineer explicitly approves a change.
 
 Do not use:
+
 - AWS SAM
 - Terraform
 - Serverless Framework
@@ -123,6 +124,7 @@ API Gateway exposes the REST API.
 DynamoDB stores claims and prize configuration.
 
 Frontend responsibilities:
+
 - UI
 - form validation
 - animations
@@ -131,6 +133,7 @@ Frontend responsibilities:
 - responsive behaviour
 
 Backend responsibilities:
+
 - business rules
 - eligibility
 - prize selection
@@ -140,12 +143,14 @@ Backend responsibilities:
 - admin operations
 
 Database responsibilities:
+
 - claims
 - prize configuration
 
 The backend is always authoritative for business-critical operations.
 
 The frontend must NEVER be trusted for:
+
 - prize selection
 - claim ID generation
 - eligibility
@@ -258,8 +263,8 @@ Admin V1 does not use admin token authentication. The admin Lambda/API component
 
 Do not use broad permissions such as:
 
-Action: "*"
-Resource: "*"
+Action: "_"
+Resource: "_"
 
 unless there is an explicit and documented technical requirement approved by the Principal Software Engineer.
 
@@ -355,6 +360,7 @@ The Principal Software Engineer owns:
 The Senior Backend Developer may propose infrastructure changes required by backend functionality.
 
 However, infrastructure changes that affect:
+
 - architecture
 - security
 - data
@@ -395,6 +401,22 @@ Do not implement all features at once.
 Each feature must be reviewed and tested before proceeding.
 
 Do not start implementation on a feature without an approved specification.
+
+### Git hooks
+
+Git hooks are managed by Husky and are installed automatically by the root `prepare` script when `npm install` runs.
+
+- `pre-commit`: runs `lint-staged` (Prettier and `eslint --fix` on staged files) followed by `npm run typecheck`.
+- `commit-msg`: enforces a Conventional Commits header (`type(scope): subject`).
+- `pre-push`: runs `npm run lint`, `npm run build`, and `npm test`.
+
+Hooks are a fast local mirror of the CI quality gate. They do not replace CI, and CI remains authoritative.
+
+Do not weaken or remove a hook to make a commit pass. Fix the underlying problem instead.
+
+`--no-verify` is reserved for genuine emergencies and must be disclosed in the pull request.
+
+Keep the `pre-commit` hook fast. Put slower whole-repository checks in `pre-push` or CI.
 
 ## 12. DOCUMENTATION
 
@@ -478,6 +500,7 @@ Before considering a feature complete:
 Use TypeScript strict mode.
 
 Prefer:
+
 - small functions
 - clear names
 - reusable components
@@ -487,6 +510,7 @@ Prefer:
 - testable business logic
 
 Avoid:
+
 - giant components
 - giant services
 - duplicated logic
@@ -507,6 +531,7 @@ The agents are specialist roles used by one developer. They do not represent sep
 ### 1. Principal Software Engineer
 
 Owns:
+
 - architecture
 - technical governance
 - cross-cutting concerns
@@ -519,6 +544,7 @@ Owns:
 ### 2. Senior UI/UX Designer
 
 Owns:
+
 - user experience
 - visual design
 - user flows
@@ -532,6 +558,7 @@ Does NOT own backend or React implementation.
 ### 3. Senior Frontend Developer
 
 Owns:
+
 - React implementation
 - frontend components
 - forms
@@ -545,6 +572,7 @@ Does NOT own business rules or DynamoDB.
 ### 4. Senior Backend Developer
 
 Owns:
+
 - Node.js
 - REST APIs
 - business logic

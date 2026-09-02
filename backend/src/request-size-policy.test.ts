@@ -65,7 +65,6 @@ describe('request-size policy enforcement (node application layer)', () => {
     );
 
     openServers.length = 0;
-
   });
 
   const startServer = async (): Promise<string> => {

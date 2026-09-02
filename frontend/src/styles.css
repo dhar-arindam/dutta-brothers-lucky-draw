@@ -344,7 +344,9 @@ body {
   min-height: 2.75rem;
   color: #fff1cf;
   background: rgb(20 19 56 / 92%);
-  box-shadow: inset 0 0 0 1px rgb(255 200 89 / 12%), 0 0 0 1px rgb(16 14 47 / 70%);
+  box-shadow:
+    inset 0 0 0 1px rgb(255 200 89 / 12%),
+    0 0 0 1px rgb(16 14 47 / 70%);
 }
 
 .form-view input::placeholder {
@@ -427,9 +429,7 @@ body {
   background-size: contain;
   background-repeat: no-repeat;
   background-position: center;
-  filter:
-    drop-shadow(0 1px 0 rgb(255 233 167 / 55%))
-    drop-shadow(0 2px 5px rgb(0 0 0 / 34%));
+  filter: drop-shadow(0 1px 0 rgb(255 233 167 / 55%)) drop-shadow(0 2px 5px rgb(0 0 0 / 34%));
 }
 
 .error-text {
@@ -489,9 +489,7 @@ body {
   transform-origin: 50% 44%;
   object-fit: contain;
   object-position: 50% 58%;
-  filter:
-    drop-shadow(0 9px 16px rgb(0 0 0 / 36%))
-    drop-shadow(0 0 18px rgb(255 187 92 / 20%));
+  filter: drop-shadow(0 9px 16px rgb(0 0 0 / 36%)) drop-shadow(0 0 18px rgb(255 187 92 / 20%));
   animation: anticipationSpinDrop 700ms cubic-bezier(0.22, 0.88, 0.3, 1) both;
 }
 
@@ -531,11 +529,26 @@ body {
   box-shadow: 0 0 10px rgb(255 220 143 / 60%);
 }
 
-.dot-a { top: -0.3rem; left: 50%; transform: translateX(-50%); }
-.dot-b { right: -0.25rem; top: 50%; transform: translateY(-50%); }
-.dot-c { bottom: -0.3rem; left: 50%; transform: translateX(-50%); }
-.dot-d { left: -0.25rem; top: 50%; transform: translateY(-50%); }
-
+.dot-a {
+  top: -0.3rem;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.dot-b {
+  right: -0.25rem;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.dot-c {
+  bottom: -0.3rem;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.dot-d {
+  left: -0.25rem;
+  top: 50%;
+  transform: translateY(-50%);
+}
 
 .gift-box-image {
   display: block;
@@ -558,11 +571,15 @@ body {
   gap: 0.85rem;
   opacity: 1;
   transform: translateY(0);
-  transition: opacity 220ms ease, transform 220ms ease;
+  transition:
+    opacity 220ms ease,
+    transform 220ms ease;
 }
 
 .reveal-view .overlay-title {
-  transition: opacity 260ms ease, transform 320ms ease;
+  transition:
+    opacity 260ms ease,
+    transform 320ms ease;
 }
 
 .reveal-view[data-presentation-state='BOX_OPENING'] .overlay-title,
@@ -592,7 +609,9 @@ body {
   justify-items: center;
   background: rgb(5 5 24 / 46%);
   backdrop-filter: blur(4px);
-  transition: background-color 280ms ease, backdrop-filter 280ms ease;
+  transition:
+    background-color 280ms ease,
+    backdrop-filter 280ms ease;
 }
 
 .reveal-overlay[data-modal-state='RESULT'] {
@@ -634,7 +653,9 @@ body {
   padding: 0.5rem;
   background: transparent;
   box-shadow: none;
-  transition: opacity 360ms ease, transform 520ms cubic-bezier(0.18, 0.84, 0.28, 1);
+  transition:
+    opacity 360ms ease,
+    transform 520ms cubic-bezier(0.18, 0.84, 0.28, 1);
 }
 
 .gift-box-wrap {
@@ -643,7 +664,9 @@ body {
   place-items: center;
   width: min(100%, 12.8rem);
   aspect-ratio: 199 / 232;
-  transition: width 180ms ease, aspect-ratio 180ms ease;
+  transition:
+    width 180ms ease,
+    aspect-ratio 180ms ease;
   margin-inline: auto;
   border-radius: 0.88rem;
   overflow: hidden;
@@ -1208,7 +1231,9 @@ body {
   border: 1px solid rgb(243 181 72 / 35%);
   border-radius: 1.1rem;
   padding: 1rem;
-  box-shadow: 0 20px 36px rgb(0 0 0 / 45%), inset 0 0 0 1px rgb(255 223 151 / 14%);
+  box-shadow:
+    0 20px 36px rgb(0 0 0 / 45%),
+    inset 0 0 0 1px rgb(255 223 151 / 14%);
 }
 
 .admin-card h1 {
@@ -1275,7 +1300,9 @@ body {
   min-height: 2.75rem;
   color: #fff1cf;
   background: rgb(20 19 56 / 92%);
-  box-shadow: inset 0 0 0 1px rgb(255 200 89 / 12%), 0 0 0 1px rgb(16 14 47 / 70%);
+  box-shadow:
+    inset 0 0 0 1px rgb(255 200 89 / 12%),
+    0 0 0 1px rgb(16 14 47 / 70%);
 }
 
 .admin-form input:focus-visible,

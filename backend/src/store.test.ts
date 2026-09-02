@@ -147,15 +147,23 @@ describe('in-memory store campaign and prize admin operations', () => {
       claimId: 'DB26-000050',
       billNumberDisplay: 'AB050',
       billNumberNormalized: 'AB050',
-      prize: { id: created.prize.id, name: created.prize.name, displayName: created.prize.displayName },
+      prize: {
+        id: created.prize.id,
+        name: created.prize.name,
+        displayName: created.prize.displayName,
+      },
     });
     store.createClaimAndUpdateAggregatesAtomic({ claim, now });
 
     const summary = store.summary();
-    const distribution = summary.prizeDistribution.find((item) => item.prizeId === created.prize.id);
+    const distribution = summary.prizeDistribution.find(
+      (item) => item.prizeId === created.prize.id,
+    );
 
     expect(distribution?.givenCount).toBe(1);
-    expect(store.listEligiblePrizesForDraw().some((item) => item.id === created.prize.id)).toBe(false);
+    expect(store.listEligiblePrizesForDraw().some((item) => item.id === created.prize.id)).toBe(
+      false,
+    );
   });
 });
 
@@ -192,7 +200,11 @@ describe('in-memory store claim deletion', () => {
 
     store.createClaimAndUpdateAggregatesAtomic({ claim: createClaim(), now });
     store.createClaimAndUpdateAggregatesAtomic({
-      claim: createClaim({ claimId: 'DB26-000002', billNumberDisplay: 'AB124', billNumberNormalized: 'AB124' }),
+      claim: createClaim({
+        claimId: 'DB26-000002',
+        billNumberDisplay: 'AB124',
+        billNumberNormalized: 'AB124',
+      }),
       now,
     });
 

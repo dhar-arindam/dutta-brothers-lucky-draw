@@ -23,9 +23,7 @@ import {
 } from './services/admin-prize-api';
 import './admin.tailwind.css';
 
-type AdminPageState =
-  | { type: 'READY' }
-  | { type: 'ERROR'; message: string };
+type AdminPageState = { type: 'READY' } | { type: 'ERROR'; message: string };
 
 type BusyAction =
   | 'NONE'
@@ -64,9 +62,7 @@ interface CampaignFormErrors {
 
 type CampaignTone = 'not-configured' | 'not-started' | 'active' | 'ended';
 
-type ConfirmDialogState =
-  | { type: 'DELETE_CLAIM'; claimId: string }
-  | { type: 'CLEAR_ALL_CLAIMS' };
+type ConfirmDialogState = { type: 'DELETE_CLAIM'; claimId: string } | { type: 'CLEAR_ALL_CLAIMS' };
 
 const CLEAR_ALL_CONFIRMATION_PHRASE = 'CLEAR ALL CLAIMS';
 
@@ -125,7 +121,9 @@ export const AdminPrizePage = () => {
   );
 
   const givenByPrizeId = useMemo(() => {
-    return new Map((summary?.prizeDistribution ?? []).map((item) => [item.prizeId, item.givenCount]));
+    return new Map(
+      (summary?.prizeDistribution ?? []).map((item) => [item.prizeId, item.givenCount]),
+    );
   }, [summary]);
 
   const filteredPrizeName = useMemo(() => {
@@ -205,12 +203,9 @@ export const AdminPrizePage = () => {
     setFeedback('Loading admin data...');
 
     try {
-      const [summaryResponse, campaignResponse, prizesResponse, claimsResponse] = await Promise.all([
-        getAdminSummary(),
-        getAdminCampaign(),
-        listAdminPrizes(),
-        listAdminClaims({}),
-      ]);
+      const [summaryResponse, campaignResponse, prizesResponse, claimsResponse] = await Promise.all(
+        [getAdminSummary(), getAdminCampaign(), listAdminPrizes(), listAdminClaims({})],
+      );
 
       const failure = firstError(summaryResponse, campaignResponse, prizesResponse, claimsResponse);
       if (failure) {
@@ -218,7 +213,11 @@ export const AdminPrizePage = () => {
         return;
       }
 
-      if (!('items' in prizesResponse) || !('items' in claimsResponse) || !('campaign' in campaignResponse)) {
+      if (
+        !('items' in prizesResponse) ||
+        !('items' in claimsResponse) ||
+        !('campaign' in campaignResponse)
+      ) {
         setErrorState('We could not complete the admin request. Please try again.');
         return;
       }
@@ -231,7 +230,9 @@ export const AdminPrizePage = () => {
       });
       setCampaignErrors({});
       setPrizes((prizesResponse.items ?? []).slice());
-      setWeightDrafts(Object.fromEntries(prizesResponse.items.map((item) => [item.id, String(item.weight)])));
+      setWeightDrafts(
+        Object.fromEntries(prizesResponse.items.map((item) => [item.id, String(item.weight)])),
+      );
 
       const claimsPayload = claimsResponse as AdminClaimsListResponse;
       setClaims(claimsPayload.items);
@@ -267,12 +268,16 @@ export const AdminPrizePage = () => {
         return;
       }
 
-      const loadedClaimsCount = append ? claims.length + response.items.length : response.items.length;
+      const loadedClaimsCount = append
+        ? claims.length + response.items.length
+        : response.items.length;
       setClaims((current) => (append ? [...current, ...response.items] : response.items));
       setNextPageToken(response.nextPageToken);
       setState({ type: 'READY' });
       if (append) {
-        setFeedback(`Loaded ${loadedClaimsCount} of ${summary?.totalSuccessfulSpins ?? loadedClaimsCount} claims.`);
+        setFeedback(
+          `Loaded ${loadedClaimsCount} of ${summary?.totalSuccessfulSpins ?? loadedClaimsCount} claims.`,
+        );
       }
     } catch {
       setErrorState('We could not complete the admin request. Please try again.');
@@ -303,7 +308,10 @@ export const AdminPrizePage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nextPageToken, isBusy]);
 
-  const buildClaimsQuery = (pageToken?: string, sourceFilters: ClaimsFilters = filters): AdminClaimsQuery => {
+  const buildClaimsQuery = (
+    pageToken?: string,
+    sourceFilters: ClaimsFilters = filters,
+  ): AdminClaimsQuery => {
     const fromDate = sourceFilters.from.trim();
     const toDate = sourceFilters.to.trim();
 
@@ -340,10 +348,7 @@ export const AdminPrizePage = () => {
     setFeedback(prizeId ? 'Prize filter applied.' : 'Showing all prize claims.');
   };
 
-  const onPrizeFilterKeyDown = (
-    event: KeyboardEvent<HTMLButtonElement>,
-    prizeId: string,
-  ) => {
+  const onPrizeFilterKeyDown = (event: KeyboardEvent<HTMLButtonElement>, prizeId: string) => {
     if (event.key !== 'Enter' && event.key !== ' ') {
       return;
     }
@@ -420,7 +425,10 @@ export const AdminPrizePage = () => {
       }
 
       setPrizes((current) => [...current, response.item]);
-      setWeightDrafts((current) => ({ ...current, [response.item.id]: String(response.item.weight) }));
+      setWeightDrafts((current) => ({
+        ...current,
+        [response.item.id]: String(response.item.weight),
+      }));
       setAddForm(defaultAddPrizeForm);
       setState({ type: 'READY' });
       setFeedback('Prize added successfully.');
@@ -556,7 +564,11 @@ export const AdminPrizePage = () => {
 
   const onCopyClaimId = async (claimId: string) => {
     try {
-      if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+      if (
+        typeof navigator !== 'undefined' &&
+        navigator.clipboard &&
+        typeof navigator.clipboard.writeText === 'function'
+      ) {
         await navigator.clipboard.writeText(claimId);
       } else {
         const textArea = document.createElement('textarea');
@@ -668,23 +680,23 @@ export const AdminPrizePage = () => {
       ? 'border-solid border-emerald-300 bg-emerald-50'
       : isCampaignNotStarted
         ? 'border-solid border-sky-300 bg-sky-50'
-      : 'border-solid border-amber-300 bg-amber-50'
+        : 'border-solid border-amber-300 bg-amber-50'
     : isCampaignActive
       ? 'border-solid border-emerald-300/45 bg-emerald-950/20'
       : isCampaignNotStarted
         ? 'border-solid border-sky-300/45 bg-sky-950/20'
-      : 'border-solid border-amber-300/45 bg-amber-950/20';
+        : 'border-solid border-amber-300/45 bg-amber-950/20';
   const campaignBadgeClass = isLightTheme
     ? isCampaignActive
       ? 'border-solid border-emerald-300 bg-emerald-100 text-emerald-800'
       : isCampaignNotStarted
         ? 'border-solid border-sky-300 bg-sky-100 text-sky-800'
-      : 'border-solid border-amber-300 bg-amber-100 text-amber-800'
+        : 'border-solid border-amber-300 bg-amber-100 text-amber-800'
     : isCampaignActive
       ? 'border-solid border-emerald-300/55 bg-emerald-900/45 text-emerald-100'
       : isCampaignNotStarted
         ? 'border-solid border-sky-300/55 bg-sky-900/45 text-sky-100'
-      : 'border-solid border-amber-300/55 bg-amber-900/45 text-amber-100';
+        : 'border-solid border-amber-300/55 bg-amber-900/45 text-amber-100';
   const campaignDetailClass = isLightTheme
     ? 'text-slate-700'
     : isCampaignActive
@@ -721,9 +733,19 @@ export const AdminPrizePage = () => {
       <section className={panelClass}>
         <header className="flex flex-wrap items-start justify-between gap-3">
           <div className="grid gap-1">
-            <p className={`m-0 text-xs font-bold uppercase tracking-[0.16em] ${isLightTheme ? 'text-slate-500' : 'text-amber-300'}`}>Dutta Brothers</p>
-            <h1 className={`m-0 text-2xl font-semibold uppercase tracking-[0.04em] sm:text-3xl ${headingTextClass}`}>Lucky Draw Admin</h1>
-            <p className={`m-0 text-sm ${mutedTextClass}`}>Operational view for campaign control, prize status, and claims reporting.</p>
+            <p
+              className={`m-0 text-xs font-bold uppercase tracking-[0.16em] ${isLightTheme ? 'text-slate-500' : 'text-amber-300'}`}
+            >
+              Dutta Brothers
+            </p>
+            <h1
+              className={`m-0 text-2xl font-semibold uppercase tracking-[0.04em] sm:text-3xl ${headingTextClass}`}
+            >
+              Lucky Draw Admin
+            </h1>
+            <p className={`m-0 text-sm ${mutedTextClass}`}>
+              Operational view for campaign control, prize status, and claims reporting.
+            </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <button
@@ -734,7 +756,11 @@ export const AdminPrizePage = () => {
             >
               {busyAction === 'INITIAL' ? 'Refreshing...' : 'Refresh'}
             </button>
-            <button type="button" className={secondaryButtonClass} onClick={() => setIsLightTheme((current) => !current)}>
+            <button
+              type="button"
+              className={secondaryButtonClass}
+              onClick={() => setIsLightTheme((current) => !current)}
+            >
               {isLightTheme ? 'Switch to Dark' : 'Switch to Light'}
             </button>
           </div>
@@ -751,7 +777,9 @@ export const AdminPrizePage = () => {
             }`}
             role="alert"
           >
-            <p className={`m-0 text-sm ${isLightTheme ? 'text-rose-700' : 'text-rose-200'}`}>{state.message}</p>
+            <p className={`m-0 text-sm ${isLightTheme ? 'text-rose-700' : 'text-rose-200'}`}>
+              {state.message}
+            </p>
             <button
               type="button"
               className={secondaryButtonClass}
@@ -763,30 +791,52 @@ export const AdminPrizePage = () => {
           </div>
         ) : null}
 
-        {panelLoadingText ? <p className={`mt-2 text-sm ${mutedTextClass}`}>{panelLoadingText}</p> : null}
+        {panelLoadingText ? (
+          <p className={`mt-2 text-sm ${mutedTextClass}`}>{panelLoadingText}</p>
+        ) : null}
 
         <section className={`mt-4 border-t pt-4 ${sectionBorderClass}`}>
-          <h2 className={`m-0 text-base font-semibold uppercase tracking-[0.04em] ${headingTextClass}`}>Campaign Configuration</h2>
+          <h2
+            className={`m-0 text-base font-semibold uppercase tracking-[0.04em] ${headingTextClass}`}
+          >
+            Campaign Configuration
+          </h2>
           <section
             className={`mt-3 rounded-xl border p-3 ${campaignToneClass}`}
             aria-label="Campaign status"
           >
-            <p className={`m-0 inline-block rounded-full border px-2 py-1 text-xs font-bold uppercase tracking-[0.08em] ${campaignBadgeClass}`}>
+            <p
+              className={`m-0 inline-block rounded-full border px-2 py-1 text-xs font-bold uppercase tracking-[0.08em] ${campaignBadgeClass}`}
+            >
               {campaignStatus.label}
             </p>
             {campaign?.fromDate && campaign?.toDate ? (
-              <p className={`mb-0 mt-2 text-base font-semibold ${isLightTheme ? 'text-slate-900' : 'text-amber-50'}`}>
+              <p
+                className={`mb-0 mt-2 text-base font-semibold ${isLightTheme ? 'text-slate-900' : 'text-amber-50'}`}
+              >
                 {formatDateOnly(campaign.fromDate)} {'->'} {formatDateOnly(campaign.toDate)}
               </p>
             ) : (
-              <p className={`mb-0 mt-2 text-base font-semibold ${isLightTheme ? 'text-slate-900' : 'text-amber-50'}`}>Campaign period not configured.</p>
+              <p
+                className={`mb-0 mt-2 text-base font-semibold ${isLightTheme ? 'text-slate-900' : 'text-amber-50'}`}
+              >
+                Campaign period not configured.
+              </p>
             )}
             <p className={`mb-0 mt-1 text-sm ${campaignDetailClass}`}>{campaignStatus.detail}</p>
           </section>
-          <p className={`mb-0 mt-2 text-sm ${mutedTextClass}`}>Timezone: {campaign?.timezone ?? 'Asia/Kolkata'} (IST)</p>
-          <form className="mt-3 grid gap-3 sm:grid-cols-2" onSubmit={(event) => void onSaveCampaign(event)}>
+          <p className={`mb-0 mt-2 text-sm ${mutedTextClass}`}>
+            Timezone: {campaign?.timezone ?? 'Asia/Kolkata'} (IST)
+          </p>
+          <form
+            className="mt-3 grid gap-3 sm:grid-cols-2"
+            onSubmit={(event) => void onSaveCampaign(event)}
+          >
             <div className="grid gap-1">
-              <label htmlFor="campaign-from-date" className={`text-sm font-medium ${headingTextClass}`}>
+              <label
+                htmlFor="campaign-from-date"
+                className={`text-sm font-medium ${headingTextClass}`}
+              >
                 From Date
               </label>
               <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
@@ -812,12 +862,17 @@ export const AdminPrizePage = () => {
                 </button>
               </div>
               {campaignErrors.fromDate ? (
-                <p className={`m-0 text-sm ${isLightTheme ? 'text-rose-700' : 'text-rose-200'}`}>{campaignErrors.fromDate}</p>
+                <p className={`m-0 text-sm ${isLightTheme ? 'text-rose-700' : 'text-rose-200'}`}>
+                  {campaignErrors.fromDate}
+                </p>
               ) : null}
             </div>
 
             <div className="grid gap-1">
-              <label htmlFor="campaign-to-date" className={`text-sm font-medium ${headingTextClass}`}>
+              <label
+                htmlFor="campaign-to-date"
+                className={`text-sm font-medium ${headingTextClass}`}
+              >
                 To Date
               </label>
               <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
@@ -843,7 +898,9 @@ export const AdminPrizePage = () => {
                 </button>
               </div>
               {campaignErrors.toDate ? (
-                <p className={`m-0 text-sm ${isLightTheme ? 'text-rose-700' : 'text-rose-200'}`}>{campaignErrors.toDate}</p>
+                <p className={`m-0 text-sm ${isLightTheme ? 'text-rose-700' : 'text-rose-200'}`}>
+                  {campaignErrors.toDate}
+                </p>
               ) : null}
             </div>
 
@@ -858,34 +915,62 @@ export const AdminPrizePage = () => {
         </section>
 
         <section className={`mt-4 border-t pt-4 ${sectionBorderClass}`}>
-          <h2 className={`m-0 text-base font-semibold uppercase tracking-[0.04em] ${headingTextClass}`}>Prize Summary</h2>
+          <h2
+            className={`m-0 text-base font-semibold uppercase tracking-[0.04em] ${headingTextClass}`}
+          >
+            Prize Summary
+          </h2>
           <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <article className={`rounded-xl border p-3 ${surfaceClass}`}>
-              <p className={`m-0 text-xs uppercase tracking-[0.06em] ${mutedTextClass}`}>Total Winners</p>
-              <strong className={`mt-1 block text-2xl ${headingTextClass}`}>{summary?.totalSuccessfulSpins ?? 0}</strong>
+              <p className={`m-0 text-xs uppercase tracking-[0.06em] ${mutedTextClass}`}>
+                Total Winners
+              </p>
+              <strong className={`mt-1 block text-2xl ${headingTextClass}`}>
+                {summary?.totalSuccessfulSpins ?? 0}
+              </strong>
             </article>
             <article className={`rounded-xl border p-3 ${surfaceClass}`}>
-              <p className={`m-0 text-xs uppercase tracking-[0.06em] ${mutedTextClass}`}>Today's Winners</p>
-              <strong className={`mt-1 block text-2xl ${headingTextClass}`}>{summary?.today.successfulSpins ?? 0}</strong>
-              <small className={`text-xs ${mutedTextClass}`}>{summary?.today.date ? `Date ${summary.today.date}` : 'Date unavailable'}</small>
+              <p className={`m-0 text-xs uppercase tracking-[0.06em] ${mutedTextClass}`}>
+                Today's Winners
+              </p>
+              <strong className={`mt-1 block text-2xl ${headingTextClass}`}>
+                {summary?.today.successfulSpins ?? 0}
+              </strong>
+              <small className={`text-xs ${mutedTextClass}`}>
+                {summary?.today.date ? `Date ${summary.today.date}` : 'Date unavailable'}
+              </small>
             </article>
             <article className={`rounded-xl border p-3 ${surfaceClass}`}>
-              <p className={`m-0 text-xs uppercase tracking-[0.06em] ${mutedTextClass}`}>Last Claim</p>
+              <p className={`m-0 text-xs uppercase tracking-[0.06em] ${mutedTextClass}`}>
+                Last Claim
+              </p>
               <strong className={`mt-1 block text-base ${headingTextClass}`}>
                 {lastClaimTimestamp ? formatDateTime(lastClaimTimestamp, campaign?.timezone) : '—'}
               </strong>
-              <small className={`text-xs ${mutedTextClass}`}>{lastClaimTimestamp ? 'Latest loaded claim timestamp' : 'No claims yet'}</small>
+              <small className={`text-xs ${mutedTextClass}`}>
+                {lastClaimTimestamp ? 'Latest loaded claim timestamp' : 'No claims yet'}
+              </small>
             </article>
             <article className={`rounded-xl border p-3 ${surfaceClass}`}>
-              <p className={`m-0 text-xs uppercase tracking-[0.06em] ${mutedTextClass}`}>Active Prizes</p>
-              <strong className={`mt-1 block text-2xl ${headingTextClass}`}>{activePrizeCount}</strong>
-              <small className={`text-xs ${mutedTextClass}`}>{prizes.length} configured prizes</small>
+              <p className={`m-0 text-xs uppercase tracking-[0.06em] ${mutedTextClass}`}>
+                Active Prizes
+              </p>
+              <strong className={`mt-1 block text-2xl ${headingTextClass}`}>
+                {activePrizeCount}
+              </strong>
+              <small className={`text-xs ${mutedTextClass}`}>
+                {prizes.length} configured prizes
+              </small>
             </article>
           </div>
         </section>
 
         <section className={`mt-4 border-t pt-4 ${sectionBorderClass}`}>
-          <h2 className={`m-0 text-base font-semibold uppercase tracking-[0.04em] ${headingTextClass}`}>Prize Management</h2>
+          <h2
+            className={`m-0 text-base font-semibold uppercase tracking-[0.04em] ${headingTextClass}`}
+          >
+            Prize Management
+          </h2>
           <p className={`mb-0 mt-1 text-sm ${mutedTextClass}`}>
             Prize names are fixed after creation and cannot be renamed.
           </p>
@@ -909,7 +994,11 @@ export const AdminPrizePage = () => {
                   }));
                 }}
               />
-              {addErrors.name ? <p className={`m-0 text-sm ${isLightTheme ? 'text-rose-700' : 'text-rose-200'}`}>{addErrors.name}</p> : null}
+              {addErrors.name ? (
+                <p className={`m-0 text-sm ${isLightTheme ? 'text-rose-700' : 'text-rose-200'}`}>
+                  {addErrors.name}
+                </p>
+              ) : null}
             </div>
 
             <div className="grid content-start gap-1 sm:col-span-2 lg:col-span-1">
@@ -934,11 +1023,18 @@ export const AdminPrizePage = () => {
               <p className={`m-0 text-xs ${mutedTextClass}`}>
                 Weight is relative: for example, weight 10 has twice the draw chance of weight 5.
               </p>
-              {addErrors.weight ? <p className={`m-0 text-sm ${isLightTheme ? 'text-rose-700' : 'text-rose-200'}`}>{addErrors.weight}</p> : null}
+              {addErrors.weight ? (
+                <p className={`m-0 text-sm ${isLightTheme ? 'text-rose-700' : 'text-rose-200'}`}>
+                  {addErrors.weight}
+                </p>
+              ) : null}
             </div>
 
             <div className="sm:col-span-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
-              <label className={`inline-flex items-center gap-2 text-sm ${headingTextClass}`} htmlFor="prize-active">
+              <label
+                className={`inline-flex items-center gap-2 text-sm ${headingTextClass}`}
+                htmlFor="prize-active"
+              >
                 <input
                   id="prize-active"
                   type="checkbox"
@@ -964,9 +1060,16 @@ export const AdminPrizePage = () => {
             </div>
           </form>
 
-          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" role="radiogroup" aria-label="Prize claims filter cards">
+          <div
+            className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+            role="radiogroup"
+            aria-label="Prize claims filter cards"
+          >
             {sortedPrizes.map((prize) => (
-              <article key={prize.id} className={`grid gap-2 rounded-xl border p-3 ${surfaceClass}`}>
+              <article
+                key={prize.id}
+                className={`grid gap-2 rounded-xl border p-3 ${surfaceClass}`}
+              >
                 <button
                   type="button"
                   className={`grid w-full gap-2 rounded-lg border p-3 text-left ${
@@ -986,7 +1089,9 @@ export const AdminPrizePage = () => {
                   disabled={isBusy}
                 >
                   <header className="flex items-center justify-between gap-2">
-                    <h3 className={`m-0 text-base font-semibold ${headingTextClass}`}>{prize.name}</h3>
+                    <h3 className={`m-0 text-base font-semibold ${headingTextClass}`}>
+                      {prize.name}
+                    </h3>
                     <span
                       className={`rounded-full border px-2 py-1 text-[11px] font-bold tracking-[0.06em] ${
                         prize.active
@@ -1002,10 +1107,15 @@ export const AdminPrizePage = () => {
                     </span>
                   </header>
                   <p className={`m-0 text-sm ${mutedTextClass}`}>Weight: {prize.weight}</p>
-                  <p className={`m-0 text-sm ${mutedTextClass}`}>Given: {givenByPrizeId.get(prize.id) ?? prize.givenCount ?? 0}</p>
+                  <p className={`m-0 text-sm ${mutedTextClass}`}>
+                    Given: {givenByPrizeId.get(prize.id) ?? prize.givenCount ?? 0}
+                  </p>
                 </button>
                 <div className="grid gap-2">
-                  <label htmlFor={`weight-${prize.id}`} className={`text-sm font-medium ${headingTextClass}`}>
+                  <label
+                    htmlFor={`weight-${prize.id}`}
+                    className={`text-sm font-medium ${headingTextClass}`}
+                  >
                     Weight
                   </label>
                   <input
@@ -1033,7 +1143,10 @@ export const AdminPrizePage = () => {
                     {busyAction === 'PRIZE_WEIGHT' ? 'Saving...' : 'Save Weight'}
                   </button>
                 </div>
-                <label className={`inline-flex items-center gap-2 text-sm ${headingTextClass}`} htmlFor={`active-${prize.id}`}>
+                <label
+                  className={`inline-flex items-center gap-2 text-sm ${headingTextClass}`}
+                  htmlFor={`active-${prize.id}`}
+                >
                   <input
                     id={`active-${prize.id}`}
                     type="checkbox"
@@ -1051,8 +1164,15 @@ export const AdminPrizePage = () => {
         </section>
 
         <section className={`mt-4 border-t pt-4 ${sectionBorderClass}`}>
-          <h2 className={`m-0 text-base font-semibold uppercase tracking-[0.04em] ${headingTextClass}`}>Claims</h2>
-          <form className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4" onSubmit={(event) => void onApplyFilters(event)}>
+          <h2
+            className={`m-0 text-base font-semibold uppercase tracking-[0.04em] ${headingTextClass}`}
+          >
+            Claims
+          </h2>
+          <form
+            className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
+            onSubmit={(event) => void onApplyFilters(event)}
+          >
             <div className="grid content-start gap-1">
               <label htmlFor="claims-search" className={`text-sm font-medium ${headingTextClass}`}>
                 Search
@@ -1071,7 +1191,10 @@ export const AdminPrizePage = () => {
             </div>
 
             <div className="grid content-start gap-1">
-              <label htmlFor="claims-prize-filter" className={`text-sm font-medium ${headingTextClass}`}>
+              <label
+                htmlFor="claims-prize-filter"
+                className={`text-sm font-medium ${headingTextClass}`}
+              >
                 Prize
               </label>
               <select
@@ -1131,11 +1254,7 @@ export const AdminPrizePage = () => {
             </div>
 
             <div className="grid gap-2 sm:col-span-2 sm:grid-cols-3 lg:col-span-4 lg:w-full lg:grid-cols-4">
-              <button
-                type="submit"
-                className={primaryButtonClass}
-                disabled={isBusy}
-              >
+              <button type="submit" className={primaryButtonClass} disabled={isBusy}>
                 {busyAction === 'CLAIMS' ? 'Applying...' : 'Apply Filters'}
               </button>
               <button
@@ -1170,28 +1289,72 @@ export const AdminPrizePage = () => {
               <>
                 <table
                   className={`hidden w-full border-separate border-spacing-0 sm:table ${
-                    isLightTheme ? 'border border-solid border-[#d4af37]' : 'border border-solid border-amber-300/25'
+                    isLightTheme
+                      ? 'border border-solid border-[#d4af37]'
+                      : 'border border-solid border-amber-300/25'
                   }`}
                   aria-label="Claims table"
                 >
-                  <thead className={isLightTheme ? 'bg-[#ece1cc] text-slate-700' : 'bg-[#1b143d] text-amber-100'}>
+                  <thead
+                    className={
+                      isLightTheme ? 'bg-[#ece1cc] text-slate-700' : 'bg-[#1b143d] text-amber-100'
+                    }
+                  >
                     <tr>
-                      <th className={`border border-solid px-2 py-2 text-left text-xs uppercase tracking-[0.06em] ${isLightTheme ? 'border-[#d4af37]' : 'border-amber-300/25'}`}>Claim ID</th>
-                      <th className={`border border-solid px-2 py-2 text-left text-xs uppercase tracking-[0.06em] ${isLightTheme ? 'border-[#d4af37]' : 'border-amber-300/25'}`}>Customer</th>
-                      <th className={`border border-solid px-2 py-2 text-left text-xs uppercase tracking-[0.06em] ${isLightTheme ? 'border-[#d4af37]' : 'border-amber-300/25'}`}>Phone</th>
-                      <th className={`border border-solid px-2 py-2 text-left text-xs uppercase tracking-[0.06em] ${isLightTheme ? 'border-[#d4af37]' : 'border-amber-300/25'}`}>Bill Number</th>
-                      <th className={`border border-solid px-2 py-2 text-left text-xs uppercase tracking-[0.06em] ${isLightTheme ? 'border-[#d4af37]' : 'border-amber-300/25'}`}>Prize</th>
-                      <th className={`border border-solid px-2 py-2 text-left text-xs uppercase tracking-[0.06em] ${isLightTheme ? 'border-[#d4af37]' : 'border-amber-300/25'}`}>Date/Time</th>
-                      <th className={`border border-solid px-2 py-2 text-left text-xs uppercase tracking-[0.06em] ${isLightTheme ? 'border-[#d4af37]' : 'border-amber-300/25'}`}>Actions</th>
+                      <th
+                        className={`border border-solid px-2 py-2 text-left text-xs uppercase tracking-[0.06em] ${isLightTheme ? 'border-[#d4af37]' : 'border-amber-300/25'}`}
+                      >
+                        Claim ID
+                      </th>
+                      <th
+                        className={`border border-solid px-2 py-2 text-left text-xs uppercase tracking-[0.06em] ${isLightTheme ? 'border-[#d4af37]' : 'border-amber-300/25'}`}
+                      >
+                        Customer
+                      </th>
+                      <th
+                        className={`border border-solid px-2 py-2 text-left text-xs uppercase tracking-[0.06em] ${isLightTheme ? 'border-[#d4af37]' : 'border-amber-300/25'}`}
+                      >
+                        Phone
+                      </th>
+                      <th
+                        className={`border border-solid px-2 py-2 text-left text-xs uppercase tracking-[0.06em] ${isLightTheme ? 'border-[#d4af37]' : 'border-amber-300/25'}`}
+                      >
+                        Bill Number
+                      </th>
+                      <th
+                        className={`border border-solid px-2 py-2 text-left text-xs uppercase tracking-[0.06em] ${isLightTheme ? 'border-[#d4af37]' : 'border-amber-300/25'}`}
+                      >
+                        Prize
+                      </th>
+                      <th
+                        className={`border border-solid px-2 py-2 text-left text-xs uppercase tracking-[0.06em] ${isLightTheme ? 'border-[#d4af37]' : 'border-amber-300/25'}`}
+                      >
+                        Date/Time
+                      </th>
+                      <th
+                        className={`border border-solid px-2 py-2 text-left text-xs uppercase tracking-[0.06em] ${isLightTheme ? 'border-[#d4af37]' : 'border-amber-300/25'}`}
+                      >
+                        Actions
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {claims.map((claim, index) => (
                       <tr
                         key={claim.claimId}
-                        className={isLightTheme ? (index % 2 === 0 ? 'bg-[#f8f0e1]' : 'bg-[#f2e7d3]') : index % 2 === 0 ? 'bg-[#12163a]' : 'bg-[#101334]'}
+                        className={
+                          isLightTheme
+                            ? index % 2 === 0
+                              ? 'bg-[#f8f0e1]'
+                              : 'bg-[#f2e7d3]'
+                            : index % 2 === 0
+                              ? 'bg-[#12163a]'
+                              : 'bg-[#101334]'
+                        }
                       >
-                        <td className={`border border-solid px-2 py-2 text-sm ${isLightTheme ? 'border-[#d4af37] text-slate-700' : 'border-amber-300/20 text-amber-100'}`}>
+                        <td
+                          className={`border border-solid px-2 py-2 text-sm ${isLightTheme ? 'border-[#d4af37] text-slate-700' : 'border-amber-300/20 text-amber-100'}`}
+                        >
                           <div className="flex flex-wrap items-center gap-2">
                             <span>{claim.claimId}</span>
                             <button
@@ -1204,12 +1367,34 @@ export const AdminPrizePage = () => {
                             </button>
                           </div>
                         </td>
-                        <td className={`border border-solid px-2 py-2 text-sm ${isLightTheme ? 'border-[#d4af37] text-slate-700' : 'border-amber-300/20 text-amber-100'}`}>{claim.customerName}</td>
-                        <td className={`border border-solid px-2 py-2 text-sm ${isLightTheme ? 'border-[#d4af37] text-slate-700' : 'border-amber-300/20 text-amber-100'}`}>{claim.maskedPhone}</td>
-                        <td className={`border border-solid px-2 py-2 text-sm ${isLightTheme ? 'border-[#d4af37] text-slate-700' : 'border-amber-300/20 text-amber-100'}`}>{claim.billNumber}</td>
-                        <td className={`border border-solid px-2 py-2 text-sm ${isLightTheme ? 'border-[#d4af37] text-slate-700' : 'border-amber-300/20 text-amber-100'}`}>{claim.prize}</td>
-                        <td className={`border border-solid px-2 py-2 text-sm ${isLightTheme ? 'border-[#d4af37] text-slate-700' : 'border-amber-300/20 text-amber-100'}`}>{formatDateTime(claim.claimTimestamp, campaign?.timezone)}</td>
-                        <td className={`border border-solid px-2 py-2 text-sm ${isLightTheme ? 'border-[#d4af37] text-slate-700' : 'border-amber-300/20 text-amber-100'}`}>
+                        <td
+                          className={`border border-solid px-2 py-2 text-sm ${isLightTheme ? 'border-[#d4af37] text-slate-700' : 'border-amber-300/20 text-amber-100'}`}
+                        >
+                          {claim.customerName}
+                        </td>
+                        <td
+                          className={`border border-solid px-2 py-2 text-sm ${isLightTheme ? 'border-[#d4af37] text-slate-700' : 'border-amber-300/20 text-amber-100'}`}
+                        >
+                          {claim.maskedPhone}
+                        </td>
+                        <td
+                          className={`border border-solid px-2 py-2 text-sm ${isLightTheme ? 'border-[#d4af37] text-slate-700' : 'border-amber-300/20 text-amber-100'}`}
+                        >
+                          {claim.billNumber}
+                        </td>
+                        <td
+                          className={`border border-solid px-2 py-2 text-sm ${isLightTheme ? 'border-[#d4af37] text-slate-700' : 'border-amber-300/20 text-amber-100'}`}
+                        >
+                          {claim.prize}
+                        </td>
+                        <td
+                          className={`border border-solid px-2 py-2 text-sm ${isLightTheme ? 'border-[#d4af37] text-slate-700' : 'border-amber-300/20 text-amber-100'}`}
+                        >
+                          {formatDateTime(claim.claimTimestamp, campaign?.timezone)}
+                        </td>
+                        <td
+                          className={`border border-solid px-2 py-2 text-sm ${isLightTheme ? 'border-[#d4af37] text-slate-700' : 'border-amber-300/20 text-amber-100'}`}
+                        >
                           <button
                             type="button"
                             className={smallDangerButtonClass}
@@ -1227,9 +1412,16 @@ export const AdminPrizePage = () => {
 
                 <div className="grid gap-2 sm:hidden" aria-label="Claims list">
                   {claims.map((claim) => (
-                    <article key={`mobile-${claim.claimId}`} className={`grid gap-2 rounded-xl border p-3 ${surfaceClass}`}>
+                    <article
+                      key={`mobile-${claim.claimId}`}
+                      className={`grid gap-2 rounded-xl border p-3 ${surfaceClass}`}
+                    >
                       <div className="grid gap-1">
-                        <p className={`m-0 text-[11px] font-bold uppercase tracking-[0.08em] ${mutedTextClass}`}>Claim</p>
+                        <p
+                          className={`m-0 text-[11px] font-bold uppercase tracking-[0.08em] ${mutedTextClass}`}
+                        >
+                          Claim
+                        </p>
                         <div className="flex flex-wrap items-center gap-2">
                           <strong>{claim.claimId}</strong>
                           <button
@@ -1244,24 +1436,48 @@ export const AdminPrizePage = () => {
                       </div>
                       <dl className="m-0 grid gap-2">
                         <div className="grid gap-0.5">
-                          <dt className={`m-0 text-[11px] uppercase tracking-[0.06em] ${mutedTextClass}`}>Customer</dt>
-                          <dd className={`m-0 text-sm ${headingTextClass}`}>{claim.customerName}</dd>
+                          <dt
+                            className={`m-0 text-[11px] uppercase tracking-[0.06em] ${mutedTextClass}`}
+                          >
+                            Customer
+                          </dt>
+                          <dd className={`m-0 text-sm ${headingTextClass}`}>
+                            {claim.customerName}
+                          </dd>
                         </div>
                         <div className="grid gap-0.5">
-                          <dt className={`m-0 text-[11px] uppercase tracking-[0.06em] ${mutedTextClass}`}>Phone</dt>
+                          <dt
+                            className={`m-0 text-[11px] uppercase tracking-[0.06em] ${mutedTextClass}`}
+                          >
+                            Phone
+                          </dt>
                           <dd className={`m-0 text-sm ${headingTextClass}`}>{claim.maskedPhone}</dd>
                         </div>
                         <div className="grid gap-0.5">
-                          <dt className={`m-0 text-[11px] uppercase tracking-[0.06em] ${mutedTextClass}`}>Bill</dt>
+                          <dt
+                            className={`m-0 text-[11px] uppercase tracking-[0.06em] ${mutedTextClass}`}
+                          >
+                            Bill
+                          </dt>
                           <dd className={`m-0 text-sm ${headingTextClass}`}>{claim.billNumber}</dd>
                         </div>
                         <div className="grid gap-0.5">
-                          <dt className={`m-0 text-[11px] uppercase tracking-[0.06em] ${mutedTextClass}`}>Prize</dt>
+                          <dt
+                            className={`m-0 text-[11px] uppercase tracking-[0.06em] ${mutedTextClass}`}
+                          >
+                            Prize
+                          </dt>
                           <dd className={`m-0 text-sm ${headingTextClass}`}>{claim.prize}</dd>
                         </div>
                         <div className="grid gap-0.5">
-                          <dt className={`m-0 text-[11px] uppercase tracking-[0.06em] ${mutedTextClass}`}>Claimed</dt>
-                          <dd className={`m-0 text-sm ${headingTextClass}`}>{formatDateTime(claim.claimTimestamp, campaign?.timezone)}</dd>
+                          <dt
+                            className={`m-0 text-[11px] uppercase tracking-[0.06em] ${mutedTextClass}`}
+                          >
+                            Claimed
+                          </dt>
+                          <dd className={`m-0 text-sm ${headingTextClass}`}>
+                            {formatDateTime(claim.claimTimestamp, campaign?.timezone)}
+                          </dd>
                         </div>
                       </dl>
                       <button
@@ -1278,16 +1494,23 @@ export const AdminPrizePage = () => {
                 </div>
               </>
             ) : (
-              <div className={`rounded-xl border border-dashed p-3 ${isLightTheme ? 'border-slate-300 bg-[#f3e9d7]' : 'border-amber-300/35 bg-[#11153b]'}`} role="status">
+              <div
+                className={`rounded-xl border border-dashed p-3 ${isLightTheme ? 'border-slate-300 bg-[#f3e9d7]' : 'border-amber-300/35 bg-[#11153b]'}`}
+                role="status"
+              >
                 <p className={`m-0 text-sm font-semibold ${headingTextClass}`}>
-                  {filters.prizeId ? 'No claims found for this prize.' : hasActiveFilters ? 'No claims match your filters.' : 'No claims yet.'}
+                  {filters.prizeId
+                    ? 'No claims found for this prize.'
+                    : hasActiveFilters
+                      ? 'No claims match your filters.'
+                      : 'No claims yet.'}
                 </p>
                 <p className={`mb-0 mt-1 text-sm ${mutedTextClass}`}>
                   {filters.prizeId
                     ? `${filteredPrizeName ?? 'Selected prize'} has no successful claims in this view.`
                     : hasActiveFilters
-                    ? 'Adjust or clear filters to load more claims.'
-                    : 'Successful lucky-draw claims will appear here.'}
+                      ? 'Adjust or clear filters to load more claims.'
+                      : 'Successful lucky-draw claims will appear here.'}
                 </p>
                 {hasActiveFilters ? (
                   <button
@@ -1315,15 +1538,17 @@ export const AdminPrizePage = () => {
           {lastCsvExport ? (
             <details className={csvPanelClass}>
               <summary className={csvPanelSummaryClass}>Last CSV Preview</summary>
-              <pre className={csvPanelPreviewClass}>
-                {lastCsvExport}
-              </pre>
+              <pre className={csvPanelPreviewClass}>{lastCsvExport}</pre>
             </details>
           ) : null}
         </section>
 
         {statusMessage ? (
-          <div className="pointer-events-none fixed bottom-4 right-4 z-50 max-w-sm" role="status" aria-live="polite">
+          <div
+            className="pointer-events-none fixed bottom-4 right-4 z-50 max-w-sm"
+            role="status"
+            aria-live="polite"
+          >
             <div
               className={`rounded-lg border px-4 py-3 text-sm font-medium shadow-lg ${
                 isLightTheme
@@ -1337,7 +1562,10 @@ export const AdminPrizePage = () => {
         ) : null}
 
         {confirmDialog ? (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4" role="presentation">
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
+            role="presentation"
+          >
             <div
               className={`grid w-full max-w-md gap-3 rounded-2xl border p-5 shadow-xl ${surfaceClass}`}
               role="alertdialog"
@@ -1346,14 +1574,22 @@ export const AdminPrizePage = () => {
             >
               {confirmDialog.type === 'DELETE_CLAIM' ? (
                 <>
-                  <h2 id="confirm-dialog-title" className={`m-0 text-lg font-semibold ${headingTextClass}`}>
+                  <h2
+                    id="confirm-dialog-title"
+                    className={`m-0 text-lg font-semibold ${headingTextClass}`}
+                  >
                     Delete claim {confirmDialog.claimId}?
                   </h2>
                   <p className={`m-0 text-sm ${mutedTextClass}`}>
-                    This permanently removes the claim and adjusts prize and summary counts. This cannot be undone.
+                    This permanently removes the claim and adjusts prize and summary counts. This
+                    cannot be undone.
                   </p>
                   <div className="mt-2 flex flex-wrap justify-end gap-2">
-                    <button type="button" className={secondaryButtonClass} onClick={() => setConfirmDialog(null)}>
+                    <button
+                      type="button"
+                      className={secondaryButtonClass}
+                      onClick={() => setConfirmDialog(null)}
+                    >
                       Cancel
                     </button>
                     <button
@@ -1367,14 +1603,20 @@ export const AdminPrizePage = () => {
                 </>
               ) : (
                 <>
-                  <h2 id="confirm-dialog-title" className={`m-0 text-lg font-semibold ${headingTextClass}`}>
+                  <h2
+                    id="confirm-dialog-title"
+                    className={`m-0 text-lg font-semibold ${headingTextClass}`}
+                  >
                     Clear all claims?
                   </h2>
                   <p className={`m-0 text-sm ${mutedTextClass}`}>
-                    This permanently deletes ALL claims and resets prize and summary counts to zero. This cannot be
-                    undone.
+                    This permanently deletes ALL claims and resets prize and summary counts to zero.
+                    This cannot be undone.
                   </p>
-                  <label htmlFor="clear-all-confirmation" className={`text-sm font-medium ${headingTextClass}`}>
+                  <label
+                    htmlFor="clear-all-confirmation"
+                    className={`text-sm font-medium ${headingTextClass}`}
+                  >
                     Type {CLEAR_ALL_CONFIRMATION_PHRASE} to confirm
                   </label>
                   <input
@@ -1386,7 +1628,11 @@ export const AdminPrizePage = () => {
                     autoComplete="off"
                   />
                   <div className="mt-2 flex flex-wrap justify-end gap-2">
-                    <button type="button" className={secondaryButtonClass} onClick={() => setConfirmDialog(null)}>
+                    <button
+                      type="button"
+                      className={secondaryButtonClass}
+                      onClick={() => setConfirmDialog(null)}
+                    >
                       Cancel
                     </button>
                     <button
@@ -1474,9 +1720,7 @@ const toUtcRangeBoundary = (isoDateText: string, boundary: 'start' | 'end'): str
     return undefined;
   }
 
-  return boundary === 'start'
-    ? `${isoDateText}T00:00:00.000Z`
-    : `${isoDateText}T23:59:59.999Z`;
+  return boundary === 'start' ? `${isoDateText}T00:00:00.000Z` : `${isoDateText}T23:59:59.999Z`;
 };
 
 const firstError = (

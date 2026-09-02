@@ -72,6 +72,12 @@ describe('draw api idempotency header behavior', () => {
     expect(first).not.toBe(second);
   });
 
+  it('creates a fallback idempotency key when randomUUID is unavailable', () => {
+    vi.stubGlobal('crypto', {});
+
+    expect(createIdempotencyKey()).toMatch(/^\d+-[0-9a-f]+$/);
+  });
+
   it('uses crypto.randomUUID when available', () => {
     const randomUUID = vi.fn(() => 'uuid-123');
     vi.stubGlobal('crypto', { randomUUID });
@@ -124,7 +130,9 @@ describe('draw api idempotency header behavior', () => {
         phone: '9876543210',
         billNumber: 'DB12345',
       }),
-    ).rejects.toEqual(expect.objectContaining({ name: 'DrawApiError', code: 'API_ERROR', message: 'upstream' }));
+    ).rejects.toEqual(
+      expect.objectContaining({ name: 'DrawApiError', code: 'API_ERROR', message: 'upstream' }),
+    );
   });
 
   it('maps generic fetch failures to NETWORK_ERROR', async () => {

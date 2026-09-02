@@ -37,10 +37,18 @@ describe('validateDrawRequest direct branches', () => {
       billNumber: 'AB*123',
     });
 
-    expect('fieldErrors' in nameControl && nameControl.fieldErrors.name).toBe('Name contains unsupported characters.');
-    expect('fieldErrors' in nameSymbols && nameSymbols.fieldErrors.name).toBe('Name contains unsupported characters.');
-    expect('fieldErrors' in billControl && billControl.fieldErrors.billNumber).toBe('Bill number contains unsupported characters.');
-    expect('fieldErrors' in billSymbols && billSymbols.fieldErrors.billNumber).toBe('Bill number contains unsupported characters.');
+    expect('fieldErrors' in nameControl && nameControl.fieldErrors.name).toBe(
+      'Name contains unsupported characters.',
+    );
+    expect('fieldErrors' in nameSymbols && nameSymbols.fieldErrors.name).toBe(
+      'Name contains unsupported characters.',
+    );
+    expect('fieldErrors' in billControl && billControl.fieldErrors.billNumber).toBe(
+      'Bill number contains unsupported characters.',
+    );
+    expect('fieldErrors' in billSymbols && billSymbols.fieldErrors.billNumber).toBe(
+      'Bill number contains unsupported characters.',
+    );
   });
 
   it('enforces max lengths for name and bill number', () => {

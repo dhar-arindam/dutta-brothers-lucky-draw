@@ -122,16 +122,18 @@ export class FoundationStack extends Stack {
       autoDeploy: true,
       accessLogSettings: {
         destination: new apigwv2.LogGroupLogDestination(apiGatewayAccessLogs),
-        format: apigw.AccessLogFormat.custom(JSON.stringify({
-          requestId: '$context.requestId',
-          requestTime: '$context.requestTime',
-          httpMethod: '$context.httpMethod',
-          routeKey: '$context.routeKey',
-          status: '$context.status',
-          protocol: '$context.protocol',
-          responseLength: '$context.responseLength',
-          integrationErrorMessage: '$context.integrationErrorMessage',
-        })),
+        format: apigw.AccessLogFormat.custom(
+          JSON.stringify({
+            requestId: '$context.requestId',
+            requestTime: '$context.requestTime',
+            httpMethod: '$context.httpMethod',
+            routeKey: '$context.routeKey',
+            status: '$context.status',
+            protocol: '$context.protocol',
+            responseLength: '$context.responseLength',
+            integrationErrorMessage: '$context.integrationErrorMessage',
+          }),
+        ),
       },
       throttle: {
         rateLimit: props.apiThrottleRateLimit,

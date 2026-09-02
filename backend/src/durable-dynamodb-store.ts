@@ -141,11 +141,13 @@ export class DynamoDbDrawStore {
     this.docClient = docClient;
     this.tableName = options.tableName;
     this.nowProvider = options.now ?? (() => new Date());
-    this.maxTransactionAttempts = options.maxTransactionAttempts ?? DEFAULT_MAX_TRANSACTION_ATTEMPTS;
+    this.maxTransactionAttempts =
+      options.maxTransactionAttempts ?? DEFAULT_MAX_TRANSACTION_ATTEMPTS;
     this.retryBaseDelayMs = options.retryBaseDelayMs ?? DEFAULT_RETRY_BASE_DELAY_MS;
     this.retryMaxDelayMs = options.retryMaxDelayMs ?? DEFAULT_RETRY_MAX_DELAY_MS;
     this.random = options.random ?? Math.random;
-    this.sleep = options.sleep ?? ((ms: number) => new Promise((resolve) => setTimeout(resolve, ms)));
+    this.sleep =
+      options.sleep ?? ((ms: number) => new Promise((resolve) => setTimeout(resolve, ms)));
   }
 
   public async createClaimAndUpdateAggregatesAtomic(
@@ -313,7 +315,8 @@ export class DynamoDbDrawStore {
           throw new Error('Unable to persist claim transaction.');
         }
 
-        const canRetry = classification.category === 'TRANSIENT' && attempt < this.maxTransactionAttempts;
+        const canRetry =
+          classification.category === 'TRANSIENT' && attempt < this.maxTransactionAttempts;
         if (canRetry) {
           const delayMs = computeBackoffDelayMs(attempt, {
             baseDelayMs: this.retryBaseDelayMs,
@@ -334,7 +337,10 @@ export class DynamoDbDrawStore {
         }
 
         logTransactionOutcome({
-          event: classification.category === 'TRANSIENT' ? 'TRANSIENT_CONTENTION_RETRY_EXHAUSTED' : 'PERMANENT_TRANSACTION_FAILURE',
+          event:
+            classification.category === 'TRANSIENT'
+              ? 'TRANSIENT_CONTENTION_RETRY_EXHAUSTED'
+              : 'PERMANENT_TRANSACTION_FAILURE',
           attempt,
           maxAttempts: this.maxTransactionAttempts,
           reasonCodes: classification.reasonCodes,
@@ -407,7 +413,10 @@ export class DynamoDbDrawStore {
     };
   }
 
-  public async updatePrize(prizeId: string, input: UpdatePrizeInput): Promise<AdminPrizeMutationResult> {
+  public async updatePrize(
+    prizeId: string,
+    input: UpdatePrizeInput,
+  ): Promise<AdminPrizeMutationResult> {
     const existing = await this.getPrize(prizeId);
     if (!existing) {
       return {
@@ -591,10 +600,10 @@ export class DynamoDbDrawStore {
     );
 
     const totalSuccessfulSpins = Number(
-      ((totalItem as { Item?: AggregateEntity }).Item?.successfulSpins ?? 0),
+      (totalItem as { Item?: AggregateEntity }).Item?.successfulSpins ?? 0,
     );
     const todaySuccessfulSpins = Number(
-      ((todayItem as { Item?: AggregateEntity }).Item?.successfulSpins ?? 0),
+      (todayItem as { Item?: AggregateEntity }).Item?.successfulSpins ?? 0,
     );
 
     const prizeDistribution = ((distributionQuery as { Items?: AggregateEntity[] }).Items ?? [])
@@ -651,7 +660,12 @@ export class DynamoDbDrawStore {
       fieldErrors.toDate = 'To Date must be a valid calendar date.';
     }
 
-    if (Object.keys(fieldErrors).length === 0 && fromMillis !== null && toMillis !== null && fromMillis > toMillis) {
+    if (
+      Object.keys(fieldErrors).length === 0 &&
+      fromMillis !== null &&
+      toMillis !== null &&
+      fromMillis > toMillis
+    ) {
       fieldErrors.toDate = 'To Date must be on or after From Date.';
     }
 
@@ -797,7 +811,9 @@ export class DynamoDbDrawStore {
     return claimKeys.length;
   }
 
-  private async collectKeys(pk: 'CLAIM' | 'BILL' | 'AGG'): Promise<Array<{ pk: string; sk: string }>> {
+  private async collectKeys(
+    pk: 'CLAIM' | 'BILL' | 'AGG',
+  ): Promise<Array<{ pk: string; sk: string }>> {
     const keys: Array<{ pk: string; sk: string }> = [];
     let exclusiveStartKey: Record<string, unknown> | undefined;
 
@@ -934,7 +950,8 @@ const toCampaignConfig = (entity: CampaignEntity | undefined): CampaignConfig | 
     return undefined;
   }
 
-  const fromDate = entity.fromDate ?? toIsoDateFromTimestamp((entity as { startAt?: string }).startAt);
+  const fromDate =
+    entity.fromDate ?? toIsoDateFromTimestamp((entity as { startAt?: string }).startAt);
   const toDate = entity.toDate ?? toIsoDateFromTimestamp((entity as { endAt?: string }).endAt);
   if (!fromDate || !toDate) {
     return undefined;

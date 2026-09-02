@@ -1,4 +1,10 @@
-import { BatchWriteCommand, GetCommand, QueryCommand, TransactWriteCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import {
+  BatchWriteCommand,
+  GetCommand,
+  QueryCommand,
+  TransactWriteCommand,
+  UpdateCommand,
+} from '@aws-sdk/lib-dynamodb';
 import { describe, expect, it, vi } from 'vitest';
 
 import { DynamoDbDrawStore } from './durable-dynamodb-store.js';
@@ -69,7 +75,9 @@ class ConcurrencySimulatingDocClient {
 
     if (command instanceof TransactWriteCommand) {
       this.transactWriteAttempts += 1;
-      const items = command.input.TransactItems as unknown as Array<{ Put?: { Item: StoredEntity } }>;
+      const items = command.input.TransactItems as unknown as Array<{
+        Put?: { Item: StoredEntity };
+      }>;
       const billItem = items[0]?.Put?.Item;
       const claimItem = items[1]?.Put?.Item;
       if (!billItem || !claimItem) {
@@ -77,11 +85,23 @@ class ConcurrencySimulatingDocClient {
       }
 
       if (this.billItems.has(billItem.sk) || this.claimItems.has(claimItem.sk)) {
-        throw makeTransactionCanceledException(['ConditionalCheckFailed', 'None', 'None', 'None', 'None']);
+        throw makeTransactionCanceledException([
+          'ConditionalCheckFailed',
+          'None',
+          'None',
+          'None',
+          'None',
+        ]);
       }
 
       if (this.aggLocked) {
-        throw makeTransactionCanceledException(['None', 'None', 'TransactionConflict', 'None', 'None']);
+        throw makeTransactionCanceledException([
+          'None',
+          'None',
+          'TransactionConflict',
+          'None',
+          'None',
+        ]);
       }
 
       this.aggLocked = true;
@@ -138,7 +158,13 @@ describe('dynamo db draw store persistence', () => {
     const fake = new FakeDocClient();
     fake.enqueue(async () => ({ Attributes: { value: 2 } }));
     fake.enqueue(async () => {
-      throw makeTransactionCanceledException(['ConditionalCheckFailed', 'None', 'None', 'None', 'None']);
+      throw makeTransactionCanceledException([
+        'ConditionalCheckFailed',
+        'None',
+        'None',
+        'None',
+        'None',
+      ]);
     });
     fake.enqueue(async () => ({ Item: { pk: 'BILL', sk: 'DB12345', claimId: 'DB26-000001' } }));
     fake.enqueue(async () => ({
@@ -498,7 +524,13 @@ describe('dynamo db draw store persistence', () => {
     const fake = new FakeDocClient();
     fake.enqueue(async () => ({ Attributes: { value: 11 } }));
     fake.enqueue(async () => {
-      throw makeTransactionCanceledException(['ConditionalCheckFailed', 'None', 'None', 'None', 'None']);
+      throw makeTransactionCanceledException([
+        'ConditionalCheckFailed',
+        'None',
+        'None',
+        'None',
+        'None',
+      ]);
     });
     fake.enqueue(async () => ({ Item: undefined }));
 
@@ -741,7 +773,10 @@ describe('dynamo db draw store transient transaction contention retry', () => {
       sleep,
     });
 
-    const result = await store.createClaimAndUpdateAggregatesAtomic({ now: new Date('2026-08-16T10:30:00.000Z'), claim: baseClaim });
+    const result = await store.createClaimAndUpdateAggregatesAtomic({
+      now: new Date('2026-08-16T10:30:00.000Z'),
+      claim: baseClaim,
+    });
 
     expect(result.type).toBe('CREATED');
     expect(sleep).not.toHaveBeenCalled();
@@ -752,7 +787,13 @@ describe('dynamo db draw store transient transaction contention retry', () => {
     const fake = new FakeDocClient();
     fake.enqueue(async () => ({ Attributes: { value: 1 } }));
     fake.enqueue(async () => {
-      throw makeTransactionCanceledException(['None', 'None', 'TransactionConflict', 'None', 'None']);
+      throw makeTransactionCanceledException([
+        'None',
+        'None',
+        'TransactionConflict',
+        'None',
+        'None',
+      ]);
     });
     fake.enqueue(async () => ({}));
 
@@ -764,7 +805,10 @@ describe('dynamo db draw store transient transaction contention retry', () => {
       random: () => 0.5,
     });
 
-    const result = await store.createClaimAndUpdateAggregatesAtomic({ now: new Date('2026-08-16T10:30:00.000Z'), claim: baseClaim });
+    const result = await store.createClaimAndUpdateAggregatesAtomic({
+      now: new Date('2026-08-16T10:30:00.000Z'),
+      claim: baseClaim,
+    });
 
     expect(result.type).toBe('CREATED');
     expect(sleep).toHaveBeenCalledTimes(1);
@@ -775,10 +819,22 @@ describe('dynamo db draw store transient transaction contention retry', () => {
     const fake = new FakeDocClient();
     fake.enqueue(async () => ({ Attributes: { value: 1 } }));
     fake.enqueue(async () => {
-      throw makeTransactionCanceledException(['None', 'None', 'TransactionConflict', 'None', 'None']);
+      throw makeTransactionCanceledException([
+        'None',
+        'None',
+        'TransactionConflict',
+        'None',
+        'None',
+      ]);
     });
     fake.enqueue(async () => {
-      throw makeTransactionCanceledException(['None', 'None', 'None', 'ProvisionedThroughputExceeded', 'None']);
+      throw makeTransactionCanceledException([
+        'None',
+        'None',
+        'None',
+        'ProvisionedThroughputExceeded',
+        'None',
+      ]);
     });
     fake.enqueue(async () => {
       throw makeTransactionCanceledException(['None', 'None', 'None', 'None', 'ThrottlingError']);
@@ -794,7 +850,10 @@ describe('dynamo db draw store transient transaction contention retry', () => {
       maxTransactionAttempts: 4,
     });
 
-    const result = await store.createClaimAndUpdateAggregatesAtomic({ now: new Date('2026-08-16T10:30:00.000Z'), claim: baseClaim });
+    const result = await store.createClaimAndUpdateAggregatesAtomic({
+      now: new Date('2026-08-16T10:30:00.000Z'),
+      claim: baseClaim,
+    });
 
     expect(result.type).toBe('CREATED');
     expect(sleep).toHaveBeenCalledTimes(3);
@@ -805,13 +864,31 @@ describe('dynamo db draw store transient transaction contention retry', () => {
     const fake = new FakeDocClient();
     fake.enqueue(async () => ({ Attributes: { value: 1 } }));
     fake.enqueue(async () => {
-      throw makeTransactionCanceledException(['None', 'None', 'TransactionConflict', 'None', 'None']);
+      throw makeTransactionCanceledException([
+        'None',
+        'None',
+        'TransactionConflict',
+        'None',
+        'None',
+      ]);
     });
     fake.enqueue(async () => {
-      throw makeTransactionCanceledException(['None', 'None', 'TransactionConflict', 'None', 'None']);
+      throw makeTransactionCanceledException([
+        'None',
+        'None',
+        'TransactionConflict',
+        'None',
+        'None',
+      ]);
     });
     fake.enqueue(async () => {
-      throw makeTransactionCanceledException(['None', 'None', 'TransactionConflict', 'None', 'None']);
+      throw makeTransactionCanceledException([
+        'None',
+        'None',
+        'TransactionConflict',
+        'None',
+        'None',
+      ]);
     });
 
     const sleep = vi.fn(async () => {});
@@ -824,7 +901,10 @@ describe('dynamo db draw store transient transaction contention retry', () => {
     });
 
     await expect(
-      store.createClaimAndUpdateAggregatesAtomic({ now: new Date('2026-08-16T10:30:00.000Z'), claim: baseClaim }),
+      store.createClaimAndUpdateAggregatesAtomic({
+        now: new Date('2026-08-16T10:30:00.000Z'),
+        claim: baseClaim,
+      }),
     ).rejects.toThrow();
 
     // Exactly maxTransactionAttempts sends, and retries only between attempts (maxAttempts - 1 sleeps).
@@ -836,7 +916,13 @@ describe('dynamo db draw store transient transaction contention retry', () => {
     const fake = new FakeDocClient();
     fake.enqueue(async () => ({ Attributes: { value: 1 } }));
     fake.enqueue(async () => {
-      throw makeTransactionCanceledException(['ConditionalCheckFailed', 'None', 'None', 'None', 'None']);
+      throw makeTransactionCanceledException([
+        'ConditionalCheckFailed',
+        'None',
+        'None',
+        'None',
+        'None',
+      ]);
     });
     fake.enqueue(async () => ({ Item: { pk: 'BILL', sk: 'DB12345', claimId: 'DB26-000001' } }));
     fake.enqueue(async () => ({
@@ -861,7 +947,10 @@ describe('dynamo db draw store transient transaction contention retry', () => {
       sleep,
     });
 
-    const result = await store.createClaimAndUpdateAggregatesAtomic({ now: new Date('2026-08-16T10:30:00.000Z'), claim: baseClaim });
+    const result = await store.createClaimAndUpdateAggregatesAtomic({
+      now: new Date('2026-08-16T10:30:00.000Z'),
+      claim: baseClaim,
+    });
 
     expect(result.type).toBe('EXISTS');
     expect(sleep).not.toHaveBeenCalled();
@@ -872,7 +961,13 @@ describe('dynamo db draw store transient transaction contention retry', () => {
     const fake = new FakeDocClient();
     fake.enqueue(async () => ({ Attributes: { value: 1 } }));
     fake.enqueue(async () => {
-      throw makeTransactionCanceledException(['ConditionalCheckFailed', 'None', 'None', 'None', 'None']);
+      throw makeTransactionCanceledException([
+        'ConditionalCheckFailed',
+        'None',
+        'None',
+        'None',
+        'None',
+      ]);
     });
     fake.enqueue(async () => ({ Item: { pk: 'BILL', sk: 'DB12345', claimId: 'DB26-000001' } }));
     fake.enqueue(async () => ({
@@ -898,7 +993,10 @@ describe('dynamo db draw store transient transaction contention retry', () => {
       maxTransactionAttempts: 5,
     });
 
-    await store.createClaimAndUpdateAggregatesAtomic({ now: new Date('2026-08-16T10:30:00.000Z'), claim: baseClaim });
+    await store.createClaimAndUpdateAggregatesAtomic({
+      now: new Date('2026-08-16T10:30:00.000Z'),
+      claim: baseClaim,
+    });
 
     // Only one TransactWriteCommand was ever sent -- duplicate detection short-circuits immediately, never retries.
     expect(fake.calls.filter((call) => call instanceof TransactWriteCommand)).toHaveLength(1);
@@ -921,7 +1019,10 @@ describe('dynamo db draw store transient transaction contention retry', () => {
     });
 
     await expect(
-      store.createClaimAndUpdateAggregatesAtomic({ now: new Date('2026-08-16T10:30:00.000Z'), claim: baseClaim }),
+      store.createClaimAndUpdateAggregatesAtomic({
+        now: new Date('2026-08-16T10:30:00.000Z'),
+        claim: baseClaim,
+      }),
     ).rejects.toThrow('AccessDeniedException');
 
     expect(fake.calls.filter((call) => call instanceof TransactWriteCommand)).toHaveLength(1);
@@ -932,7 +1033,13 @@ describe('dynamo db draw store transient transaction contention retry', () => {
     const fake = new FakeDocClient();
     fake.enqueue(async () => ({ Attributes: { value: 1 } }));
     fake.enqueue(async () => {
-      throw makeTransactionCanceledException(['None', 'None', 'TransactionConflict', 'None', 'None']);
+      throw makeTransactionCanceledException([
+        'None',
+        'None',
+        'TransactionConflict',
+        'None',
+        'None',
+      ]);
     });
     fake.enqueue(async () => ({}));
 
@@ -951,7 +1058,9 @@ describe('dynamo db draw store transient transaction contention retry', () => {
     });
 
     const loggedPayloads = logSpy.mock.calls.map((call) => String(call[0]));
-    expect(loggedPayloads.some((payload) => payload.includes('TRANSIENT_CONTENTION_RETRY'))).toBe(true);
+    expect(loggedPayloads.some((payload) => payload.includes('TRANSIENT_CONTENTION_RETRY'))).toBe(
+      true,
+    );
     expect(loggedPayloads.some((payload) => payload.includes('req-123'))).toBe(true);
     for (const payload of loggedPayloads) {
       expect(payload).not.toContain(baseClaim.phone);
@@ -994,7 +1103,9 @@ describe('dynamo db draw store concurrency (10 unique participants, real interle
     const created = results.filter((result) => result.type === 'CREATED');
     expect(created).toHaveLength(10);
 
-    const uniqueClaimIds = new Set(created.map((result) => (result.type === 'CREATED' ? result.claim.claimId : '')));
+    const uniqueClaimIds = new Set(
+      created.map((result) => (result.type === 'CREATED' ? result.claim.claimId : '')),
+    );
     expect(uniqueClaimIds.size).toBe(10);
 
     expect(fake.transactWriteAttempts).toBeGreaterThanOrEqual(10);
@@ -1023,7 +1134,10 @@ describe('dynamo db draw store concurrency (10 unique participants, real interle
 
     const results = await Promise.all(
       Array.from({ length: 10 }, () =>
-        store.createClaimAndUpdateAggregatesAtomic({ now: new Date('2026-08-21T10:00:00.000Z'), claim: sameClaimInput }),
+        store.createClaimAndUpdateAggregatesAtomic({
+          now: new Date('2026-08-21T10:00:00.000Z'),
+          claim: sameClaimInput,
+        }),
       ),
     );
 

@@ -7,12 +7,7 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'html', 'json-summary'],
       include: ['lib/**/*.ts'],
-      exclude: [
-        'test/**',
-        'dist/**',
-        'cdk.out/**',
-        'coverage/**',
-      ],
+      exclude: ['test/**', 'dist/**', 'cdk.out/**', 'coverage/**'],
       thresholds: {
         statements: 85,
         branches: 85,

@@ -92,18 +92,28 @@ export const App = () => {
   const [formValue, setFormValue] = useState<DrawRequest>(emptyRequest);
   const [formErrors, setFormErrors] = useState<FormErrors>({});
   const [uiState, setUiState] = useState<UiState>({ type: 'LANDING' });
-  const [lastSubmittedAttempt, setLastSubmittedAttempt] = useState<SubmittedDrawAttempt | null>(null);
-  const [pendingSuccessResponse, setPendingSuccessResponse] = useState<
-    Extract<DrawResponse, { status: 'SUCCESS' }> | null
-  >(null);
-  const [resolvedSuccessResponse, setResolvedSuccessResponse] = useState<
-    Extract<DrawResponse, { status: 'SUCCESS' }> | null
-  >(null);
+  const [lastSubmittedAttempt, setLastSubmittedAttempt] = useState<SubmittedDrawAttempt | null>(
+    null,
+  );
+  const [pendingSuccessResponse, setPendingSuccessResponse] = useState<Extract<
+    DrawResponse,
+    { status: 'SUCCESS' }
+  > | null>(null);
+  const [resolvedSuccessResponse, setResolvedSuccessResponse] = useState<Extract<
+    DrawResponse,
+    { status: 'SUCCESS' }
+  > | null>(null);
   const [revealModalState, setRevealModalState] = useState<RevealModalState>('HIDDEN');
   const [isBoxOpened, setIsBoxOpened] = useState(false);
   const [revealFrameIndex, setRevealFrameIndex] = useState(0);
   const [presentationState, setPresentationState] = useState<
-    'ANTICIPATION' | 'BOX_IDLE' | 'BOX_OPENING' | 'CELEBRATION' | 'RESULT_ENTERING' | 'RESULT' | 'NONE'
+    | 'ANTICIPATION'
+    | 'BOX_IDLE'
+    | 'BOX_OPENING'
+    | 'CELEBRATION'
+    | 'RESULT_ENTERING'
+    | 'RESULT'
+    | 'NONE'
   >('NONE');
 
   const stateHeadingRef = useRef<HTMLHeadingElement | null>(null);
@@ -116,9 +126,7 @@ export const App = () => {
   const primarySubmitRef = useRef<HTMLButtonElement | null>(null);
   const revealOverlayRef = useRef<HTMLElement | null>(null);
 
-  const isSubmitting =
-    uiState.type === 'CHECKING_ELIGIBILITY' ||
-    uiState.type === 'RETRY';
+  const isSubmitting = uiState.type === 'CHECKING_ELIGIBILITY' || uiState.type === 'RETRY';
   const isDrawClosed = uiState.type === 'DRAW_ENDED' || uiState.type === 'NO_ELIGIBLE_PRIZE';
   const isSubmitDisabled = isSubmitting || isDrawClosed;
   const isFormExperience = uiState.type !== 'LANDING';
@@ -450,20 +458,29 @@ export const App = () => {
       setRevealFrameIndex(REVEAL_SEQUENCE_IMAGES.length - 1);
     }
 
-    celebrationTimerRef.current = window.setTimeout(() => {
-      setPresentationState('CELEBRATION');
-      celebrationTimerRef.current = null;
-    }, prefersReducedMotion ? 80 : OPENING_TO_CELEBRATION_MS);
+    celebrationTimerRef.current = window.setTimeout(
+      () => {
+        setPresentationState('CELEBRATION');
+        celebrationTimerRef.current = null;
+      },
+      prefersReducedMotion ? 80 : OPENING_TO_CELEBRATION_MS,
+    );
 
-    resultEnterTimerRef.current = window.setTimeout(() => {
-      setPresentationState('RESULT_ENTERING');
-      setResolvedSuccessResponse(pendingSuccessResponse);
-      resultEnterTimerRef.current = null;
-    }, prefersReducedMotion ? REDUCED_RESULT_ENTER_START_MS : RESULT_ENTER_START_MS);
+    resultEnterTimerRef.current = window.setTimeout(
+      () => {
+        setPresentationState('RESULT_ENTERING');
+        setResolvedSuccessResponse(pendingSuccessResponse);
+        resultEnterTimerRef.current = null;
+      },
+      prefersReducedMotion ? REDUCED_RESULT_ENTER_START_MS : RESULT_ENTER_START_MS,
+    );
 
-    revealTimerRef.current = window.setTimeout(() => {
-      commitRevealResult();
-    }, prefersReducedMotion ? REDUCED_REVEAL_MS : REVEAL_MS);
+    revealTimerRef.current = window.setTimeout(
+      () => {
+        commitRevealResult();
+      },
+      prefersReducedMotion ? REDUCED_REVEAL_MS : REVEAL_MS,
+    );
   };
 
   const closeRevealOverlayToForm = () => {
@@ -509,7 +526,10 @@ export const App = () => {
 
   return (
     <main className="app-shell" aria-label="Customer draw page">
-      <section className={`customer-card${isOverlayVisible ? ' overlay-active' : ''}`} data-state={isOverlayVisible ? revealModalState : uiState.type}>
+      <section
+        className={`customer-card${isOverlayVisible ? ' overlay-active' : ''}`}
+        data-state={isOverlayVisible ? revealModalState : uiState.type}
+      >
         <p className="brand-kicker">DUTTA BROTHERS</p>
         <p className="campaign-tag">DURGA PUJA &amp; DIWALI DHAMAKA</p>
         <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
@@ -610,7 +630,12 @@ export const App = () => {
                   </p>
                 ) : null}
 
-                <button className="primary-cta" type="submit" disabled={isSubmitDisabled} ref={primarySubmitRef}>
+                <button
+                  className="primary-cta"
+                  type="submit"
+                  disabled={isSubmitDisabled}
+                  ref={primarySubmitRef}
+                >
                   PLAY NOW
                   <span className="cta-motif" aria-hidden="true" />
                 </button>
@@ -703,7 +728,10 @@ export const App = () => {
                   disabled={isBoxOpened}
                   aria-label={isBoxOpened ? 'Opening your lucky box' : 'Tap to open your lucky box'}
                 >
-                  <span className={`gift-box-wrap${revealFrameIndex === REVEAL_SEQUENCE_IMAGES.length - 1 ? ' is-final-frame' : ''}`} aria-hidden="true">
+                  <span
+                    className={`gift-box-wrap${revealFrameIndex === REVEAL_SEQUENCE_IMAGES.length - 1 ? ' is-final-frame' : ''}`}
+                    aria-hidden="true"
+                  >
                     <img
                       src={REVEAL_SEQUENCE_IMAGES[revealFrameIndex]}
                       alt=""
@@ -714,7 +742,8 @@ export const App = () => {
               </section>
             ) : null}
 
-            {(revealModalState === 'RESULT' || presentationState === 'RESULT_ENTERING') && resolvedSuccessResponse ? (
+            {(revealModalState === 'RESULT' || presentationState === 'RESULT_ENTERING') &&
+            resolvedSuccessResponse ? (
               <section
                 className="result success result-view overlay-result-layer"
                 data-testid="result-view"
@@ -722,7 +751,10 @@ export const App = () => {
                 aria-live="polite"
                 aria-atomic="true"
                 onTransitionEnd={(event) => {
-                  if (presentationState !== 'RESULT_ENTERING' || revealModalState !== 'BOX_REVEAL') {
+                  if (
+                    presentationState !== 'RESULT_ENTERING' ||
+                    revealModalState !== 'BOX_REVEAL'
+                  ) {
                     return;
                   }
 
@@ -742,11 +774,17 @@ export const App = () => {
                 </h2>
                 <p className="celebration-tag">YOU WON!</p>
                 <section className="prize-showcase" aria-label="Prize card">
-                  <img src={giftBoxOpenImage} alt="" className="prize-art-image" aria-hidden="true" />
+                  <img
+                    src={giftBoxOpenImage}
+                    alt=""
+                    className="prize-art-image"
+                    aria-hidden="true"
+                  />
                   <p className="highlight">{resolvedSuccessResponse.prize.displayName}</p>
                 </section>
                 <p className="claim-id-row">
-                  Claim ID: <span className="claim-id-value">{resolvedSuccessResponse.claimId}</span>
+                  Claim ID:{' '}
+                  <span className="claim-id-value">{resolvedSuccessResponse.claimId}</span>
                 </p>
                 <p>Show this at the Dutta Brothers counter.</p>
                 <div className="overlay-actions">
@@ -766,7 +804,8 @@ export const App = () => {
             </h2>
             <p>{uiState.response.message}</p>
             <p>
-              Original Prize: <span className="claim-id-value">{uiState.response.prize.displayName}</span>
+              Original Prize:{' '}
+              <span className="claim-id-value">{uiState.response.prize.displayName}</span>
             </p>
             <p className="claim-id-row">
               Claim ID: <span className="claim-id-value">{uiState.response.claimId}</span>
@@ -783,7 +822,9 @@ export const App = () => {
               {uiState.type === 'DRAW_ENDED' ? 'Draw Ended' : 'No Eligible Prize'}
             </h2>
             <p>{uiState.message}</p>
-            <p className="availability-note">Please visit the Dutta Brothers counter for assistance.</p>
+            <p className="availability-note">
+              Please visit the Dutta Brothers counter for assistance.
+            </p>
             <button type="button" className="retry-button" onClick={returnToForm}>
               Back
             </button>

@@ -424,6 +424,8 @@ jobs:
               `Changed files (dependency PR): ${process.env.CHANGED_FILES || 'N/A'}`,
             ].join('\n');
 
+            await core.summary.addRaw(body).write();
+
             const { data: comments } = await github.rest.issues.listComments({
               owner,
               repo,
@@ -433,18 +435,23 @@ jobs:
 
             const existing = comments.find((c) => c.user?.type === 'Bot' && c.body?.includes(marker));
 
-            if (existing) {
-              await github.rest.issues.updateComment({
-                owner,
-                repo,
-                comment_id: existing.id,
-                body,
-              });
-            } else {
-              await github.rest.issues.createComment({
-                owner,
-                repo,
-                issue_number: issueNumber,
-                body,
-              });
+            try {
+              if (existing) {
+                await github.rest.issues.updateComment({
+                  owner,
+                  repo,
+                  comment_id: existing.id,
+                  body,
+                });
+              } else {
+                await github.rest.issues.createComment({
+                  owner,
+                  repo,
+                  issue_number: issueNumber,
+                  body,
+                });
+              }
+            } catch (error) {
+              if (error.status !== 403) throw error;
+              core.warning('Dependabot token cannot write PR comments; review is available in the job summary.');
             }

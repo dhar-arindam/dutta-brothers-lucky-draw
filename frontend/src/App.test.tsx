@@ -77,6 +77,14 @@ describe('customer draw app gift box reveal flow', () => {
     expect(screen.queryByTestId('lucky-wheel')).not.toBeInTheDocument();
   });
 
+  it('renders when the reduced-motion media query API is unavailable', () => {
+    vi.stubGlobal('matchMedia', undefined);
+
+    render(<App />);
+
+    expect(screen.getByTestId('landing-view')).toBeInTheDocument();
+  });
+
   it('shows validation for invalid phone', async () => {
     setupMatchMedia();
     vi.stubGlobal('fetch', mockFetch);
@@ -95,7 +103,9 @@ describe('customer draw app gift box reveal flow', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'PLAY NOW' }));
 
-    expect(await screen.findByText('Phone number must contain exactly 10 digits.')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Phone number must contain exactly 10 digits.'),
+    ).toBeInTheDocument();
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
@@ -134,19 +144,28 @@ describe('customer draw app gift box reveal flow', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'PLAY NOW' }));
 
-    await waitFor(() => {
-      expect(screen.getByTestId('anticipation-view')).toBeInTheDocument();
-    }, { timeout: 1500 });
+    await waitFor(
+      () => {
+        expect(screen.getByTestId('anticipation-view')).toBeInTheDocument();
+      },
+      { timeout: 1500 },
+    );
 
-    await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalledTimes(1);
-      expect(screen.getByTestId('reveal-view')).toBeInTheDocument();
-    }, { timeout: 2500 });
+    await waitFor(
+      () => {
+        expect(mockFetch).toHaveBeenCalledTimes(1);
+        expect(screen.getByTestId('reveal-view')).toBeInTheDocument();
+      },
+      { timeout: 2500 },
+    );
 
-    await waitFor(() => {
-      expect(screen.getByTestId('gift-box-hero')).toHaveAttribute('data-state', 'BOX_REVEAL');
-      expect(screen.getByTestId('reveal-overlay')).toBeInTheDocument();
-    }, { timeout: 2500 });
+    await waitFor(
+      () => {
+        expect(screen.getByTestId('gift-box-hero')).toHaveAttribute('data-state', 'BOX_REVEAL');
+        expect(screen.getByTestId('reveal-overlay')).toBeInTheDocument();
+      },
+      { timeout: 2500 },
+    );
 
     fireEvent.click(screen.getByTestId('gift-box-hero'));
     await waitFor(() => {
@@ -207,15 +226,21 @@ describe('customer draw app gift box reveal flow', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'PLAY NOW' }));
 
-    await waitFor(() => {
-      expect(screen.getByTestId('anticipation-view')).toBeInTheDocument();
-    }, { timeout: 1500 });
+    await waitFor(
+      () => {
+        expect(screen.getByTestId('anticipation-view')).toBeInTheDocument();
+      },
+      { timeout: 1500 },
+    );
 
     const anticipationStart = Date.now();
 
-    await waitFor(() => {
-      expect(screen.getByTestId('reveal-view')).toBeInTheDocument();
-    }, { timeout: 2500 });
+    await waitFor(
+      () => {
+        expect(screen.getByTestId('reveal-view')).toBeInTheDocument();
+      },
+      { timeout: 2500 },
+    );
 
     const anticipationElapsedMs = Date.now() - anticipationStart;
     expect(anticipationElapsedMs).toBeGreaterThanOrEqual(650);
@@ -235,10 +260,16 @@ describe('customer draw app gift box reveal flow', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'PLAY NOW' }));
 
-    await waitFor(() => {
-      expect(screen.getByTestId('reveal-view')).toBeInTheDocument();
-      expect(screen.getByTestId('gift-box-hero')).toHaveAttribute('data-presentation-state', 'BOX_IDLE');
-    }, { timeout: 2500 });
+    await waitFor(
+      () => {
+        expect(screen.getByTestId('reveal-view')).toBeInTheDocument();
+        expect(screen.getByTestId('gift-box-hero')).toHaveAttribute(
+          'data-presentation-state',
+          'BOX_IDLE',
+        );
+      },
+      { timeout: 2500 },
+    );
 
     expect(screen.queryByText('CONGRATULATIONS!')).not.toBeInTheDocument();
 
@@ -264,20 +295,26 @@ describe('customer draw app gift box reveal flow', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'PLAY NOW' }));
 
-    await waitFor(() => {
-      expect(screen.getByTestId('reveal-view')).toBeInTheDocument();
-    }, { timeout: 2500 });
+    await waitFor(
+      () => {
+        expect(screen.getByTestId('reveal-view')).toBeInTheDocument();
+      },
+      { timeout: 2500 },
+    );
 
     fireEvent.click(screen.getByTestId('gift-box-hero'));
 
-    await waitFor(() => {
-      expect(screen.getByTestId('reveal-overlay')).toHaveAttribute(
-        'data-presentation-state',
-        'RESULT_ENTERING',
-      );
-      expect(screen.getByTestId('reveal-view')).toBeInTheDocument();
-      expect(screen.getByTestId('result-view')).toBeInTheDocument();
-    }, { timeout: 3500 });
+    await waitFor(
+      () => {
+        expect(screen.getByTestId('reveal-overlay')).toHaveAttribute(
+          'data-presentation-state',
+          'RESULT_ENTERING',
+        );
+        expect(screen.getByTestId('reveal-view')).toBeInTheDocument();
+        expect(screen.getByTestId('result-view')).toBeInTheDocument();
+      },
+      { timeout: 3500 },
+    );
 
     expect(await screen.findByText('DB26-350001', {}, { timeout: 3500 })).toBeInTheDocument();
   });
@@ -295,24 +332,36 @@ describe('customer draw app gift box reveal flow', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'PLAY NOW' }));
 
-    await waitFor(() => {
-      expect(screen.getByTestId('reveal-view')).toBeInTheDocument();
-    }, { timeout: 2500 });
+    await waitFor(
+      () => {
+        expect(screen.getByTestId('reveal-view')).toBeInTheDocument();
+      },
+      { timeout: 2500 },
+    );
 
     fireEvent.click(screen.getByTestId('gift-box-hero'));
 
-    await waitFor(() => {
-      expect(screen.getByTestId('reveal-overlay')).toHaveAttribute('data-modal-state', 'BOX_REVEAL');
-      expect(screen.getByTestId('reveal-overlay')).toHaveAttribute(
-        'data-presentation-state',
-        'RESULT_ENTERING',
-      );
-    }, { timeout: 3500 });
+    await waitFor(
+      () => {
+        expect(screen.getByTestId('reveal-overlay')).toHaveAttribute(
+          'data-modal-state',
+          'BOX_REVEAL',
+        );
+        expect(screen.getByTestId('reveal-overlay')).toHaveAttribute(
+          'data-presentation-state',
+          'RESULT_ENTERING',
+        );
+      },
+      { timeout: 3500 },
+    );
 
-    await waitFor(() => {
-      expect(screen.getByTestId('reveal-overlay')).toHaveAttribute('data-modal-state', 'RESULT');
-      expect(screen.getByText('DB26-360001')).toBeInTheDocument();
-    }, { timeout: 2500 });
+    await waitFor(
+      () => {
+        expect(screen.getByTestId('reveal-overlay')).toHaveAttribute('data-modal-state', 'RESULT');
+        expect(screen.getByText('DB26-360001')).toBeInTheDocument();
+      },
+      { timeout: 2500 },
+    );
   });
 
   it('supports keyboard activation for gift box opening', async () => {
@@ -468,7 +517,8 @@ describe('customer draw app gift box reveal flow', () => {
       json: async () => ({
         status: 'ERROR',
         code: 'DRAW_ENDED',
-        message: 'The lucky draw has ended for this festive season. Please visit the Dutta Brothers counter.',
+        message:
+          'The lucky draw has ended for this festive season. Please visit the Dutta Brothers counter.',
       }),
     });
     vi.stubGlobal('fetch', mockFetch);
@@ -493,7 +543,8 @@ describe('customer draw app gift box reveal flow', () => {
       json: async () => ({
         status: 'ERROR',
         code: 'NO_ELIGIBLE_PRIZE',
-        message: 'The lucky draw has ended for this festive season. Please visit the Dutta Brothers counter.',
+        message:
+          'The lucky draw has ended for this festive season. Please visit the Dutta Brothers counter.',
       }),
     });
     vi.stubGlobal('fetch', mockFetch);
@@ -532,7 +583,9 @@ describe('customer draw app gift box reveal flow', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'PLAY NOW' }));
 
-    expect(await screen.findByText('Phone number must contain exactly 10 digits.')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Phone number must contain exactly 10 digits.'),
+    ).toBeInTheDocument();
   });
 
   it('renders explicit API_ERROR state from backend and supports retry flow', async () => {
@@ -557,7 +610,9 @@ describe('customer draw app gift box reveal flow', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'PLAY NOW' }));
 
-    expect(await screen.findByText('Service temporarily unavailable. Please retry.')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Service temporarily unavailable. Please retry.'),
+    ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
 
@@ -595,12 +650,17 @@ describe('customer draw app gift box reveal flow', () => {
     fillValidForm('DB9201');
 
     fireEvent.click(screen.getByRole('button', { name: 'PLAY NOW' }));
-    expect(await screen.findByText('Service temporarily unavailable. Please retry.')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Service temporarily unavailable. Please retry.'),
+    ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
-    await waitFor(() => {
-      expect(screen.getByTestId('reveal-view')).toBeInTheDocument();
-    }, { timeout: 3000 });
+    await waitFor(
+      () => {
+        expect(screen.getByTestId('reveal-view')).toBeInTheDocument();
+      },
+      { timeout: 3000 },
+    );
     fireEvent.click(screen.getByTestId('gift-box-hero'));
     expect(await screen.findByText('DB26-300010', {}, { timeout: 3500 })).toBeInTheDocument();
 
@@ -613,9 +673,12 @@ describe('customer draw app gift box reveal flow', () => {
     fillValidForm('DB9202');
     fireEvent.click(screen.getByRole('button', { name: 'PLAY NOW' }));
 
-    await waitFor(() => {
-      expect(screen.getByTestId('reveal-view')).toBeInTheDocument();
-    }, { timeout: 3000 });
+    await waitFor(
+      () => {
+        expect(screen.getByTestId('reveal-view')).toBeInTheDocument();
+      },
+      { timeout: 3000 },
+    );
     const nextHeaders = mockFetch.mock.calls[2]?.[1]?.headers as Record<string, string>;
     expect(nextHeaders['idempotency-key']).toBeDefined();
     expect(nextHeaders['idempotency-key']).not.toBe(firstHeaders['idempotency-key']);
@@ -623,11 +686,9 @@ describe('customer draw app gift box reveal flow', () => {
 
   it('renders explicit NETWORK_ERROR state on transport failure and supports retry', async () => {
     setupMatchMedia();
-    mockFetch
-      .mockRejectedValueOnce(new Error('network down'))
-      .mockResolvedValueOnce({
-        json: async () => ({ ...successResponse, claimId: 'DB26-200002' }),
-      });
+    mockFetch.mockRejectedValueOnce(new Error('network down')).mockResolvedValueOnce({
+      json: async () => ({ ...successResponse, claimId: 'DB26-200002' }),
+    });
 
     vi.stubGlobal('fetch', mockFetch);
 
@@ -638,7 +699,9 @@ describe('customer draw app gift box reveal flow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'PLAY NOW' }));
 
     expect(
-      await screen.findByText('We could not complete the draw. Please check your connection and retry.'),
+      await screen.findByText(
+        'We could not complete the draw. Please check your connection and retry.',
+      ),
     ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
@@ -674,4 +737,3 @@ describe('customer draw app gift box reveal flow', () => {
     expect(cta).toHaveClass('primary-cta');
   });
 });
-

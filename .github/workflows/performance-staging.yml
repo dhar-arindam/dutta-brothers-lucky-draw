@@ -21,7 +21,7 @@ on:
 
 env:
   AWS_REGION: ap-south-1
-  AWS_ACCOUNT_ID: "176515272004"
+  AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
   STAGING_STACK_NAME: DuttaDrawFoundationStackStaging
 
 permissions:
@@ -48,10 +48,10 @@ jobs:
     environment: staging
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 24
           cache: npm
@@ -60,7 +60,7 @@ jobs:
         run: npm ci
 
       - name: Configure AWS credentials (OIDC staging role)
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN_STAGING }}
           aws-region: ${{ env.AWS_REGION }}
@@ -69,6 +69,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          if [ -z "${AWS_ACCOUNT_ID:-}" ]; then
+            echo "AWS_ACCOUNT_ID repository variable is not set"
+            exit 1
+          fi
           ACTUAL_ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
           if [ "$ACTUAL_ACCOUNT_ID" != "${AWS_ACCOUNT_ID}" ]; then
             echo "Unexpected AWS account: $ACTUAL_ACCOUNT_ID"
@@ -106,7 +110,7 @@ jobs:
 
       - name: Upload performance report artifact
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: performance-report-${{ github.event.inputs.scenario }}-${{ github.run_id }}
           path: tests/performance/results/

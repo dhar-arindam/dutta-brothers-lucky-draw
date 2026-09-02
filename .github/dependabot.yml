@@ -5,11 +5,27 @@ updates:
     schedule:
       interval: weekly
       day: monday
-      time: "03:00"
+      time: '03:00'
       timezone: Asia/Kolkata
     open-pull-requests-limit: 5
     groups:
       non-security-minor-patch:
+        applies-to: version-updates
+        update-types:
+          - minor
+          - patch
+
+  # Workflow actions are pinned to commit SHAs, so this is the only mechanism that keeps them current.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '03:00'
+      timezone: Asia/Kolkata
+    open-pull-requests-limit: 5
+    groups:
+      github-actions:
         applies-to: version-updates
         update-types:
           - minor

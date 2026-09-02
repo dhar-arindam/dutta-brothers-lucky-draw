@@ -196,8 +196,8 @@ The awarded/given information per prize provides a shortcut into the Claims Repo
 - Claims filtering uses date-only controls for `From Date` and `To Date`.
 - Admin selects dates with calendar/date-picker controls.
 - Frontend converts selected date-only values to UTC day boundaries before API calls:
-	- `From Date` -> `YYYY-MM-DDT00:00:00.000Z`
-	- `To Date` -> `YYYY-MM-DDT23:59:59.999Z`
+  - `From Date` -> `YYYY-MM-DDT00:00:00.000Z`
+  - `To Date` -> `YYYY-MM-DDT23:59:59.999Z`
 - Admin is not required to enter time-of-day values for claims filtering.
 
 ### Admin Data Loading and Failure Handling
@@ -209,9 +209,9 @@ The awarded/given information per prize provides a shortcut into the Claims Repo
 - If any initial dependency fails, the page shows a single operational error state with retry.
 - While requests are in flight, section-appropriate loading text is displayed.
 - Empty-data states are explicit:
-	- `No claims yet.`
-	- `No claims match your filters.`
-	- `No claims found for this prize.`
+  - `No claims yet.`
+  - `No claims match your filters.`
+  - `No claims found for this prize.`
 
 ### Search
 
@@ -237,8 +237,18 @@ CSV exports must contain only:
 
 CSV export scope:
 
-- Export must include all successful claims irrespective of active claims filters.
+- Export is scoped to a single calendar year that the administrator selects before exporting.
+- Selecting the export action opens a modal dialog that asks which year to download. No file is requested until the administrator confirms a year in that dialog.
+- The dialog offers only the calendar years that currently hold at least one successful claim, newest first, as reported by `availableExportYears` on the admin summary. The administrator is never offered a year that would produce an empty file.
+- The most recent available year is preselected.
+- When no claims exist, the dialog explains that there is nothing to export and offers no year choice, and the confirm action is unavailable.
+- A claim belongs to the year of its claim timestamp interpreted in `Asia/Kolkata`.
+- Within the selected year the export includes all successful claims irrespective of active claims filters.
 - Active claims filters affect dashboard viewing only and must not limit CSV export content.
+- Dismissing the dialog cancels the export and requests nothing.
+- The downloaded file is named `claims-<year>.csv` so that exports from different years are not confused with each other.
+
+Exporting one year at a time keeps each export small enough to download reliably and makes the period covered by a file unambiguous for prize fulfilment and reconciliation. Asking for the year in a modal at the point of export makes the period an explicit, deliberate choice rather than a filter the operator may not notice.
 
 Bill number is visible to the shop owner because it is required for operational verification. Do not export unnecessary personal information or internal database identifiers. CSV values beginning with `=`, `+`, `-`, or `@` must be prefixed with a single apostrophe before normal CSV quoting.
 
@@ -347,6 +357,8 @@ Touch targets should be approximately 44px or greater where practical.
 
 - The admin sees successful claim data with masked phone numbers.
 - Claims support search, date filtering, prize filtering, pagination, and CSV export.
+- CSV export requires the admin to select a calendar year, and exports only that year.
+- The exported file is named `claims-<year>.csv`.
 - Claims default to all results when no prize card filter is selected.
 - Selecting a prize card applies prize-filtered claims reporting.
 - `Clear Filters` clears prize filtering and restores all claims.

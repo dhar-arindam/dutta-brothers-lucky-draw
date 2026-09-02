@@ -20,7 +20,7 @@ import {
   toRequestTooLargeBody,
   utf8ByteLength,
 } from './request-size-policy.js';
-import { CsvExportTooLargeError } from './store.js';
+import { CsvExportTooLargeError, parseCsvExportYear } from './store.js';
 import { validateDrawRequest } from './validation.js';
 import { resolveRuntimeMode } from './runtime-mode.js';
 
@@ -585,9 +585,17 @@ export const handler = async (event: {
     }
 
     if (method === 'GET' && path === '/api/admin/claims.csv') {
+      const year = parseCsvExportYear(query.get('year'));
+      if (year === null) {
+        const response = validationErrorResponse('Select a valid year to export.', {
+          year: 'Year must be a four-digit calendar year.',
+        });
+        return responseJson(response.statusCode, response.body);
+      }
+
       let claims;
       try {
-        claims = await store.listAdminClaimsForCsv();
+        claims = await store.listAdminClaimsForCsv(year);
       } catch (error) {
         if (error instanceof CsvExportTooLargeError) {
           return responseJson(413, {
@@ -616,7 +624,7 @@ export const handler = async (event: {
         statusCode: 200,
         headers: {
           'content-type': 'text/csv; charset=utf-8',
-          'content-disposition': 'attachment; filename="claims.csv"',
+          'content-disposition': `attachment; filename="claims-${year}.csv"`,
         },
         body: rows.map((row) => row.map(toCsvCell).join(',')).join('\n'),
       };
@@ -635,6 +643,7 @@ export const handler = async (event: {
         totalSuccessfulSpins: summary.totalSuccessfulSpins,
         today: summary.today,
         prizeDistribution: summary.prizeDistribution,
+        availableExportYears: summary.availableExportYears,
       });
     }
 

@@ -362,7 +362,7 @@ describe('campaign, summary, and claims endpoints', () => {
     );
 
     const response = adminApiHandler.exportClaimsCsv(
-      new URLSearchParams({ search: 'Amit', pageSize: '1' }),
+      new URLSearchParams({ search: 'Amit', pageSize: '1', year: '2026' }),
     );
 
     expect(response.statusCode).toBe(200);
@@ -387,7 +387,7 @@ describe('campaign, summary, and claims endpoints', () => {
     } as unknown as InMemoryDrawStore;
 
     const response = createAdminPrizeApiHandler(throwingStore).exportClaimsCsv(
-      new URLSearchParams(),
+      new URLSearchParams({ year: '2026' }),
     );
 
     expect(response.statusCode).toBe(413);
@@ -396,6 +396,46 @@ describe('campaign, summary, and claims endpoints', () => {
       status: 'ERROR',
       code: 'EXPORT_TOO_LARGE',
     });
+  });
+
+  it('rejects a csv export without a year rather than exporting every claim', () => {
+    const { adminApiHandler } = createHarness();
+
+    const response = adminApiHandler.exportClaimsCsv(new URLSearchParams());
+
+    expect(response.statusCode).toBe(400);
+    expect(JSON.parse(response.body)).toMatchObject({
+      status: 'ERROR',
+      code: 'VALIDATION_ERROR',
+      fieldErrors: { year: 'Year must be a four-digit calendar year.' },
+    });
+  });
+
+  it('rejects a malformed or out-of-range csv export year', () => {
+    const { adminApiHandler } = createHarness();
+
+    for (const year of ['20xx', '26', '1999', '2101', '']) {
+      const response = adminApiHandler.exportClaimsCsv(new URLSearchParams({ year }));
+      expect(response.statusCode).toBe(400);
+    }
+  });
+
+  it('exports only the selected year and names the file after it', () => {
+    const { drawApiHandler, adminApiHandler } = createHarness();
+
+    drawApiHandler.handle(
+      JSON.stringify({ name: 'Amit Das', phone: '9123456789', billNumber: 'YEAR-001' }),
+    );
+
+    const inYear = adminApiHandler.exportClaimsCsv(new URLSearchParams({ year: '2026' }));
+    expect(inYear.statusCode).toBe(200);
+    expect(inYear.headers['content-disposition']).toContain('claims-2026.csv');
+    expect(inYear.body).toContain('YEAR-001');
+
+    const otherYear = adminApiHandler.exportClaimsCsv(new URLSearchParams({ year: '2025' }));
+    expect(otherYear.statusCode).toBe(200);
+    expect(otherYear.headers['content-disposition']).toContain('claims-2025.csv');
+    expect(otherYear.body).not.toContain('YEAR-001');
   });
 
   it('deletes a single claim and decrements aggregates', () => {
@@ -496,9 +536,23 @@ describe('campaign, summary, and claims endpoints', () => {
       status: 'SUCCESS',
       totalSuccessfulSpins: 0,
       prizeDistribution: [],
+      availableExportYears: [],
     });
 
     const claimsAfter = adminApiHandler.listClaims(new URLSearchParams());
     expect(claimsAfter.body).toMatchObject({ status: 'SUCCESS', items: [] });
+  });
+
+  it('reports only years that hold claims as available export years', () => {
+    const { drawApiHandler, adminApiHandler } = createHarness();
+
+    expect(adminApiHandler.getSummary().body).toMatchObject({ availableExportYears: [] });
+
+    drawApiHandler.handle(
+      JSON.stringify({ name: 'Amit Das', phone: '9123456789', billNumber: 'YEARS-001' }),
+    );
+
+    // The harness clock is fixed at 2026-08-16, so only that year becomes available.
+    expect(adminApiHandler.getSummary().body).toMatchObject({ availableExportYears: [2026] });
   });
 });

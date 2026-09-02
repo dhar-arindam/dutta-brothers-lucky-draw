@@ -390,7 +390,40 @@ describe('dynamo db draw store persistence', () => {
       now: () => new Date('2026-08-16T10:30:00.000Z'),
     });
 
-    await expect(store.listAdminClaimsForCsv()).rejects.toBeInstanceOf(CsvExportTooLargeError);
+    await expect(store.listAdminClaimsForCsv(2026)).rejects.toBeInstanceOf(CsvExportTooLargeError);
+  });
+
+  it('exports only claims falling in the requested Asia/Kolkata calendar year', async () => {
+    const makeClaim = (claimId: string, claimTimestamp: string) => ({
+      pk: 'CLAIM',
+      sk: claimId,
+      claimId,
+      claimTimestamp,
+      customerName: 'Amit Das',
+      phone: '9123456789',
+      billNumberDisplay: `BILL-${claimId}`,
+      billNumberNormalized: `BILL-${claimId}`,
+      prize: { id: 'prize-001', name: 'Electric Kettle', displayName: 'Electric Kettle' },
+    });
+
+    const fake = new FakeDocClient();
+    fake.enqueue(async () => ({
+      Items: [
+        // 19:00 UTC on 31 Dec is already 00:30 on 1 Jan in Asia/Kolkata, so this belongs to 2027.
+        makeClaim('DB26-000003', '2026-12-31T19:00:00.000Z'),
+        makeClaim('DB26-000002', '2026-06-15T10:30:00.000Z'),
+        makeClaim('DB26-000001', '2025-06-15T10:30:00.000Z'),
+      ],
+    }));
+
+    const store = new DynamoDbDrawStore(fake as never, {
+      tableName: 'draws-table',
+      now: () => new Date('2026-08-16T10:30:00.000Z'),
+    });
+
+    const claims = await store.listAdminClaimsForCsv(2026);
+
+    expect(claims.map((claim) => claim.claimId)).toEqual(['DB26-000002']);
   });
 
   it('builds summary from aggregate records', async () => {
@@ -406,6 +439,14 @@ describe('dynamo db draw store persistence', () => {
           prizeName: 'Electric Kettle',
           successfulSpins: 4,
         },
+      ],
+    }));
+    fake.enqueue(async () => ({
+      Items: [
+        { pk: 'AGG', sk: 'DATE#2026-08-16', successfulSpins: 2 },
+        { pk: 'AGG', sk: 'DATE#2025-11-02', successfulSpins: 7 },
+        // A date whose claims were all deleted must not offer an empty export year.
+        { pk: 'AGG', sk: 'DATE#2024-01-05', successfulSpins: 0 },
       ],
     }));
 
@@ -425,6 +466,7 @@ describe('dynamo db draw store persistence', () => {
         givenCount: 4,
       },
     ]);
+    expect(summary.availableExportYears).toEqual([2026, 2025]);
 
     expect(fake.calls[2]).toBeInstanceOf(QueryCommand);
   });

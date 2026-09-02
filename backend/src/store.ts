@@ -1,4 +1,4 @@
-import { campaignDateInKolkata, isCampaignActive } from './campaign.js';
+import { campaignDateInKolkata, campaignYearInKolkata, isCampaignActive } from './campaign.js';
 import type { AdminClaimItem, AdminSummaryDistributionItem } from './contracts.js';
 import type { Claim, ConfiguredPrize, DrawStoreSnapshot, Prize } from './domain.js';
 
@@ -91,6 +91,25 @@ export interface AdminCsvClaimItem {
 // below the API Gateway payload limit rather than being allowed to exhaust memory or time out.
 export const CSV_EXPORT_MAX_ROWS = 20000;
 
+export const CSV_EXPORT_MIN_YEAR = 2000;
+export const CSV_EXPORT_MAX_YEAR = 2100;
+
+// Exports are scoped to one calendar year, so a missing year must fail rather than silently
+// widening the export to every claim ever recorded.
+export const parseCsvExportYear = (raw: string | null | undefined): number | null => {
+  const value = (raw ?? '').trim();
+  if (!/^\d{4}$/.test(value)) {
+    return null;
+  }
+
+  const year = Number(value);
+  if (year < CSV_EXPORT_MIN_YEAR || year > CSV_EXPORT_MAX_YEAR) {
+    return null;
+  }
+
+  return year;
+};
+
 export class CsvExportTooLargeError extends Error {
   public readonly limit: number;
 
@@ -124,6 +143,7 @@ export interface AdminSummaryData {
     successfulSpins: number;
   };
   prizeDistribution: AdminSummaryDistributionItem[];
+  availableExportYears: number[];
 }
 
 const MAX_PRIZE_NAME_LENGTH = 100;
@@ -356,12 +376,16 @@ export class InMemoryDrawStore {
     };
   }
 
-  public listAdminClaimsForCsv(): AdminCsvClaimItem[] {
-    if (this.claimsInCreatedOrder.length > CSV_EXPORT_MAX_ROWS) {
+  public listAdminClaimsForCsv(year: number): AdminCsvClaimItem[] {
+    const claimsForYear = this.claimsInCreatedOrder.filter(
+      (claim) => campaignYearInKolkata(new Date(claim.claimTimestamp)) === year,
+    );
+
+    if (claimsForYear.length > CSV_EXPORT_MAX_ROWS) {
       throw new CsvExportTooLargeError(CSV_EXPORT_MAX_ROWS);
     }
 
-    return [...this.claimsInCreatedOrder].reverse().map((claim): AdminCsvClaimItem => {
+    return [...claimsForYear].reverse().map((claim): AdminCsvClaimItem => {
       return {
         claimId: claim.claimId,
         claimTimestamp: claim.claimTimestamp,
@@ -393,7 +417,21 @@ export class InMemoryDrawStore {
         successfulSpins: todayCount,
       },
       prizeDistribution: distribution,
+      availableExportYears: this.availableExportYears(),
     };
+  }
+
+  // Years are derived from the daily aggregate keys rather than the claims themselves so the
+  // admin is only ever offered a year that would produce a non-empty export.
+  private availableExportYears(): number[] {
+    const years = new Set<number>();
+    for (const [date, count] of this.successfulByDate.entries()) {
+      if (count > 0) {
+        years.add(Number(date.slice(0, 4)));
+      }
+    }
+
+    return [...years].sort((left, right) => right - left);
   }
 
   public getCampaign(): CampaignView {

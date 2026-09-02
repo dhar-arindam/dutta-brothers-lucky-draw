@@ -58,6 +58,7 @@ export interface AdminSummaryResponse {
     successfulSpins: number;
   };
   prizeDistribution: AdminSummaryDistributionItem[];
+  availableExportYears: number[];
 }
 
 export interface AdminCampaignResponse {
@@ -83,7 +84,7 @@ export interface AdminErrorResponse {
   message: string;
   fieldErrors?: Partial<
     Record<
-      'name' | 'weight' | 'active' | 'pageSize' | 'from' | 'to' | 'fromDate' | 'toDate',
+      'name' | 'weight' | 'active' | 'pageSize' | 'from' | 'to' | 'fromDate' | 'toDate' | 'year',
       string
     >
   >;

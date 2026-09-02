@@ -62,7 +62,8 @@ interface CampaignFormErrors {
 
 type CampaignTone = 'not-configured' | 'not-started' | 'active' | 'ended';
 
-type ConfirmDialogState = { type: 'DELETE_CLAIM'; claimId: string } | { type: 'CLEAR_ALL_CLAIMS' };
+type ConfirmDialogState =
+  { type: 'DELETE_CLAIM'; claimId: string } | { type: 'CLEAR_ALL_CLAIMS' } | { type: 'EXPORT_CSV' };
 
 const CLEAR_ALL_CONFIRMATION_PHRASE = 'CLEAR ALL CLAIMS';
 
@@ -103,8 +104,15 @@ export const AdminPrizePage = () => {
   const [weightDrafts, setWeightDrafts] = useState<Record<string, string>>({});
   const [campaignForm, setCampaignForm] = useState<CampaignForm>({ fromDate: '', toDate: '' });
   const [campaignErrors, setCampaignErrors] = useState<CampaignFormErrors>({});
+  const [exportYear, setExportYear] = useState('');
 
   const isBusy = busyAction !== 'NONE';
+
+  const exportYearOptions = useMemo(() => {
+    return (summary?.availableExportYears ?? []).map(String);
+  }, [summary?.availableExportYears]);
+
+  const selectedExportYear = resolveExportYear(exportYear, exportYearOptions);
 
   const sortedPrizes = useMemo(() => {
     return [...prizes].sort((a, b) => a.id.localeCompare(b.id));
@@ -358,11 +366,17 @@ export const AdminPrizePage = () => {
   };
 
   const onExportCsv = async () => {
+    if (!selectedExportYear) {
+      return;
+    }
+
+    const year = selectedExportYear;
+    setConfirmDialog(null);
     setBusyAction('CSV');
-    setFeedback('Preparing CSV export...');
+    setFeedback(`Preparing ${year} CSV export...`);
 
     try {
-      const csvText = await exportAdminClaimsCsv(buildClaimsQuery());
+      const csvText = await exportAdminClaimsCsv(Number(year));
       setLastCsvExport(csvText);
 
       if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
@@ -370,13 +384,13 @@ export const AdminPrizePage = () => {
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = 'claims.csv';
+        link.download = `claims-${year}.csv`;
         link.click();
         URL.revokeObjectURL(url);
       }
 
       setState({ type: 'READY' });
-      setFeedback('CSV export generated.');
+      setFeedback(`CSV export generated for ${year}.`);
     } catch {
       setErrorState('We could not complete the admin request. Please try again.');
     } finally {
@@ -1269,9 +1283,12 @@ export const AdminPrizePage = () => {
                 type="button"
                 className={`justify-self-start sm:justify-self-end ${primaryButtonClass}`}
                 disabled={isBusy}
-                onClick={() => void onExportCsv()}
+                onClick={() => {
+                  setExportYear('');
+                  setConfirmDialog({ type: 'EXPORT_CSV' });
+                }}
               >
-                {busyAction === 'CSV' ? 'Exporting...' : 'Export All Data'}
+                {busyAction === 'CSV' ? 'Exporting...' : 'Export Data'}
               </button>
               <button
                 type="button"
@@ -1601,6 +1618,71 @@ export const AdminPrizePage = () => {
                     </button>
                   </div>
                 </>
+              ) : confirmDialog.type === 'EXPORT_CSV' ? (
+                <>
+                  <h2
+                    id="confirm-dialog-title"
+                    className={`m-0 text-lg font-semibold ${headingTextClass}`}
+                  >
+                    Select year to download
+                  </h2>
+                  {exportYearOptions.length === 0 ? (
+                    <>
+                      <p className={`m-0 text-sm ${mutedTextClass}`}>
+                        There are no claims to export yet.
+                      </p>
+                      <div className="mt-2 flex flex-wrap justify-end gap-2">
+                        <button
+                          type="button"
+                          className={secondaryButtonClass}
+                          onClick={() => setConfirmDialog(null)}
+                        >
+                          Close
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <p className={`m-0 text-sm ${mutedTextClass}`}>
+                        The export contains every claim recorded in the selected year.
+                      </p>
+                      <label
+                        htmlFor="export-year"
+                        className={`text-sm font-medium ${headingTextClass}`}
+                      >
+                        Year
+                      </label>
+                      <select
+                        id="export-year"
+                        className={inputClass}
+                        value={selectedExportYear}
+                        onChange={(event) => setExportYear(event.target.value)}
+                      >
+                        {exportYearOptions.map((year) => (
+                          <option key={year} value={year}>
+                            {year}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="mt-2 flex flex-wrap justify-end gap-2">
+                        <button
+                          type="button"
+                          className={secondaryButtonClass}
+                          onClick={() => setConfirmDialog(null)}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          className={primaryButtonClass}
+                          onClick={() => void onExportCsv()}
+                        >
+                          Download {selectedExportYear}
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </>
               ) : (
                 <>
                   <h2
@@ -1695,6 +1777,12 @@ const campaignDateInTimezone = (value: Date, timezone: string): string => {
   });
 
   return formatter.format(value);
+};
+
+// The dialog only offers years that already hold claims, so the fallback is simply the newest
+// available year rather than a calendar-derived guess.
+const resolveExportYear = (selected: string, options: string[]): string => {
+  return options.includes(selected) ? selected : (options[0] ?? '');
 };
 
 const isValidIsoDate = (value: string): boolean => {

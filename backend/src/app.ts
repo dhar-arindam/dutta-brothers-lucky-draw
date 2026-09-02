@@ -13,6 +13,7 @@ import {
   type CampaignUpdateInput,
   CsvExportTooLargeError,
   InMemoryDrawStore,
+  parseCsvExportYear,
   UpdatePrizeInput,
 } from './store.js';
 import {
@@ -236,10 +237,25 @@ export const createAdminPrizeApiHandler = (store: InMemoryDrawStore): AdminPrize
     },
 
     exportClaimsCsv(query: URLSearchParams): AdminCsvResponse {
-      void query;
+      const year = parseCsvExportYear(query.get('year'));
+      if (year === null) {
+        const body: AdminErrorResponse = {
+          status: 'ERROR',
+          code: 'VALIDATION_ERROR',
+          message: 'Select a valid year to export.',
+          fieldErrors: { year: 'Year must be a four-digit calendar year.' },
+        };
+
+        return {
+          statusCode: 400,
+          headers: jsonHeaders,
+          body: JSON.stringify(body),
+        };
+      }
+
       let result;
       try {
-        result = store.listAdminClaimsForCsv();
+        result = store.listAdminClaimsForCsv(year);
       } catch (error) {
         if (error instanceof CsvExportTooLargeError) {
           const body: AdminErrorResponse = {
@@ -274,7 +290,7 @@ export const createAdminPrizeApiHandler = (store: InMemoryDrawStore): AdminPrize
         statusCode: 200,
         headers: {
           'content-type': 'text/csv; charset=utf-8',
-          'content-disposition': 'attachment; filename="claims.csv"',
+          'content-disposition': `attachment; filename="claims-${year}.csv"`,
         },
         body: rows.map((row) => row.map(toCsvCell).join(',')).join('\n'),
       };
@@ -314,6 +330,7 @@ export const createAdminPrizeApiHandler = (store: InMemoryDrawStore): AdminPrize
           totalSuccessfulSpins: summary.totalSuccessfulSpins,
           today: summary.today,
           prizeDistribution: summary.prizeDistribution,
+          availableExportYears: summary.availableExportYears,
         },
       };
     },

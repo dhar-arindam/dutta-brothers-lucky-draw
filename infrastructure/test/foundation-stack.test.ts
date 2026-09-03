@@ -87,8 +87,17 @@ describe('foundation stack aws configuration', () => {
     template.resourceCountIs('AWS::CloudFront::Distribution', 1);
     template.resourceCountIs('AWS::ApiGatewayV2::Api', 1);
     template.resourceCountIs('AWS::Cognito::UserPool', 1);
+    template.resourceCountIs('AWS::Cognito::UserPoolUser', 1);
     template.resourceCountIs('AWS::Cognito::UserPoolClient', 1);
     template.resourceCountIs('AWS::Cognito::ManagedLoginBranding', 1);
+    template.hasResourceProperties('AWS::Cognito::UserPoolUser', {
+      Username: 'luckydraw.admin',
+      DesiredDeliveryMediums: ['EMAIL'],
+      UserAttributes: Match.arrayWith([
+        Match.objectLike({ Name: 'email', Value: 'bunty.kool@gmail.com' }),
+        Match.objectLike({ Name: 'email_verified', Value: 'true' }),
+      ]),
+    });
     template.hasResourceProperties('AWS::Cognito::UserPoolDomain', {
       ManagedLoginVersion: 2,
     });

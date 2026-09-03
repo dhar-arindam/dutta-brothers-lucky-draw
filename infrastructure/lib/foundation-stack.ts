@@ -114,6 +114,15 @@ export class FoundationStack extends Stack {
       },
       removalPolicy: isProduction ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY,
     });
+    new cognito.CfnUserPoolUser(this, 'AdminUser', {
+      userPoolId: adminUserPool.userPoolId,
+      username: 'luckydraw.admin',
+      desiredDeliveryMediums: ['EMAIL'],
+      userAttributes: [
+        { name: 'email', value: 'bunty.kool@gmail.com' },
+        { name: 'email_verified', value: 'true' },
+      ],
+    });
     const adminDomain = adminUserPool.addDomain('AdminDomain', {
       cognitoDomain: { domainPrefix: cognitoDomainPrefix },
     });

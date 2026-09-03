@@ -54,19 +54,14 @@ Required GitHub repository variables (available to reusable CI workflow calls):
 - staging environment:
   - `AWS_ROLE_ARN_STAGING`
   - `STAGING_FRONTEND_ORIGIN`
-  - `STAGING_COGNITO_DOMAIN`
-  - `STAGING_COGNITO_CLIENT_ID`
 - production environment:
   - `AWS_ROLE_ARN_PRODUCTION`
   - `PRODUCTION_FRONTEND_ORIGIN`
-  - `PRODUCTION_COGNITO_DOMAIN`
-  - `PRODUCTION_COGNITO_CLIENT_ID`
 
 Admin Cognito configuration:
 
-- The frontend build must receive `VITE_COGNITO_DOMAIN` and `VITE_COGNITO_CLIENT_ID` for the target stage through the `STAGING_*` or `PRODUCTION_*` repository variables.
-- `VITE_COGNITO_DOMAIN` is the Cognito Managed Login domain created by the CDK stack.
-- `VITE_COGNITO_CLIENT_ID` is the public SPA app-client ID created by the CDK stack.
+- Deployment resolves `AdminCognitoDomain` and `AdminUserPoolClientId` from the deployed CloudFormation stack outputs and rebuilds the frontend asset with those values before the final asset deployment.
+- `VITE_COGNITO_DOMAIN` and `VITE_COGNITO_CLIENT_ID` are derived build-time values and do not need to be manually maintained as GitHub variables.
 - These values are identifiers, not secrets. The Cognito app client has no client secret.
 - Provision exactly two local Cognito users after stack creation. Do not enable MFA or configure Google federation in V1.
 - Never place user passwords in repository variables, source files, CDK context, or build artifacts.

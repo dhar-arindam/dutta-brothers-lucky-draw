@@ -18,6 +18,9 @@ permissions:
 jobs:
   ci:
     uses: ./.github/workflows/ci.yml
+    with:
+      cognito_domain: ${{ vars.PRODUCTION_COGNITO_DOMAIN }}
+      cognito_client_id: ${{ vars.PRODUCTION_COGNITO_CLIENT_ID }}
 
   staging-validation:
     needs: ci

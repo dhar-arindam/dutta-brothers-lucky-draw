@@ -12,6 +12,7 @@ interface AdminAuthGateProps {
     isAuthenticated: boolean,
     onSignIn: () => void,
     onSignOut: () => void,
+    authMessage: string,
   ) => React.ReactNode;
 }
 
@@ -19,6 +20,7 @@ type AuthState = 'CHECKING' | 'SIGNED_OUT' | 'SIGNED_IN' | 'ERROR';
 
 export const AdminAuthGate = ({ children }: AdminAuthGateProps) => {
   const [authState, setAuthState] = useState<AuthState>('CHECKING');
+  const [authMessage, setAuthMessage] = useState('');
 
   useEffect(() => {
     let active = true;
@@ -28,8 +30,9 @@ export const AdminAuthGate = ({ children }: AdminAuthGateProps) => {
           setAuthState(hasAdminSession() ? 'SIGNED_IN' : 'SIGNED_OUT');
         }
       })
-      .catch(() => {
+      .catch((error: unknown) => {
         if (active) {
+          setAuthMessage(error instanceof Error ? error.message : 'Admin login failed.');
           setAuthState('ERROR');
         }
       });
@@ -39,11 +42,21 @@ export const AdminAuthGate = ({ children }: AdminAuthGateProps) => {
     };
   }, []);
 
+  useEffect(() => {
+    const onSessionExpired = () => {
+      setAuthMessage('Your admin session expired. Please sign in again.');
+      setAuthState('SIGNED_OUT');
+    };
+    window.addEventListener('dutta-draw-admin-session-expired', onSessionExpired);
+    return () => window.removeEventListener('dutta-draw-admin-session-expired', onSessionExpired);
+  }, []);
+
   const signIn = () => {
-    void startCognitoLogin().catch(() => {
+    void startCognitoLogin().catch((error: unknown) => {
+      setAuthMessage(error instanceof Error ? error.message : 'Admin login failed.');
       setAuthState('ERROR');
     });
   };
 
-  return children(authState === 'SIGNED_IN', signIn, logoutCognito);
+  return children(authState === 'SIGNED_IN', signIn, logoutCognito, authMessage);
 };

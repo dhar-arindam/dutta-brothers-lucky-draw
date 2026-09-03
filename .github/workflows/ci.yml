@@ -6,6 +6,13 @@ on:
       - main
   pull_request:
   workflow_call:
+    inputs:
+      cognito_domain:
+        required: false
+        type: string
+      cognito_client_id:
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -53,6 +60,9 @@ jobs:
           npm --version
 
       - name: Build frontend assets for infrastructure tests and synth
+        env:
+          VITE_COGNITO_DOMAIN: ${{ inputs.cognito_domain || 'https://build-placeholder.auth.ap-south-1.amazoncognito.com' }}
+          VITE_COGNITO_CLIENT_ID: ${{ inputs.cognito_client_id || 'build-placeholder-client' }}
         run: npm run build --workspace frontend
 
       - name: Lint

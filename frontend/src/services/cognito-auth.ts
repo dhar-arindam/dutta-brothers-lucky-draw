@@ -73,6 +73,11 @@ export const getAdminAccessToken = (): string | null => readSession()?.accessTok
 
 export const hasAdminSession = (): boolean => getAdminAccessToken() !== null;
 
+export const expireAdminSession = (): void => {
+  sessionStorage.removeItem(STORAGE_KEY);
+  window.dispatchEvent(new Event('dutta-draw-admin-session-expired'));
+};
+
 export const startCognitoLogin = async (): Promise<void> => {
   const config = getConfig();
   if (!config) {

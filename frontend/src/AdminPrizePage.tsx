@@ -84,12 +84,14 @@ interface AdminPrizePageProps {
   isAuthenticated?: boolean;
   onSignIn?: () => void;
   onSignOut?: () => void;
+  authMessage?: string;
 }
 
 export const AdminPrizePage = ({
   isAuthenticated = true,
   onSignIn,
   onSignOut,
+  authMessage = '',
 }: AdminPrizePageProps) => {
   const [isLightTheme, setIsLightTheme] = useState(() => {
     if (typeof window === 'undefined') {
@@ -818,6 +820,15 @@ export const AdminPrizePage = ({
             </button>
           </div>
         </header>
+
+        {authMessage ? (
+          <p
+            className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"
+            role="status"
+          >
+            {authMessage}
+          </p>
+        ) : null}
 
         <p className="sr-only" aria-live="polite">
           {liveMessage || panelLoadingText}

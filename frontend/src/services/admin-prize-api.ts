@@ -9,7 +9,7 @@ import type {
   AdminPrizeResponse,
   AdminSummaryResponse,
 } from '../types';
-import { getAdminAccessToken } from './cognito-auth';
+import { expireAdminSession, getAdminAccessToken } from './cognito-auth';
 
 export class AdminApiError extends Error {
   public readonly statusCode?: number;
@@ -47,6 +47,9 @@ const request = async (path: string, init: RequestInit): Promise<AdminPrizeRespo
 
     if (response.ok === false) {
       if (response.status === 401 || response.status === 403) {
+        if (response.status === 401) {
+          expireAdminSession();
+        }
         throw new AdminApiError('Your admin session is no longer authorized.', response.status);
       }
       throw new AdminApiError('We could not complete the admin request.', response.status);

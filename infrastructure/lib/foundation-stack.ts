@@ -306,7 +306,7 @@ export class FoundationStack extends Stack {
     });
 
     new CfnOutput(this, 'AdminCognitoDomain', {
-      value: adminDomain.domainName,
+      value: `https://${adminDomain.domainName}.auth.${this.region}.amazoncognito.com`,
     });
 
     new CfnOutput(this, 'DrawsTableName', {

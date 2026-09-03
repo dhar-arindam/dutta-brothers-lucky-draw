@@ -16,6 +16,9 @@ permissions:
 jobs:
   ci:
     uses: ./.github/workflows/ci.yml
+    with:
+      cognito_domain: ${{ vars.STAGING_COGNITO_DOMAIN }}
+      cognito_client_id: ${{ vars.STAGING_COGNITO_CLIENT_ID }}
 
   deploy-staging:
     needs: ci

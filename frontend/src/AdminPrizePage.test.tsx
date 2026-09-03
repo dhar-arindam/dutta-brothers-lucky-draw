@@ -106,6 +106,23 @@ describe('admin operations page', () => {
     expect(screen.getAllByText('Amit Das').length).toBeGreaterThan(0);
   });
 
+  it('shows an authentication recovery message', async () => {
+    enqueueDashboardSuccess();
+    vi.stubGlobal('fetch', mockFetch);
+
+    render(
+      <AdminPrizePage
+        isAuthenticated={false}
+        authMessage="Your admin session expired. Please sign in again."
+      />,
+    );
+    await waitForAutoLoad();
+
+    expect(
+      screen.getByText('Your admin session expired. Please sign in again.'),
+    ).toBeInTheDocument();
+  });
+
   it('persists the selected theme and restores it on a later render', async () => {
     enqueueDashboardSuccess();
     vi.stubGlobal('fetch', mockFetch);

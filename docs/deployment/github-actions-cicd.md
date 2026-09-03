@@ -49,18 +49,22 @@ Required GitHub repository variables:
 
 - `AWS_ACCOUNT_ID` — the target AWS account. Workflows fail before any stack-changing command if this is unset or does not match the assumed role's account.
 
-Required GitHub environment variables:
+Required GitHub repository variables (available to reusable CI workflow calls):
 
 - staging environment:
   - `AWS_ROLE_ARN_STAGING`
   - `STAGING_FRONTEND_ORIGIN`
+  - `STAGING_COGNITO_DOMAIN`
+  - `STAGING_COGNITO_CLIENT_ID`
 - production environment:
   - `AWS_ROLE_ARN_PRODUCTION`
   - `PRODUCTION_FRONTEND_ORIGIN`
+  - `PRODUCTION_COGNITO_DOMAIN`
+  - `PRODUCTION_COGNITO_CLIENT_ID`
 
 Admin Cognito configuration:
 
-- The frontend build must receive `VITE_COGNITO_DOMAIN` and `VITE_COGNITO_CLIENT_ID` for the target stage.
+- The frontend build must receive `VITE_COGNITO_DOMAIN` and `VITE_COGNITO_CLIENT_ID` for the target stage through the `STAGING_*` or `PRODUCTION_*` repository variables.
 - `VITE_COGNITO_DOMAIN` is the Cognito Managed Login domain created by the CDK stack.
 - `VITE_COGNITO_CLIENT_ID` is the public SPA app-client ID created by the CDK stack.
 - These values are identifiers, not secrets. The Cognito app client has no client secret.

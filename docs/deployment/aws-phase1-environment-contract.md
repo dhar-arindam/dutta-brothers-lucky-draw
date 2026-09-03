@@ -79,7 +79,7 @@ The CDK application requires `stage` and stage-specific context values.
 2. AWS credentials target the intended account and region.
 3. Bootstrap for CDK is completed in the target account/region.
 4. `frontend/dist` is built before synth/deploy.
-5. Deployment runbooks include Admin V1 no-auth access verification.
+5. Deployment runbooks include Cognito Admin login and protected-route verification.
 6. Context values are provided for the target stage.
 
 ## 6. Promotion Runbook (Staging to Production)
@@ -88,17 +88,19 @@ The CDK application requires `stage` and stage-specific context values.
 2. Validate infrastructure tests and CDK synth in staging config.
 3. Deploy to staging account/environment.
 4. Verify:
+
 - customer draw success and duplicate behavior
-- admin direct-access behavior with no login/token/session flow
+- Admin login, logout, token expiry, and protected-route behavior
 - CORS preflight and browser calls through CloudFront `/api/*`
 - API throttling and access logs are emitted
+
 5. Review staging logs and error rates.
-6. Confirm production context values and admin no-auth operational checks.
+6. Confirm production context values and Cognito Admin operational checks.
 7. Deploy production stack with `stage=prod` and production context values.
 8. Run production smoke tests for customer draw and admin endpoints.
 
 ## 7. Non-goals
 
 - No change to product behavior or business rules.
-- Admin V1 remains intentionally no-auth by approved specification.
+- Admin V1 uses Cognito local-user authentication with no MFA and no external identity provider.
 - No multi-service or microservice split.

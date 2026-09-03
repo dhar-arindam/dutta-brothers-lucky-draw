@@ -1,5 +1,9 @@
 # Dutta Brothers Festive Lucky Draw Architecture
 
+## Integrated design
+
+The cross-layer implementation design is documented in [integrated-solution-design.md](integrated-solution-design.md). It connects the approved customer, admin, API, data, backend, frontend, infrastructure, security, delivery, and verification decisions without introducing new product behaviour.
+
 > **Status:** Legacy planning document. Product behaviour is defined by the approved specifications in `/docs/specs`. This document must not override them; the bill-only participation rule and no-inventory rule in `/docs/specs/00-product/business-rules.md` take precedence.
 >
 > **Migration note:** Active customer reveal is now the festive gift box reveal. Historical envelope and wheel references in legacy documents are deprecated for active implementation guidance.
@@ -190,4 +194,4 @@ Before a feature is considered complete, verify:
 - [ADR-001: Server-authoritative prize selection and atomic uniqueness enforcement](ADR-001-authoritative-prize-selection.md)
 - [ADR-002: DynamoDB single-table design](ADR-002-dynamodb-single-table-design.md)
 - [ADR-003: Wheel as a visual reflection of backend result (historical)](ADR-003-wheel-visualization.md)
-- [ADR-004: Admin V1 operates at /admin with no authentication](ADR-004-private-admin-v1.md)
+- [ADR-004: Admin V1 uses Cognito local-user authentication](ADR-004-private-admin-v1.md)

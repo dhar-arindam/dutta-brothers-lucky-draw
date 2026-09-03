@@ -10,7 +10,9 @@ import {
   StackProps,
   Tags,
   aws_apigatewayv2 as apigwv2,
+  aws_apigatewayv2_authorizers as apigwv2Authorizers,
   aws_apigateway as apigw,
+  aws_cognito as cognito,
   aws_cloudfront as cloudfront,
   aws_cloudfront_origins as origins,
   aws_dynamodb as dynamodb,
@@ -30,6 +32,7 @@ export interface FoundationStackProps extends StackProps {
   frontendAllowedOrigin: string;
   apiThrottleRateLimit: number;
   apiThrottleBurstLimit: number;
+  cognitoDomainPrefix?: string;
 }
 
 export class FoundationStack extends Stack {
@@ -46,6 +49,7 @@ export class FoundationStack extends Stack {
     const stageName = props.stageName;
     const isProduction = stageName === 'prod';
     const frontendAllowedOrigin = props.frontendAllowedOrigin;
+    const cognitoDomainPrefix = props.cognitoDomainPrefix ?? `dutta-draw-admin-${stageName}`;
 
     const frontendBucket = new s3.Bucket(this, 'FrontendBucket', {
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
@@ -96,10 +100,58 @@ export class FoundationStack extends Stack {
 
     drawsTable.grantReadWriteData(apiFunction);
 
+    const adminUserPool = new cognito.UserPool(this, 'AdminUserPool', {
+      selfSignUpEnabled: false,
+      signInAliases: { username: true },
+      autoVerify: { email: true },
+      mfa: cognito.Mfa.OFF,
+      passwordPolicy: {
+        minLength: 6,
+        requireLowercase: true,
+        requireUppercase: true,
+        requireDigits: true,
+        requireSymbols: true,
+      },
+      removalPolicy: isProduction ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY,
+    });
+    const adminDomain = adminUserPool.addDomain('AdminDomain', {
+      cognitoDomain: { domainPrefix: cognitoDomainPrefix },
+    });
+    const adminDomainCfn = adminDomain.node.defaultChild as cognito.CfnUserPoolDomain;
+    adminDomainCfn.managedLoginVersion = 2;
+    const adminScope = new cognito.ResourceServerScope({
+      scopeName: 'admin',
+      scopeDescription: 'Access Admin operations.',
+    });
+    const adminResourceServer = adminUserPool.addResourceServer('AdminResourceServer', {
+      identifier: 'dutta-admin',
+      scopes: [adminScope],
+    });
+    const adminClient = adminUserPool.addClient('AdminWebClient', {
+      generateSecret: false,
+      preventUserExistenceErrors: true,
+      oAuth: {
+        flows: { authorizationCodeGrant: true },
+        scopes: [
+          cognito.OAuthScope.OPENID,
+          cognito.OAuthScope.EMAIL,
+          cognito.OAuthScope.PROFILE,
+          cognito.OAuthScope.resourceServer(adminResourceServer, adminScope),
+        ],
+        callbackUrls: [`${frontendAllowedOrigin}/admin`],
+        logoutUrls: [`${frontendAllowedOrigin}/admin`],
+      },
+    });
+    new cognito.CfnManagedLoginBranding(this, 'AdminManagedLoginBranding', {
+      clientId: adminClient.userPoolClientId,
+      userPoolId: adminUserPool.userPoolId,
+      useCognitoProvidedValues: true,
+    });
+
     const httpApi = new apigwv2.HttpApi(this, 'DrawApi', {
       createDefaultStage: false,
       corsPreflight: {
-        allowHeaders: ['content-type', 'idempotency-key'],
+        allowHeaders: ['content-type', 'idempotency-key', 'authorization'],
         allowMethods: [
           apigwv2.CorsHttpMethod.GET,
           apigwv2.CorsHttpMethod.POST,
@@ -143,6 +195,27 @@ export class FoundationStack extends Stack {
     });
 
     const integration = new HttpLambdaIntegration('ApiIntegration', apiFunction);
+    const adminAuthorizer = new apigwv2Authorizers.HttpJwtAuthorizer(
+      'AdminJwtAuthorizer',
+      adminUserPool.userPoolProviderUrl,
+      { jwtAudience: [adminClient.userPoolClientId] },
+    );
+
+    httpApi.addRoutes({
+      path: '/api/admin/{proxy+}',
+      methods: [apigwv2.HttpMethod.POST, apigwv2.HttpMethod.PATCH, apigwv2.HttpMethod.DELETE],
+      integration,
+      authorizer: adminAuthorizer,
+      authorizationScopes: ['dutta-admin/admin'],
+    });
+
+    httpApi.addRoutes({
+      path: '/api/admin/claims.csv',
+      methods: [apigwv2.HttpMethod.GET],
+      integration,
+      authorizer: adminAuthorizer,
+      authorizationScopes: ['dutta-admin/admin'],
+    });
 
     httpApi.addRoutes({
       path: '/api/{proxy+}',
@@ -222,6 +295,18 @@ export class FoundationStack extends Stack {
 
     new CfnOutput(this, 'ApiBaseUrl', {
       value: httpApi.apiEndpoint,
+    });
+
+    new CfnOutput(this, 'AdminUserPoolId', {
+      value: adminUserPool.userPoolId,
+    });
+
+    new CfnOutput(this, 'AdminUserPoolClientId', {
+      value: adminClient.userPoolClientId,
+    });
+
+    new CfnOutput(this, 'AdminCognitoDomain', {
+      value: `https://${adminDomain.domainName}.auth.${this.region}.amazoncognito.com`,
     });
 
     new CfnOutput(this, 'DrawsTableName', {

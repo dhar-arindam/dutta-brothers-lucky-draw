@@ -11,6 +11,12 @@ This document defines the initial API contract conceptually. It is not an implem
 
 The Principal Software Engineer must review and approve this contract before API implementation.
 
+## Admin Authentication
+
+Admin mutation and export endpoints require a Cognito User Pool access token in the `Authorization: Bearer <token>` header. Admin read endpoints remain available without login. The User Pool contains locally managed users only; Google federation and MFA are not enabled in V1. API Gateway validates the token using a native JWT authorizer before invoking the backend.
+
+Unauthenticated or invalid-token requests return `401 Unauthorized`. Authenticated users without the required Admin scope return `403 Forbidden`. The customer `POST /api/draw` endpoint remains public.
+
 ## Customer API
 
 ### POST `/api/draw`
@@ -220,10 +226,7 @@ Error responses must use a consistent machine-readable shape and must not expose
 
 ## Admin APIs
 
-V1 admin APIs do not require authentication for shop-owner operation in this phase.
-
-- V1 has no login, token, token header authentication, cookie authentication, session, Cognito, OIDC, OAuth, SSO, JWT, or authentication bootstrap.
-- Customer endpoints remain separate from admin endpoints by route.
+V1 Admin mutation and export APIs require a Cognito access token with the Admin scope; read APIs remain public read-only endpoints. Cognito users are managed locally in AWS; Google federation and MFA are not enabled. Customer endpoints remain separate from admin endpoints by route, and `POST /api/draw` remains public.
 
 ### `GET /api/admin/claims`
 

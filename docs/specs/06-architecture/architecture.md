@@ -74,7 +74,9 @@ DynamoDB
 - IAM permissions follow least privilege.
 - All taggable AWS resources created by CDK must include tags `project=lucky-draw` and `organization=dutta-brothers`.
 - Customer PII is masked in admin responses and exports.
-- V1 has no authentication model for admin routes or admin APIs (no login/token header auth/cookie auth/session/Cognito/OIDC/OAuth/SSO/JWT/bootstrap).
+- Admin mutation/export routes use an Amazon Cognito User Pool with local AWS-managed users, OAuth2 Authorization Code + PKCE, and no MFA in V1; Admin read routes remain public read-only endpoints.
+- Google and other external identity providers are not configured.
+- API Gateway uses a native JWT authorizer for `/api/admin/*`; `/api/draw` remains public.
 - Campaign dates use `Asia/Kolkata`; APIs use ISO 8601 UTC timestamps where time values are returned and the backend is authoritative for campaign-period enforcement.
 
 ## Frontend Isolation Constraint

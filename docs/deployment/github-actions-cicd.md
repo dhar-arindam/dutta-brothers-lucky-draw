@@ -49,7 +49,7 @@ Required GitHub repository variables:
 
 - `AWS_ACCOUNT_ID` — the target AWS account. Workflows fail before any stack-changing command if this is unset or does not match the assumed role's account.
 
-Required GitHub environment variables:
+Required GitHub repository variables (available to reusable CI workflow calls):
 
 - staging environment:
   - `AWS_ROLE_ARN_STAGING`
@@ -57,6 +57,14 @@ Required GitHub environment variables:
 - production environment:
   - `AWS_ROLE_ARN_PRODUCTION`
   - `PRODUCTION_FRONTEND_ORIGIN`
+
+Admin Cognito configuration:
+
+- Deployment resolves `AdminCognitoDomain` and `AdminUserPoolClientId` from the deployed CloudFormation stack outputs and rebuilds the frontend asset with those values before the final asset deployment.
+- `VITE_COGNITO_DOMAIN` and `VITE_COGNITO_CLIENT_ID` are derived build-time values and do not need to be manually maintained as GitHub variables.
+- These values are identifiers, not secrets. The Cognito app client has no client secret.
+- Provision exactly two local Cognito users after stack creation. Do not enable MFA or configure Google federation in V1.
+- Never place user passwords in repository variables, source files, CDK context, or build artifacts.
 
 Reference trust policy templates are provided in `docs/deployment/aws-oidc-role-trust-policy-examples.json`. Replace `<AWS_ACCOUNT_ID>` with the real account when applying them.
 

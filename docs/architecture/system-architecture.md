@@ -344,8 +344,9 @@ and the persisted claim can never disagree.
 
 ## 9. Admin flows
 
-Admin V1 has no token authentication; access is controlled by keeping the route private
-(see `docs/architecture/ADR-004-private-admin-v1.md`).
+Admin V1 exposes public read-only Admin data and uses Cognito local-user Managed Login
+with OAuth2 Authorization Code + PKCE and no MFA for edits and exports. API Gateway's
+native JWT authorizer protects Admin mutation/export routes; the customer draw endpoint remains public.
 
 ### Dashboard load and claims paging
 

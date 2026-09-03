@@ -6,7 +6,7 @@
 >
 > **Migration note:** Active customer flow is `LANDING -> FORM -> ANTICIPATION -> BOX_REVEAL -> RESULT`. Gift box reveal is the active presentation mechanism; envelope and wheel reveal guidance is historical/deprecated.
 
-> **Admin V1 supersession note:** Any legacy references in this guide to private/token-based admin access are superseded by the approved no-auth Admin V1 model. Tailwind CSS constraints for Admin-only scope are defined by current `/docs/specs` and must not alter customer UI.
+> **Admin V1 note:** Admin reads are public read-only; edits and exports use Cognito-managed local users with Managed Login OAuth2 Authorization Code + PKCE and no MFA. Tailwind CSS constraints for Admin-only scope are defined by current `/docs/specs` and must not alter customer UI.
 
 ## 1. Scope and responsibilities
 

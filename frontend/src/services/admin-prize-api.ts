@@ -9,11 +9,15 @@ import type {
   AdminPrizeResponse,
   AdminSummaryResponse,
 } from '../types';
+import { expireAdminSession, getAdminAccessToken } from './cognito-auth';
 
 export class AdminApiError extends Error {
-  public constructor(message: string) {
+  public readonly statusCode?: number;
+
+  public constructor(message: string, statusCode?: number) {
     super(message);
     this.name = 'AdminApiError';
+    this.statusCode = statusCode;
   }
 }
 
@@ -26,14 +30,30 @@ const request = async (path: string, init: RequestInit): Promise<AdminPrizeRespo
   }, REQUEST_TIMEOUT_MS);
 
   try {
+    const accessToken = getAdminAccessToken();
+    const headers: Record<string, string> = {
+      'content-type': 'application/json',
+      ...(init.headers as Record<string, string> | undefined),
+    };
+    if (accessToken) {
+      headers.authorization = `Bearer ${accessToken}`;
+    }
+
     const response = await fetch(path, {
       ...init,
-      headers: {
-        'content-type': 'application/json',
-        ...(init.headers ?? {}),
-      },
+      headers,
       signal: abortController.signal,
     });
+
+    if (response.ok === false) {
+      if (response.status === 401 || response.status === 403) {
+        if (response.status === 401) {
+          expireAdminSession();
+        }
+        throw new AdminApiError('Your admin session is no longer authorized.', response.status);
+      }
+      throw new AdminApiError('We could not complete the admin request.', response.status);
+    }
 
     const body = (await response.json()) as Partial<AdminPrizeResponse>;
     if (!body || typeof body !== 'object' || typeof body.status !== 'string') {
@@ -41,7 +61,10 @@ const request = async (path: string, init: RequestInit): Promise<AdminPrizeRespo
     }
 
     return body as AdminPrizeResponse;
-  } catch {
+  } catch (error) {
+    if (error instanceof AdminApiError) {
+      throw error;
+    }
     throw new AdminApiError('We could not complete the admin request. Please try again.');
   } finally {
     clearTimeout(timeoutHandle);
@@ -55,18 +78,34 @@ const requestText = async (path: string, init: RequestInit): Promise<string> => 
   }, REQUEST_TIMEOUT_MS);
 
   try {
+    const accessToken = getAdminAccessToken();
+    const headers: Record<string, string> = {
+      ...(init.headers as Record<string, string> | undefined),
+    };
+    if (accessToken) {
+      headers.authorization = `Bearer ${accessToken}`;
+    }
+
     const response = await fetch(path, {
       ...init,
-      headers: init.headers,
+      headers,
       signal: abortController.signal,
     });
 
     if (!response.ok) {
-      throw new AdminApiError('We could not complete the admin request. Please try again.');
+      throw new AdminApiError(
+        response.status === 401 || response.status === 403
+          ? 'Your admin session is no longer authorized.'
+          : 'We could not complete the admin request. Please try again.',
+        response.status,
+      );
     }
 
     return response.text();
-  } catch {
+  } catch (error) {
+    if (error instanceof AdminApiError) {
+      throw error;
+    }
     throw new AdminApiError('We could not complete the admin request. Please try again.');
   } finally {
     clearTimeout(timeoutHandle);

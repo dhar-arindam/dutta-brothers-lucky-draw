@@ -18,3 +18,16 @@ main[aria-label='Admin operations page']
 main[aria-label='Admin operations page'] :where(button:disabled, input:disabled, select:disabled) {
   cursor: not-allowed;
 }
+
+main.admin-light [class*='border-[#c79f32]'],
+main.admin-light [class*='border-[#d4af37]'] {
+  border-color: #d9e2ec !important;
+}
+
+main.admin-light [class*='bg-[#f3e9d7]'],
+main.admin-light [class*='bg-[#f7efdf]'],
+main.admin-light [class*='bg-[#f5ecdb]'],
+main.admin-light [class*='bg-[#ecdfc7]'],
+main.admin-light [class*='bg-[#f8f1e4]'] {
+  background-color: #ffffff !important;
+}

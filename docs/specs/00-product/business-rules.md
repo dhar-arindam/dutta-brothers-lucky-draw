@@ -292,11 +292,12 @@ Transient contention while atomically creating a claim and updating aggregates m
 
 ## BR-012 — Admin Access Model (V1)
 
-V1 admin route and admin APIs do not require authentication.
+V1 Admin read APIs allow read-only access without login; Admin mutation and export APIs require Cognito local-user authentication. The customer draw API remains public. Cognito MFA and external identity providers are disabled in V1.
 
-- No login, token entry, token-header auth, session, cookie-based auth, Cognito, OIDC, OAuth, SSO, JWT, or authentication bootstrap is used in V1.
-- The admin page opens directly to operational content.
-- Admin API calls are processed without authentication checks.
+- Admin login uses Cognito Hosted UI with OAuth2 Authorization Code + PKCE.
+- Cognito users are managed locally in AWS; Google and other external identity providers are not configured.
+- MFA is disabled for the two V1 Admin users.
+- Admin mutation and export calls require a Cognito access token and Admin scope.
 - Business validation and backend-authoritative draw rules remain mandatory.
 
 ## BR-013 — Prize Given Count and Claims Drill-Down

@@ -17,6 +17,7 @@ const mockFetch = vi.fn();
 describe('admin prize api client', () => {
   afterEach(() => {
     vi.clearAllMocks();
+    sessionStorage.clear();
     vi.unstubAllGlobals();
   });
 
@@ -36,6 +37,28 @@ describe('admin prize api client', () => {
         headers: expect.objectContaining({
           'content-type': 'application/json',
         }),
+      }),
+    );
+  });
+
+  it('adds the Cognito access token to Admin requests', async () => {
+    sessionStorage.setItem(
+      'dutta-draw-admin-auth',
+      JSON.stringify({ accessToken: 'access-token', expiresAt: Date.now() + 60_000 }),
+    );
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ status: 'SUCCESS', items: [] }),
+    });
+    vi.stubGlobal('fetch', mockFetch);
+
+    await listAdminPrizes();
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      '/api/admin/prizes',
+      expect.objectContaining({
+        headers: expect.objectContaining({ authorization: 'Bearer access-token' }),
       }),
     );
   });

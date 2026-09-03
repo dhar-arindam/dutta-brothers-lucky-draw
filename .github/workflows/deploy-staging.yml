@@ -118,6 +118,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          COGNITO_DOMAIN="$(aws cloudformation describe-stacks --stack-name "${STAGING_STACK_NAME}" --query "Stacks[0].Outputs[?OutputKey=='AdminCognitoDomain'].OutputValue" --output text)"
+          COGNITO_CLIENT_ID="$(aws cloudformation describe-stacks --stack-name "${STAGING_STACK_NAME}" --query "Stacks[0].Outputs[?OutputKey=='AdminUserPoolClientId'].OutputValue" --output text)"
+          test -n "$COGNITO_DOMAIN" && test "$COGNITO_DOMAIN" != "None"
+          test -n "$COGNITO_CLIENT_ID" && test "$COGNITO_CLIENT_ID" != "None"
+          export VITE_COGNITO_DOMAIN="$COGNITO_DOMAIN"
+          export VITE_COGNITO_CLIENT_ID="$COGNITO_CLIENT_ID"
+          npm run build --workspace frontend
+          npm run cdk:deploy:staging -- --context frontendOriginStaging="${{ steps.frontend-origin.outputs.origin }}" --require-approval never
           FRONTEND_DOMAIN="$(aws cloudformation describe-stacks --stack-name "${STAGING_STACK_NAME}" --query "Stacks[0].Outputs[?OutputKey=='CloudFrontDistributionDomainName'].OutputValue" --output text)"
           API_BASE_URL="$(aws cloudformation describe-stacks --stack-name "${STAGING_STACK_NAME}" --query "Stacks[0].Outputs[?OutputKey=='ApiBaseUrl'].OutputValue" --output text)"
           echo "staging_frontend_url=https://${FRONTEND_DOMAIN}" >> "$GITHUB_OUTPUT"

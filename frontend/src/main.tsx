@@ -16,11 +16,12 @@ createRoot(rootElement).render(
   <StrictMode>
     {window.location.pathname === '/admin' ? (
       <AdminAuthGate>
-        {(isAuthenticated, onSignIn, onSignOut) => (
+        {(isAuthenticated, onSignIn, onSignOut, authMessage) => (
           <AdminPrizePage
             isAuthenticated={isAuthenticated}
             onSignIn={onSignIn}
             onSignOut={onSignOut}
+            authMessage={authMessage}
           />
         )}
       </AdminAuthGate>

@@ -1,6 +1,7 @@
 import * as cdk from 'aws-cdk-lib';
 
 import { FoundationStack } from '../lib/foundation-stack.js';
+import { validateFrontendOrigin } from '../lib/config-validation.js';
 
 const app = new cdk.App();
 
@@ -16,11 +17,7 @@ const stageName: DeploymentStage = stageValue;
 const stageSuffix = stageName.charAt(0).toUpperCase() + stageName.slice(1);
 const frontendOrigin = app.node.tryGetContext(`frontendOrigin${stageSuffix}`);
 
-if (typeof frontendOrigin !== 'string' || frontendOrigin.trim().length === 0) {
-  throw new Error(`Context "frontendOrigin${stageSuffix}" is required for stage "${stageName}".`);
-}
-
-const frontendAllowedOrigin = frontendOrigin.trim();
+const frontendAllowedOrigin = validateFrontendOrigin(frontendOrigin, stageSuffix);
 const isLocalOrigin = /^(https?:\/\/)(localhost|127\.0\.0\.1)(:\d+)?$/i.test(frontendAllowedOrigin);
 
 if (stageName === 'prod' && isLocalOrigin) {

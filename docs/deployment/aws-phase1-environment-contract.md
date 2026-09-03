@@ -41,6 +41,7 @@ The CDK application requires `stage` and stage-specific context values.
 ### Guardrails
 
 - `frontendOrigin<Stage>` must be non-empty for the selected stage.
+- `frontendOrigin<Stage>` must be a real HTTP(S) origin; reserved placeholder domains such as `example.invalid` and `bootstrap-placeholder.invalid` fail CDK synth.
 - `stage=prod` must not use localhost or 127.0.0.1 origins.
 - Throttling values must be positive numbers.
 
@@ -80,7 +81,7 @@ The CDK application requires `stage` and stage-specific context values.
 3. Bootstrap for CDK is completed in the target account/region.
 4. `frontend/dist` is built before synth/deploy.
 5. Deployment runbooks include Cognito Admin login and protected-route verification.
-6. Context values are provided for the target stage.
+6. Real context values are provided for the target stage; placeholder origins are rejected before synth/deploy.
 
 ## 6. Promotion Runbook (Staging to Production)
 

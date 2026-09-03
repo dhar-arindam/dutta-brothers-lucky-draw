@@ -85,16 +85,8 @@ jobs:
             echo "bootstrap=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          # No configured origin: reuse the CloudFront domain from an existing stack, or fall back to a
-          # fail-closed placeholder on a true first deploy (real domain is unknown until the stack exists).
-          EXISTING_DOMAIN="$(aws cloudformation describe-stacks --stack-name "${STAGING_STACK_NAME}" --query "Stacks[0].Outputs[?OutputKey=='CloudFrontDistributionDomainName'].OutputValue" --output text 2>/dev/null || true)"
-          if [ -n "$EXISTING_DOMAIN" ] && [ "$EXISTING_DOMAIN" != "None" ]; then
-            echo "origin=https://${EXISTING_DOMAIN}" >> "$GITHUB_OUTPUT"
-            echo "bootstrap=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "origin=https://bootstrap-placeholder.invalid" >> "$GITHUB_OUTPUT"
-            echo "bootstrap=true" >> "$GITHUB_OUTPUT"
-          fi
+          echo "STAGING_FRONTEND_ORIGIN must be configured before deployment"
+          exit 1
 
       - name: CDK synth (staging)
         run: npm run cdk:synth:staging -- --context frontendOriginStaging=${{ steps.frontend-origin.outputs.origin }}
@@ -104,14 +96,6 @@ jobs:
 
       - name: Deploy staging stack
         run: npm run cdk:deploy:staging -- --context frontendOriginStaging=${{ steps.frontend-origin.outputs.origin }} --require-approval never
-
-      - name: Finalize CORS origin after bootstrap deploy
-        if: steps.frontend-origin.outputs.bootstrap == 'true'
-        shell: bash
-        run: |
-          set -euo pipefail
-          REAL_DOMAIN="$(aws cloudformation describe-stacks --stack-name "${STAGING_STACK_NAME}" --query "Stacks[0].Outputs[?OutputKey=='CloudFrontDistributionDomainName'].OutputValue" --output text)"
-          npm run cdk:deploy:staging -- --context frontendOriginStaging="https://${REAL_DOMAIN}" --require-approval never
 
       - name: Resolve staging endpoints
         id: resolve-endpoints

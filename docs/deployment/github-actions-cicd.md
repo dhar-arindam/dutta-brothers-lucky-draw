@@ -58,6 +58,15 @@ Required GitHub environment variables:
   - `AWS_ROLE_ARN_PRODUCTION`
   - `PRODUCTION_FRONTEND_ORIGIN`
 
+Admin Cognito configuration:
+
+- The frontend build must receive `VITE_COGNITO_DOMAIN` and `VITE_COGNITO_CLIENT_ID` for the target stage.
+- `VITE_COGNITO_DOMAIN` is the Cognito Managed Login domain created by the CDK stack.
+- `VITE_COGNITO_CLIENT_ID` is the public SPA app-client ID created by the CDK stack.
+- These values are identifiers, not secrets. The Cognito app client has no client secret.
+- Provision exactly two local Cognito users after stack creation. Do not enable MFA or configure Google federation in V1.
+- Never place user passwords in repository variables, source files, CDK context, or build artifacts.
+
 Reference trust policy templates are provided in `docs/deployment/aws-oidc-role-trust-policy-examples.json`. Replace `<AWS_ACCOUNT_ID>` with the real account when applying them.
 
 No `AWS_ACCESS_KEY_ID` or `AWS_SECRET_ACCESS_KEY` secrets are required.

@@ -86,6 +86,12 @@ describe('foundation stack aws configuration', () => {
     template.resourceCountIs('AWS::S3::Bucket', 1);
     template.resourceCountIs('AWS::CloudFront::Distribution', 1);
     template.resourceCountIs('AWS::ApiGatewayV2::Api', 1);
+    template.resourceCountIs('AWS::Cognito::UserPool', 1);
+    template.resourceCountIs('AWS::Cognito::UserPoolClient', 1);
+    template.resourceCountIs('AWS::Cognito::ManagedLoginBranding', 1);
+    template.hasResourceProperties('AWS::Cognito::UserPoolDomain', {
+      ManagedLoginVersion: 2,
+    });
     expect(
       Object.keys(template.findResources('AWS::Lambda::Function')).length,
     ).toBeGreaterThanOrEqual(2);
@@ -122,7 +128,7 @@ describe('foundation stack aws configuration', () => {
     template.hasResourceProperties('AWS::ApiGatewayV2::Api', {
       CorsConfiguration: Match.objectLike({
         AllowOrigins: [context.frontendOriginStaging],
-        AllowHeaders: Match.arrayWith(['content-type', 'idempotency-key']),
+        AllowHeaders: Match.arrayWith(['content-type', 'idempotency-key', 'authorization']),
       }),
     });
 
@@ -133,6 +139,23 @@ describe('foundation stack aws configuration', () => {
 
     template.hasResourceProperties('AWS::ApiGatewayV2::Route', {
       RouteKey: 'DELETE /api/{proxy+}',
+      AuthorizationType: 'NONE',
+    });
+
+    template.hasResourceProperties('AWS::ApiGatewayV2::Route', {
+      RouteKey: 'POST /api/admin/{proxy+}',
+      AuthorizationType: 'JWT',
+      AuthorizationScopes: ['dutta-admin/admin'],
+    });
+
+    template.hasResourceProperties('AWS::ApiGatewayV2::Route', {
+      RouteKey: 'GET /api/admin/claims.csv',
+      AuthorizationType: 'JWT',
+      AuthorizationScopes: ['dutta-admin/admin'],
+    });
+
+    template.hasResourceProperties('AWS::ApiGatewayV2::Route', {
+      RouteKey: 'GET /api/{proxy+}',
       AuthorizationType: 'NONE',
     });
   }, 30000);

@@ -11,24 +11,20 @@ Reason: Align Admin V1 with destructive operations and responsive controls
 
 Route: `/admin`
 
-Admin V1 intentionally has no authentication and no identity bootstrap.
+Admin V1 provides read-only operational access without login and requires Cognito-managed local-user authentication with no MFA for edits and exports.
 
 The admin page has:
 
-- no login
-- no token entry
-- no token-based authentication
-- no cookie-based authentication
-- no session
-- no Cognito
-- no OIDC
-- no SSO
-- no JWT
-- no authentication bootstrap
+- Cognito Hosted UI login using OAuth2 Authorization Code + PKCE
+- logout and expired-session handling
+- no Google or other external identity provider
+- no MFA in V1
+- no custom password form in the application
 
 Admin UX access requirements:
 
-- The admin page opens directly to operational content.
+- The `/admin` static route and read-only operational data may load without authentication.
+- Unauthenticated users see a sign-in action and cannot edit configuration, delete claims, clear claims, or export data.
 - The page loads admin data automatically on route load.
 - There is no separate dashboard landing step.
 
@@ -378,4 +374,4 @@ Touch targets should be approximately 44px or greater where practical.
 - The admin can view prize `Given` counts (successful claims only).
 - Admin summary and claims report remain usable at 360px, 375px, 390px, and 430px.
 - No inventory management is present.
-- Admin UI opens directly with no authentication step in V1.
+- Admin UI shows operational data without login and enables editing and export after successful Cognito authentication.

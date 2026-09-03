@@ -31,7 +31,7 @@ The system contains two core experiences:
 - **Relative prize weights:** Prizes use relative weighted selection, not percentage allocation
 - **Backend-driven:** Prize selection occurs server-side; frontend only visualizes the result
 - **Simple operations:** Minimal admin requirements with direct admin access in V1
-- **Admin UX simplicity:** Admin page opens directly without login, token, or session workflow
+- **Admin access:** Admin page uses Cognito-managed local users with no MFA in V1
 - **Festive theme:** Durga Puja + Diwali design direction for premium, celebratory aesthetic
 
 ## Business Context

@@ -46,7 +46,7 @@ Canonical staged journey:
 6. Admin filters/searches claims and views paginated results.
 7. Admin exports claims CSV with approved masked fields.
 
-Admin V1 has no login, token entry, session, or identity bootstrap.
+Admin V1 uses Cognito Hosted UI login, logout, and expired-session handling. It has no Google federation and no MFA in V1.
 
 ## 2. Page hierarchy
 

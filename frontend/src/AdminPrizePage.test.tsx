@@ -88,7 +88,38 @@ describe('admin operations page', () => {
   afterEach(() => {
     vi.clearAllMocks();
     vi.resetAllMocks();
+    window.localStorage.clear();
     vi.unstubAllGlobals();
+  });
+
+  it('keeps Admin readable while signed out and disables mutations and export', async () => {
+    enqueueDashboardSuccess();
+    vi.stubGlobal('fetch', mockFetch);
+
+    render(<AdminPrizePage isAuthenticated={false} onSignIn={vi.fn()} />);
+    await waitForAutoLoad();
+
+    expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Add Prize' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Export Data' })).toBeDisabled();
+    expect(screen.getAllByText('Amit Das').length).toBeGreaterThan(0);
+  });
+
+  it('persists the selected theme and restores it on a later render', async () => {
+    enqueueDashboardSuccess();
+    vi.stubGlobal('fetch', mockFetch);
+
+    const firstRender = render(<AdminPrizePage />);
+    await waitForAutoLoad();
+    fireEvent.click(screen.getByRole('button', { name: 'Switch to Dark' }));
+    expect(window.localStorage.getItem('dutta-draw-admin-theme')).toBe('dark');
+    firstRender.unmount();
+
+    enqueueDashboardSuccess();
+    render(<AdminPrizePage />);
+    await waitForAutoLoad();
+    expect(screen.getByRole('button', { name: 'Switch to Light' })).toBeInTheDocument();
   });
 
   it('loads admin data automatically without authentication step', async () => {

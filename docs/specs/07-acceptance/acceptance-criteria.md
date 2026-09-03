@@ -187,9 +187,15 @@ These criteria define the Definition of Done for the initial product scope.
 
 ## 8. Security
 
-- [ ] Admin route and admin APIs do not require authentication in V1.
-- [ ] Admin page opens directly without login or token entry UI.
-- [ ] No token header authentication, session, cookie-based auth, Cognito, OIDC, OAuth, SSO, JWT, or authentication bootstrap is introduced for V1 admin access.
+- [ ] Admin route and read-only Admin data load without authentication.
+- [ ] Admin login uses Cognito Hosted UI with OAuth2 Authorization Code + PKCE.
+- [ ] Cognito users are managed locally in AWS; Google and other external identity providers are not configured.
+- [ ] MFA is disabled for the two V1 Admin users.
+- [ ] Admin API requests send a Cognito access token using the `Authorization: Bearer` header.
+- [ ] Without a valid Cognito session, edit, delete, clear-all, and CSV export controls are disabled.
+- [ ] After successful Cognito login, edit, delete, clear-all, and CSV export controls are enabled.
+- [ ] Missing or invalid Admin tokens return `401`; authenticated users without the required scope return `403`.
+- [ ] `/api/draw` remains public and does not require Cognito authentication.
 - [ ] No customer endpoint behavior or business-critical draw rule depends on client-side trust.
 - [ ] Lambda receives only the minimum scoped permissions required for runtime responsibilities.
 - [ ] All taggable AWS resources created by CDK include tags `project=lucky-draw` and `organization=dutta-brothers`.

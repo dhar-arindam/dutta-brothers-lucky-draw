@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
 import { AdminPrizePage } from './AdminPrizePage';
+import { AdminAuthGate } from './AdminAuthGate';
 import { App } from './App';
 import './styles.css';
 
@@ -12,5 +13,19 @@ if (!rootElement) {
 }
 
 createRoot(rootElement).render(
-  <StrictMode>{window.location.pathname === '/admin' ? <AdminPrizePage /> : <App />}</StrictMode>,
+  <StrictMode>
+    {window.location.pathname === '/admin' ? (
+      <AdminAuthGate>
+        {(isAuthenticated, onSignIn, onSignOut) => (
+          <AdminPrizePage
+            isAuthenticated={isAuthenticated}
+            onSignIn={onSignIn}
+            onSignOut={onSignOut}
+          />
+        )}
+      </AdminAuthGate>
+    ) : (
+      <App />
+    )}
+  </StrictMode>,
 );

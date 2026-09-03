@@ -7,7 +7,7 @@ Specifications are the source of truth for product behaviour.
 
 Active customer reveal: Festive Gift Box Reveal.
 
-Active Admin V1 model: direct `/admin` operational page with no authentication and no token/session bootstrap.
+Active Admin V1 model: `/admin` operational page with public read-only access and Cognito-managed local users for edits and exports, using OAuth2 Authorization Code + PKCE and no MFA.
 
 Admin V1 supports explicitly confirmed deletion of individual claims and clearing all claims. These operations are destructive and update claim-derived aggregates consistently.
 

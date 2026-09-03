@@ -1,7 +1,7 @@
-# ADR-004: Admin V1 operates at /admin with no authentication
+# ADR-004: Admin V1 uses Cognito local-user authentication
 
 - Status: APPROVED
-- Date: 2026-08-19
+- Date: 2026-09-03
 - Owner: Principal Software Engineer
 
 ## Context
@@ -13,7 +13,9 @@ Approved V1 behavior:
 - Route: `/admin`
 - Admin page loads operational content directly
 - No separate dashboard landing step
-- No authentication or identity bootstrap in V1
+- Cognito-managed local users authenticate through the Hosted UI
+- OAuth2 Authorization Code + PKCE is used for the browser client
+- MFA is disabled for the two V1 Admin users
 
 This decision is aligned with:
 
@@ -24,19 +26,11 @@ This decision is aligned with:
 
 ## Decision
 
-Admin V1 intentionally does not include app-level authentication.
+Admin V1 uses Amazon Cognito for app-level authentication.
 
-There is no:
+There is no Google federation, custom password form, or MFA in V1.
 
-- login
-- token entry
-- token-header authentication
-- cookie/session authentication
-- Cognito
-- OIDC
-- OAuth/SSO
-- JWT
-- authentication bootstrap
+The Cognito access token is sent to API Gateway as a Bearer token. A native API Gateway JWT authorizer protects `/api/admin/*`; `/api/draw` remains public.
 
 Customer and admin concerns remain separated by route and endpoint paths.
 
@@ -46,23 +40,24 @@ Backend validation and business-rule enforcement remain mandatory and authoritat
 
 ### Positive
 
-- Faster and simpler operations for V1 shop-owner workflows.
-- Reduced UX friction for campaign management tasks.
-- Lower delivery complexity for the seasonal scope.
+- Managed user lifecycle without Google or a custom identity system.
+- Native API Gateway JWT validation without a Lambda authorizer.
+- Admin API is protected while the customer draw remains public.
 
 ### Trade-offs
 
-- Admin route is not protected by app-level identity in V1.
+- Admin users must be provisioned and removed in Cognito.
+- Lost or expired sessions require a new Hosted UI login.
 - Operational environments must still enforce standard platform controls (explicit CORS, least-privilege IAM, request limits, monitoring).
 - This ADR does not weaken backend business validation or data integrity controls.
 
 ## Non-goals for V1
 
-- Identity providers or account systems.
-- Session lifecycle management.
-- Role/permission matrices.
-- Authentication bootstrap flows.
+- Google or other external identity federation.
+- MFA.
+- Role/permission matrices beyond the Admin scope.
+- Custom password or token bootstrap flows.
 
 ## Notes
 
-This ADR defines the final Admin V1 access model and supersedes any prior draft text that referenced token-based V1 admin access.
+This ADR defines the final Admin V1 access model and supersedes the previous unauthenticated decision.

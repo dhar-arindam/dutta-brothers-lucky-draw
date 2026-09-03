@@ -80,8 +80,24 @@ const defaultFilters: ClaimsFilters = {
   to: '',
 };
 
-export const AdminPrizePage = () => {
-  const [isLightTheme, setIsLightTheme] = useState(true);
+interface AdminPrizePageProps {
+  isAuthenticated?: boolean;
+  onSignIn?: () => void;
+  onSignOut?: () => void;
+}
+
+export const AdminPrizePage = ({
+  isAuthenticated = true,
+  onSignIn,
+  onSignOut,
+}: AdminPrizePageProps) => {
+  const [isLightTheme, setIsLightTheme] = useState(() => {
+    if (typeof window === 'undefined') {
+      return true;
+    }
+
+    return window.localStorage.getItem('dutta-draw-admin-theme') !== 'dark';
+  });
   const [state, setState] = useState<AdminPageState>({ type: 'READY' });
   const [busyAction, setBusyAction] = useState<BusyAction>('NONE');
   const [statusMessage, setStatusMessage] = useState('');
@@ -107,6 +123,10 @@ export const AdminPrizePage = () => {
   const [exportYear, setExportYear] = useState('');
 
   const isBusy = busyAction !== 'NONE';
+
+  useEffect(() => {
+    window.localStorage.setItem('dutta-draw-admin-theme', isLightTheme ? 'light' : 'dark');
+  }, [isLightTheme]);
 
   const exportYearOptions = useMemo(() => {
     return (summary?.availableExportYears ?? []).map(String);
@@ -658,34 +678,34 @@ export const AdminPrizePage = () => {
   };
 
   const shellClass = isLightTheme
-    ? 'min-h-screen bg-[#efe5d4] px-3 py-4 text-slate-800 sm:px-5'
+    ? 'admin-light min-h-screen bg-[#f3f6fa] px-3 py-4 text-slate-800 sm:px-5'
     : 'min-h-screen bg-[#0f1224] px-3 py-4 text-[#ffeecf] sm:px-5';
   const panelClass = isLightTheme
-    ? 'mx-auto w-full max-w-6xl rounded-2xl border border-[#c79f32] bg-[#f7efdf] p-4 shadow-[0_8px_18px_rgba(15,23,42,0.12)] sm:p-5'
+    ? 'mx-auto w-full max-w-6xl rounded-2xl border border-[#d9e2ec] bg-white p-4 shadow-[0_8px_18px_rgba(15,23,42,0.08)] sm:p-5'
     : 'mx-auto w-full max-w-6xl rounded-2xl border border-amber-300/25 bg-[#151933] p-4 shadow-[0_8px_18px_rgba(0,0,0,0.35)] sm:p-5';
   const headingTextClass = isLightTheme ? 'text-slate-900' : 'text-amber-100';
   const mutedTextClass = isLightTheme ? 'text-slate-600' : 'text-amber-100/80';
   const sectionBorderClass = isLightTheme ? 'border-slate-300/70' : 'border-amber-300/30';
   const surfaceClass = isLightTheme
-    ? 'bg-[#f3e9d7] border-2 border-solid border-[#c79f32]'
+    ? 'bg-white border border-solid border-[#d9e2ec] shadow-[0_1px_3px_rgba(15,23,42,0.05)]'
     : 'bg-[#11153b] border-2 border-solid border-[#d4af37]';
   const inputClass = isLightTheme
-    ? 'min-h-10 rounded-lg border border-slate-300 bg-[#f9f1e3] px-3 text-slate-800 placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b88f20] focus-visible:ring-offset-2 focus-visible:ring-offset-[#f7efdf]'
+    ? 'min-h-10 rounded-lg border border-[#cfd9e5] bg-[#f5f8fc] px-3 text-slate-800 placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563c7] focus-visible:ring-offset-2 focus-visible:ring-offset-white'
     : 'min-h-10 rounded-lg border border-amber-300/35 bg-[#141338] px-3 text-amber-50 placeholder:text-amber-100/65 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200 focus-visible:ring-offset-2 focus-visible:ring-offset-[#151933]';
   const primaryButtonClass = isLightTheme
-    ? 'min-h-10 rounded-lg border border-[#d4af37] bg-[#d4af37] px-4 text-sm font-semibold text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b88f20] focus-visible:ring-offset-2 focus-visible:ring-offset-[#f7efdf] disabled:border-[#d4af37]/40 disabled:bg-[#d4af37]/40 disabled:text-slate-700/70'
+    ? 'min-h-10 rounded-lg border border-[#1557c0] bg-[#1557c0] px-4 text-sm font-semibold text-white shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563c7] focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:border-[#9fb9dc] disabled:bg-[#cbd9ec] disabled:text-slate-500'
     : 'min-h-10 rounded-lg border border-amber-200 bg-amber-100 px-4 text-sm font-semibold text-[#1f1030] shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200 focus-visible:ring-offset-2 focus-visible:ring-offset-[#151933] disabled:border-amber-200/40 disabled:bg-amber-200/40 disabled:text-[#1f1030]/60';
   const secondaryButtonClass = isLightTheme
-    ? 'min-h-10 rounded-lg border border-slate-300 bg-[#f8efdf] px-4 text-sm font-semibold text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b88f20] focus-visible:ring-offset-2 focus-visible:ring-offset-[#f7efdf] disabled:border-slate-300/50 disabled:bg-[#ece1cc] disabled:text-slate-500'
+    ? 'min-h-10 rounded-lg border border-[#cfd9e5] bg-white px-4 text-sm font-semibold text-[#24415f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563c7] focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:border-[#d9e2ec] disabled:bg-[#f1f4f8] disabled:text-slate-500'
     : 'min-h-10 rounded-lg border border-amber-200/70 bg-[#1b1849] px-4 text-sm font-semibold text-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200 focus-visible:ring-offset-2 focus-visible:ring-offset-[#151933] disabled:border-amber-200/30 disabled:bg-[#1b1849]/60 disabled:text-amber-100/60';
   const smallSecondaryButtonClass = isLightTheme
-    ? 'min-h-8 rounded-lg border border-slate-300 bg-[#f8efdf] px-3 text-xs font-semibold text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b88f20] focus-visible:ring-offset-2 focus-visible:ring-offset-[#f7efdf] disabled:border-slate-300/50 disabled:bg-[#ece1cc] disabled:text-slate-500'
+    ? 'min-h-8 rounded-lg border border-[#cfd9e5] bg-white px-3 text-xs font-semibold text-[#24415f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563c7] focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:border-[#d9e2ec] disabled:bg-[#f1f4f8] disabled:text-slate-500'
     : 'min-h-8 rounded-lg border border-amber-200/70 bg-[#1b1849] px-3 text-xs font-semibold text-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200 focus-visible:ring-offset-2 focus-visible:ring-offset-[#151933] disabled:border-amber-200/30 disabled:bg-[#1b1849]/60 disabled:text-amber-100/60';
   const dangerButtonClass = isLightTheme
-    ? 'min-h-10 rounded-lg border border-red-300 bg-red-50 px-4 text-sm font-semibold text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f7efdf] disabled:border-red-200/50 disabled:bg-red-50/60 disabled:text-red-700/50'
+    ? 'min-h-10 rounded-lg border border-red-300 bg-red-50 px-4 text-sm font-semibold text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:border-red-200/50 disabled:bg-red-50/60 disabled:text-red-700/50'
     : 'min-h-10 rounded-lg border border-red-400/70 bg-red-950/40 px-4 text-sm font-semibold text-red-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[#151933] disabled:border-red-400/30 disabled:bg-red-950/20 disabled:text-red-200/50';
   const smallDangerButtonClass = isLightTheme
-    ? 'min-h-8 rounded-lg border border-red-300 bg-red-50 px-3 text-xs font-semibold text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f7efdf] disabled:border-red-200/50 disabled:bg-red-50/60 disabled:text-red-700/50'
+    ? 'min-h-8 rounded-lg border border-red-300 bg-red-50 px-3 text-xs font-semibold text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:border-red-200/50 disabled:bg-red-50/60 disabled:text-red-700/50'
     : 'min-h-8 rounded-lg border border-red-400/70 bg-red-950/40 px-3 text-xs font-semibold text-red-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[#151933] disabled:border-red-400/30 disabled:bg-red-950/20 disabled:text-red-200/50';
   const isCampaignActive = campaignStatus.tone === 'active';
   const isCampaignNotStarted = campaignStatus.tone === 'not-started';
@@ -745,19 +765,21 @@ export const AdminPrizePage = () => {
   return (
     <main className={shellClass} aria-label="Admin operations page">
       <section className={panelClass}>
-        <header className="flex flex-wrap items-start justify-between gap-3">
+        <header
+          className={`relative flex flex-wrap items-start justify-between gap-3 rounded-xl px-4 py-3 pr-28 ${isLightTheme ? 'bg-[#1557c0] text-white' : ''}`}
+        >
           <div className="grid gap-1">
             <p
-              className={`m-0 text-xs font-bold uppercase tracking-[0.16em] ${isLightTheme ? 'text-slate-500' : 'text-amber-300'}`}
+              className={`m-0 text-xs font-bold uppercase tracking-[0.16em] ${isLightTheme ? 'text-blue-100' : 'text-amber-300'}`}
             >
               Dutta Brothers
             </p>
             <h1
-              className={`m-0 text-2xl font-semibold uppercase tracking-[0.04em] sm:text-3xl ${headingTextClass}`}
+              className={`m-0 text-2xl font-semibold uppercase tracking-[0.04em] sm:text-3xl ${isLightTheme ? 'text-white' : headingTextClass}`}
             >
               Lucky Draw Admin
             </h1>
-            <p className={`m-0 text-sm ${mutedTextClass}`}>
+            <p className={`m-0 text-sm ${isLightTheme ? 'text-blue-100' : mutedTextClass}`}>
               Operational view for campaign control, prize status, and claims reporting.
             </p>
           </div>
@@ -770,6 +792,23 @@ export const AdminPrizePage = () => {
             >
               {busyAction === 'INITIAL' ? 'Refreshing...' : 'Refresh'}
             </button>
+            {isAuthenticated ? (
+              <button
+                type="button"
+                className={`${secondaryButtonClass} absolute right-4 top-3`}
+                onClick={onSignOut}
+              >
+                Sign out
+              </button>
+            ) : (
+              <button
+                type="button"
+                className={`${primaryButtonClass} absolute right-4 top-3`}
+                onClick={onSignIn}
+              >
+                Sign in
+              </button>
+            )}
             <button
               type="button"
               className={secondaryButtonClass}
@@ -865,12 +904,13 @@ export const AdminPrizePage = () => {
                       fromDate: event.target.value,
                     }))
                   }
+                  disabled={isBusy || !isAuthenticated}
                 />
                 <button
                   type="button"
                   className={secondaryButtonClass}
                   onClick={() => setCampaignForm((current) => ({ ...current, fromDate: '' }))}
-                  disabled={isBusy || !campaignForm.fromDate}
+                  disabled={isBusy || !isAuthenticated || !campaignForm.fromDate}
                 >
                   Clear
                 </button>
@@ -901,12 +941,13 @@ export const AdminPrizePage = () => {
                       toDate: event.target.value,
                     }))
                   }
+                  disabled={isBusy || !isAuthenticated}
                 />
                 <button
                   type="button"
                   className={secondaryButtonClass}
                   onClick={() => setCampaignForm((current) => ({ ...current, toDate: '' }))}
-                  disabled={isBusy || !campaignForm.toDate}
+                  disabled={isBusy || !isAuthenticated || !campaignForm.toDate}
                 >
                   Clear
                 </button>
@@ -921,7 +962,7 @@ export const AdminPrizePage = () => {
             <button
               type="submit"
               className={`sm:col-span-2 sm:justify-self-start sm:min-w-40 mt-1 ${primaryButtonClass}`}
-              disabled={isBusy}
+              disabled={isBusy || !isAuthenticated}
             >
               {busyAction === 'CAMPAIGN' ? 'Saving...' : 'Save'}
             </button>
@@ -1007,6 +1048,7 @@ export const AdminPrizePage = () => {
                     name: event.target.value,
                   }));
                 }}
+                disabled={isBusy || !isAuthenticated}
               />
               {addErrors.name ? (
                 <p className={`m-0 text-sm ${isLightTheme ? 'text-rose-700' : 'text-rose-200'}`}>
@@ -1032,6 +1074,7 @@ export const AdminPrizePage = () => {
                     weight: event.target.value,
                   }));
                 }}
+                disabled={isBusy || !isAuthenticated}
                 inputMode="numeric"
               />
               <p className={`m-0 text-xs ${mutedTextClass}`}>
@@ -1060,6 +1103,7 @@ export const AdminPrizePage = () => {
                       active: event.target.checked,
                     }));
                   }}
+                  disabled={isBusy || !isAuthenticated}
                 />
                 Active for future draws
               </label>
@@ -1067,7 +1111,7 @@ export const AdminPrizePage = () => {
               <button
                 type="submit"
                 className={`w-full sm:w-auto ${primaryButtonClass}`}
-                disabled={isBusy}
+                disabled={isBusy || !isAuthenticated}
               >
                 {busyAction === 'PRIZE_ADD' ? 'Adding...' : 'Add Prize'}
               </button>
@@ -1100,7 +1144,7 @@ export const AdminPrizePage = () => {
                   aria-label={`Filter claims by ${prize.name}`}
                   onClick={() => void onSelectPrizeFilter(prize.id)}
                   onKeyDown={(event) => onPrizeFilterKeyDown(event, prize.id)}
-                  disabled={isBusy}
+                  disabled={isBusy || !isAuthenticated}
                 >
                   <header className="flex items-center justify-between gap-2">
                     <h3 className={`m-0 text-base font-semibold ${headingTextClass}`}>
@@ -1152,7 +1196,7 @@ export const AdminPrizePage = () => {
                     type="button"
                     className={primaryButtonClass}
                     onClick={() => void onSaveWeight(prize)}
-                    disabled={isBusy}
+                    disabled={isBusy || !isAuthenticated}
                   >
                     {busyAction === 'PRIZE_WEIGHT' ? 'Saving...' : 'Save Weight'}
                   </button>
@@ -1168,7 +1212,7 @@ export const AdminPrizePage = () => {
                     className="h-4 w-4"
                     onClick={(event) => event.stopPropagation()}
                     onChange={() => void onToggleActive(prize)}
-                    disabled={isBusy}
+                    disabled={isBusy || !isAuthenticated}
                   />
                   Active
                 </label>
@@ -1282,7 +1326,7 @@ export const AdminPrizePage = () => {
               <button
                 type="button"
                 className={`justify-self-start sm:justify-self-end ${primaryButtonClass}`}
-                disabled={isBusy}
+                disabled={isBusy || !isAuthenticated}
                 onClick={() => {
                   setExportYear('');
                   setConfirmDialog({ type: 'EXPORT_CSV' });
@@ -1293,7 +1337,7 @@ export const AdminPrizePage = () => {
               <button
                 type="button"
                 className={dangerButtonClass}
-                disabled={isBusy || claims.length === 0}
+                disabled={isBusy || !isAuthenticated || claims.length === 0}
                 onClick={() => void onClearAllClaims()}
               >
                 {busyAction === 'CLAIMS_CLEAR' ? 'Clearing...' : 'Clear All Claims'}
@@ -1415,7 +1459,7 @@ export const AdminPrizePage = () => {
                           <button
                             type="button"
                             className={smallDangerButtonClass}
-                            disabled={isBusy}
+                            disabled={isBusy || !isAuthenticated}
                             aria-label={`Delete claim ${claim.claimId}`}
                             onClick={() => void onDeleteClaim(claim.claimId)}
                           >

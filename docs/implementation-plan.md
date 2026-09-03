@@ -58,8 +58,8 @@ React -> API Gateway -> Lambda (Node.js + TypeScript) -> DynamoDB
 Admin route (/admin) -> API Gateway -> Lambda
 ```
 
-- V1 intentionally has no authentication model for admin operations.
-- No login, token, session, cookie auth, Cognito, OIDC, OAuth, SSO, JWT, or identity bootstrap is introduced.
+- V1 uses Cognito-managed local users for Admin operations, with OAuth2 Authorization Code + PKCE and no MFA.
+- No Google federation or custom password form is introduced.
 - Backend validation and business-rule enforcement remain fully authoritative.
 - Customer and admin API routes remain separated by endpoint path.
 
@@ -454,7 +454,7 @@ Senior Frontend Developer and Senior Backend Developer.
 
 #### Implementation tasks
 
-- Keep admin operations accessible without authentication in V1.
+- Protect Admin operations with the Cognito access token and Admin scope.
 - Return masked phone numbers and operationally visible bill numbers.
 - Implement exact/prefix claim ID and normalized bill search.
 - Implement case-insensitive prefix customer and prize search.
@@ -464,7 +464,7 @@ Senior Frontend Developer and Senior Backend Developer.
 
 #### Tests required
 
-- Direct admin access without login/token/session flow.
+- Cognito login, logout, expired-session, 401, and 403 behavior.
 - Claims listing and newest-first ordering.
 - Date and prize filters.
 - Search matching rules.
@@ -476,7 +476,7 @@ Senior Frontend Developer and Senior Backend Developer.
 
 - Admin claims are bounded, searchable, filterable, and exportable.
 - Internal database keys and unnecessary PII are never exposed.
-- No authentication step exists for Admin V1 requests.
+- Admin API requests require Cognito authorization; the customer draw endpoint remains public.
 
 ### Phase 7.5: Controlled Customer Reveal Redesign (Wheel/Envelope -> Gift Box)
 
@@ -751,7 +751,7 @@ Principal Software Engineer for release approval and infrastructure review; impl
 
 - Development smoke tests.
 - Production health and draw-flow smoke tests.
-- Admin direct-access behavior test (no auth/token/session bootstrap).
+- Admin read-only direct access plus Cognito Managed Login behavior tests.
 - Draw-end enforcement test.
 - Claim, retry, aggregate, and reveal-result verification.
 
@@ -845,7 +845,7 @@ The implementation must evaluate a DynamoDB transaction or equivalent atomic str
 
 ### Admin access model (V1)
 
-- Admin V1 intentionally uses no authentication.
+- Admin V1 uses Cognito local-user authentication with no MFA.
 - No token, session, or identity bootstrap is introduced.
 - Keep backend validation authoritative and customer/admin routes separated.
 
@@ -1061,7 +1061,7 @@ Verify:
 - Prize selection is backend-owned and weighted correctly.
 - Reveal result text and claim ID match the authoritative API response.
 - Dashboard aggregates equal successful claims and do not double-count.
-- Admin V1 access remains no-auth by design while backend validation and route separation remain enforced.
+- Admin V1 access uses Cognito local-user authorization while backend validation and route separation remain enforced.
 - Admin claims, summary, prizes, campaign, and CSV operations work within the contract.
 - Phone masking, bill visibility, CSV formula protection, and PII limits hold.
 - CloudWatch logs support diagnosis without unnecessary PII or secrets.
@@ -1101,7 +1101,7 @@ Verify:
 
 ### Security
 
-- Admin V1 intentionally has no authentication bootstrap while backend validation remains authoritative.
+- Admin V1 uses Cognito Hosted UI authentication while backend validation remains authoritative.
 - IAM is least-privilege and reviewed by function/resource.
 - CORS, throttling, request limits, PII masking, CSV protection, and safe logging are verified.
 

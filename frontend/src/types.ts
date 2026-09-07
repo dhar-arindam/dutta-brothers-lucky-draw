@@ -135,3 +135,95 @@ export type AdminPrizeResponse =
   | AdminSummaryResponse
   | AdminCampaignResponse
   | AdminErrorResponse;
+
+export interface MegaPrize {
+  position: number;
+  name: string;
+}
+
+export interface MegaCampaignSnapshot {
+  id: string;
+  fromDate: string;
+  toDate: string;
+  timezone: 'Asia/Kolkata';
+  ended: true;
+}
+
+export interface MegaCandidate {
+  identity?: string;
+  sourceClaimId: string;
+  sourceClaimTimestamp: string;
+  customerName: string;
+  maskedPhone: string;
+  billNumber: string;
+}
+
+export interface MegaDrawSelectedRow {
+  prize: MegaPrize;
+  candidate: MegaCandidate;
+  selectedAt: string;
+  candidatePoolCount: number;
+  sourceClaimStatus: 'ACTIVE' | 'SOURCE_CLAIM_ARCHIVED';
+}
+
+export interface MegaDrawLifecycle {
+  reference: string;
+  executionYear: number;
+  status: 'SETUP' | 'IN_PROGRESS' | 'COMPLETED';
+  campaign?: MegaCampaignSnapshot;
+  prizes?: MegaPrize[];
+  selectedRows: MegaDrawSelectedRow[];
+  nextPrizeOrdinal: number;
+  remainingPrizes: MegaPrize[];
+  completedAt?: string;
+}
+
+export interface MegaDrawPreflight {
+  reference: string;
+  executionYear: number;
+  expiresAt: string;
+  candidateCount: number;
+  prizes: MegaPrize[];
+  campaign: MegaCampaignSnapshot;
+}
+
+export interface MegaDrawGetResponse {
+  status: 'SUCCESS';
+  configuration: MegaPrize[];
+  lifecycle?: MegaDrawLifecycle;
+}
+
+export interface MegaDrawConfigurationResponse {
+  status: 'SUCCESS';
+  prizes: MegaPrize[];
+}
+
+export interface MegaDrawPreflightResponse {
+  status: 'SUCCESS';
+  preflight: MegaDrawPreflight;
+}
+
+export interface MegaDrawDrawNextResponse {
+  status: 'SUCCESS';
+  lifecycle: MegaDrawLifecycle;
+  selectedRow: MegaDrawSelectedRow;
+}
+
+export interface MegaDrawStatusResponse {
+  status: 'SUCCESS';
+  execution: 'NOT_FOUND' | 'IN_PROGRESS' | 'COMPLETED';
+  operation?: 'DRAW_NEXT';
+  lifecycle?: MegaDrawLifecycle;
+  selectedRow?: MegaDrawSelectedRow;
+}
+
+export interface MegaDrawResetResponse {
+  status: 'SUCCESS';
+  executionYear: number;
+}
+
+export interface MegaDrawErrorResponse {
+  status: 'ERROR';
+  code: string;
+  message: string;
+}

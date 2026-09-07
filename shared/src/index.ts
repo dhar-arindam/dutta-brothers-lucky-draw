@@ -41,3 +41,5 @@ export interface DrawErrorResponse {
 }
 
 export type DrawResponse = DrawSuccessResponse | AlreadyClaimedResponse | DrawErrorResponse;
+
+export * from './mega-draw.js';

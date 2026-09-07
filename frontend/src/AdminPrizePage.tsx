@@ -786,11 +786,17 @@ export const AdminPrizePage = ({
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            {isAuthenticated ? (
+              <a href="/admin/mega-draw" className={`${secondaryButtonClass} admin-nav-link`}>
+                Mega Draw
+              </a>
+            ) : null}
             <button
               type="button"
               className={secondaryButtonClass}
               onClick={() => void loadAdminData()}
               disabled={isBusy}
+              title="Refresh admin data"
             >
               {busyAction === 'INITIAL' ? 'Refreshing...' : 'Refresh'}
             </button>
@@ -815,6 +821,7 @@ export const AdminPrizePage = ({
               type="button"
               className={secondaryButtonClass}
               onClick={() => setIsLightTheme((current) => !current)}
+              title="Toggle admin color theme"
             >
               {isLightTheme ? 'Switch to Dark' : 'Switch to Light'}
             </button>
@@ -922,6 +929,8 @@ export const AdminPrizePage = ({
                   className={secondaryButtonClass}
                   onClick={() => setCampaignForm((current) => ({ ...current, fromDate: '' }))}
                   disabled={isBusy || !isAuthenticated || !campaignForm.fromDate}
+                  aria-label="Clear campaign start date"
+                  title="Clear campaign start date"
                 >
                   Clear
                 </button>
@@ -959,6 +968,8 @@ export const AdminPrizePage = ({
                   className={secondaryButtonClass}
                   onClick={() => setCampaignForm((current) => ({ ...current, toDate: '' }))}
                   disabled={isBusy || !isAuthenticated || !campaignForm.toDate}
+                  aria-label="Clear campaign end date"
+                  title="Clear campaign end date"
                 >
                   Clear
                 </button>
@@ -974,6 +985,8 @@ export const AdminPrizePage = ({
               type="submit"
               className={`sm:col-span-2 sm:justify-self-start sm:min-w-40 mt-1 ${primaryButtonClass}`}
               disabled={isBusy || !isAuthenticated}
+              aria-label="Save campaign dates"
+              title="Save campaign dates"
             >
               {busyAction === 'CAMPAIGN' ? 'Saving...' : 'Save'}
             </button>
@@ -1208,6 +1221,8 @@ export const AdminPrizePage = ({
                     className={primaryButtonClass}
                     onClick={() => void onSaveWeight(prize)}
                     disabled={isBusy || !isAuthenticated}
+                    aria-label={`Save weight for ${prize.name}`}
+                    title={`Save weight for ${prize.name}`}
                   >
                     {busyAction === 'PRIZE_WEIGHT' ? 'Saving...' : 'Save Weight'}
                   </button>
@@ -1342,6 +1357,7 @@ export const AdminPrizePage = ({
                   setExportYear('');
                   setConfirmDialog({ type: 'EXPORT_CSV' });
                 }}
+                title="Download claims as CSV"
               >
                 {busyAction === 'CSV' ? 'Exporting...' : 'Export Data'}
               </button>
@@ -1350,6 +1366,8 @@ export const AdminPrizePage = ({
                 className={dangerButtonClass}
                 disabled={isBusy || !isAuthenticated || claims.length === 0}
                 onClick={() => void onClearAllClaims()}
+                aria-label="Open clear all claims confirmation"
+                title="Permanently delete all claims"
               >
                 {busyAction === 'CLAIMS_CLEAR' ? 'Clearing...' : 'Clear All Claims'}
               </button>
@@ -1432,7 +1450,8 @@ export const AdminPrizePage = ({
                             <button
                               type="button"
                               className={smallSecondaryButtonClass}
-                              aria-label={`Copy claim ID ${claim.claimId}`}
+                              aria-label={`Copy claim ID ${claim.claimId} from table`}
+                              title={`Copy claim ID ${claim.claimId}`}
                               onClick={() => void onCopyClaimId(claim.claimId)}
                             >
                               {copiedClaimId === claim.claimId ? 'Copied' : 'Copy'}
@@ -1471,7 +1490,8 @@ export const AdminPrizePage = ({
                             type="button"
                             className={smallDangerButtonClass}
                             disabled={isBusy || !isAuthenticated}
-                            aria-label={`Delete claim ${claim.claimId}`}
+                            aria-label={`Open delete confirmation for claim ${claim.claimId}`}
+                            title={`Delete claim ${claim.claimId}`}
                             onClick={() => void onDeleteClaim(claim.claimId)}
                           >
                             Delete
@@ -1499,7 +1519,8 @@ export const AdminPrizePage = ({
                           <button
                             type="button"
                             className={smallSecondaryButtonClass}
-                            aria-label={`Copy claim ID ${claim.claimId}`}
+                            aria-label={`Copy claim ID ${claim.claimId} from mobile card`}
+                            title={`Copy claim ID ${claim.claimId}`}
                             onClick={() => void onCopyClaimId(claim.claimId)}
                           >
                             {copiedClaimId === claim.claimId ? 'Copied' : 'Copy'}
@@ -1556,7 +1577,8 @@ export const AdminPrizePage = ({
                         type="button"
                         className={smallDangerButtonClass}
                         disabled={isBusy}
-                        aria-label={`Delete claim ${claim.claimId}`}
+                        aria-label={`Open delete confirmation for claim ${claim.claimId} from mobile card`}
+                        title={`Delete claim ${claim.claimId}`}
                         onClick={() => void onDeleteClaim(claim.claimId)}
                       >
                         Delete
@@ -1668,6 +1690,8 @@ export const AdminPrizePage = ({
                       type="button"
                       className={dangerButtonClass}
                       onClick={() => void onConfirmDeleteClaim(confirmDialog.claimId)}
+                      aria-label={`Permanently delete claim ${confirmDialog.claimId}`}
+                      title={`Permanently delete claim ${confirmDialog.claimId}`}
                     >
                       Delete Claim
                     </button>
@@ -1777,6 +1801,8 @@ export const AdminPrizePage = ({
                       className={dangerButtonClass}
                       disabled={clearAllConfirmationText !== CLEAR_ALL_CONFIRMATION_PHRASE}
                       onClick={() => void onConfirmClearAllClaims()}
+                      aria-label="Permanently clear all claims"
+                      title="Permanently delete all claims"
                     >
                       Clear All Claims
                     </button>

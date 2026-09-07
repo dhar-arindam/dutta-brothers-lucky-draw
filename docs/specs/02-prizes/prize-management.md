@@ -53,7 +53,7 @@ The admin cannot:
 
 Prize names are immutable once created. Prize identity is fixed after creation and must be enforced by the backend.
 
-An explicitly confirmed admin deletion may remove a claim and its claim-derived `Given` contribution. It must not change prize configuration or alter the prize snapshot of any remaining claim.
+Before campaign end, an explicitly confirmed admin deletion may remove a claim and its claim-derived `Given` contribution. After campaign end, it archives the claim and removes its active `Given` contribution. Neither outcome changes prize configuration or alters the prize snapshot of any remaining claim.
 
 ## Historical Claims
 

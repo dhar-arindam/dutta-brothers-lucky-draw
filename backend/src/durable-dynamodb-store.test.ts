@@ -243,6 +243,17 @@ describe('dynamo db draw store persistence', () => {
         gsi1sk: '2026-08-16T10:30:00.000Z#DB26-000001',
       },
     }));
+    fake.enqueue(async () => ({
+      Item: {
+        pk: 'CAMPAIGN',
+        sk: 'CONFIG',
+        entityType: 'CAMPAIGN',
+        id: 'festive-2026',
+        timezone: 'Asia/Kolkata',
+        fromDate: '2026-08-01',
+        toDate: '2026-11-01',
+      },
+    }));
     fake.enqueue(async () => ({}));
 
     const store = new DynamoDbDrawStore(fake as never, {
@@ -254,7 +265,49 @@ describe('dynamo db draw store persistence', () => {
 
     expect(result.type).toBe('SUCCESS');
     expect(fake.calls[0]).toBeInstanceOf(GetCommand);
-    expect(fake.calls[1]).toBeInstanceOf(TransactWriteCommand);
+    expect(fake.calls[2]).toBeInstanceOf(TransactWriteCommand);
+  });
+
+  it('archives a post-campaign claim and removes it from the active claims index', async () => {
+    const fake = new FakeDocClient();
+    fake.enqueue(async () => ({
+      Item: {
+        pk: 'CLAIM',
+        sk: 'DB26-000001',
+        entityType: 'CLAIM',
+        claimId: 'DB26-000001',
+        claimTimestamp: '2026-08-16T10:30:00.000Z',
+        customerName: 'Arindam Roy',
+        phone: '9876543210',
+        billNumberDisplay: 'DB12345',
+        billNumberNormalized: 'DB12345',
+        prize: { id: 'prize-001', name: 'Electric Kettle', displayName: 'Electric Kettle' },
+        gsi1pk: 'CLAIM',
+        gsi1sk: '2026-08-16T10:30:00.000Z#DB26-000001',
+      },
+    }));
+    fake.enqueue(async () => ({
+      Item: {
+        pk: 'CAMPAIGN',
+        sk: 'CONFIG',
+        entityType: 'CAMPAIGN',
+        id: 'festive-2026',
+        timezone: 'Asia/Kolkata',
+        fromDate: '2026-08-01',
+        toDate: '2026-11-01',
+      },
+    }));
+    fake.enqueue(async () => ({}));
+    const store = new DynamoDbDrawStore(fake as never, {
+      tableName: 'draws-table',
+      now: () => new Date('2026-11-02T00:00:00.000Z'),
+    });
+
+    await expect(store.deleteClaim('DB26-000001')).resolves.toEqual({ type: 'SUCCESS' });
+    const transaction = fake.calls[2] as TransactWriteCommand;
+    expect(transaction.input.TransactItems?.[1]?.Update?.UpdateExpression).toContain(
+      'REMOVE gsi1pk, gsi1sk',
+    );
   });
 
   it('returns NOT_FOUND when deleting a claim that does not exist', async () => {
@@ -273,6 +326,17 @@ describe('dynamo db draw store persistence', () => {
 
   it('clears all claims by deleting bill keys before claim keys, then aggregates', async () => {
     const fake = new FakeDocClient();
+    fake.enqueue(async () => ({
+      Item: {
+        pk: 'CAMPAIGN',
+        sk: 'CONFIG',
+        entityType: 'CAMPAIGN',
+        id: 'festive-2026',
+        timezone: 'Asia/Kolkata',
+        fromDate: '2026-08-01',
+        toDate: '2026-11-01',
+      },
+    }));
     // BILL is drained first so an interrupted run leaves bills claimable rather than stranded.
     fake.enqueue(async () => ({
       Items: [{ pk: 'BILL', sk: 'DB12345' }],
@@ -298,24 +362,35 @@ describe('dynamo db draw store persistence', () => {
     const deletedCount = await store.clearAllClaims();
 
     expect(deletedCount).toBe(2);
-    expect(fake.calls).toHaveLength(6);
-    expect(fake.calls[0]).toBeInstanceOf(QueryCommand);
-    expect((fake.calls[0] as QueryCommand).input.ExpressionAttributeValues).toEqual({
+    expect(fake.calls).toHaveLength(7);
+    expect(fake.calls[1]).toBeInstanceOf(QueryCommand);
+    expect((fake.calls[1] as QueryCommand).input.ExpressionAttributeValues).toEqual({
       ':pk': 'BILL',
     });
-    expect(fake.calls[1]).toBeInstanceOf(BatchWriteCommand);
-    expect((fake.calls[2] as QueryCommand).input.ExpressionAttributeValues).toEqual({
+    expect(fake.calls[2]).toBeInstanceOf(BatchWriteCommand);
+    expect((fake.calls[3] as QueryCommand).input.ExpressionAttributeValues).toEqual({
       ':pk': 'CLAIM',
     });
-    expect(fake.calls[3]).toBeInstanceOf(BatchWriteCommand);
-    expect((fake.calls[4] as QueryCommand).input.ExpressionAttributeValues).toEqual({
+    expect(fake.calls[4]).toBeInstanceOf(BatchWriteCommand);
+    expect((fake.calls[5] as QueryCommand).input.ExpressionAttributeValues).toEqual({
       ':pk': 'AGG',
     });
-    expect(fake.calls[5]).toBeInstanceOf(BatchWriteCommand);
+    expect(fake.calls[6]).toBeInstanceOf(BatchWriteCommand);
   });
 
   it('resends unprocessed batch delete items instead of reporting a silent partial delete', async () => {
     const fake = new FakeDocClient();
+    fake.enqueue(async () => ({
+      Item: {
+        pk: 'CAMPAIGN',
+        sk: 'CONFIG',
+        entityType: 'CAMPAIGN',
+        id: 'festive-2026',
+        timezone: 'Asia/Kolkata',
+        fromDate: '2026-08-01',
+        toDate: '2026-11-01',
+      },
+    }));
     fake.enqueue(async () => ({ Items: [] }));
     fake.enqueue(async () => ({
       Items: [
@@ -341,7 +416,7 @@ describe('dynamo db draw store persistence', () => {
     const deletedCount = await store.clearAllClaims();
 
     expect(deletedCount).toBe(2);
-    const retried = fake.calls[3] as BatchWriteCommand;
+    const retried = fake.calls[4] as BatchWriteCommand;
     expect(retried).toBeInstanceOf(BatchWriteCommand);
     expect(retried.input.RequestItems?.['draws-table']).toEqual([
       { DeleteRequest: { Key: { pk: 'CLAIM', sk: 'DB26-000002' } } },

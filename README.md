@@ -4,6 +4,8 @@ A mobile-first festive lucky draw application for Dutta Brothers Electronics.
 
 Active customer presentation reveal is the festive gift box reveal, as defined in the approved customer specifications.
 
+Mega Draw is an Admin-scope-only, resumable year-end lifecycle. Before its first successful selection, Admin may add, remove, rename, and reorder 1 to 10 Mega prizes. The backend then locks candidate and prize snapshots for the active lifecycle and atomically selects one distinct winner at a time in configured order. Any browser wheel is presentation-only, shows only remaining backend-provided prizes, and never determines a winner; a post-start configuration change requires the pending-review Mega Draw reset, acknowledged and exactly confirmed as `RESET MEGA DRAW <year>`. Reset removes Mega Draw-only state and restores editable configuration without affecting main lucky-draw claims, prizes, campaign, claim archives, or ordinary claims CSV.
+
 Product behaviour is defined by the approved specifications in [`/docs/specs`](docs/specs). Engineering standards are defined in [`.github/copilot-instructions.md`](.github/copilot-instructions.md). The implementation plan is documented in [`docs/implementation-plan.md`](docs/implementation-plan.md).
 
 AWS deployment context and promotion requirements are documented in [`docs/deployment/aws-phase1-environment-contract.md`](docs/deployment/aws-phase1-environment-contract.md).

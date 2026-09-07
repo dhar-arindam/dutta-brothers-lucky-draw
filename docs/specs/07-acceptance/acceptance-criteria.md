@@ -4,10 +4,10 @@ Status: APPROVED
 Backend impact: None  
 API impact: None  
 Owner: Principal Software Engineer  
-Version: 1.8
-Last Updated: 2026-08-21
-Change: Claim deletion, contention retry, and deployment provenance
-Reason: Align acceptance criteria with implemented runtime and delivery behaviour
+Version: 2.2
+Last Updated: 2026-09-08
+Change: Approved epoch-based Mega Draw reset policy
+Reason: Record confirmed immediate isolation and separate cleanup of prior Mega Draw epochs
 
 These criteria define the Definition of Done for the initial product scope.
 
@@ -184,6 +184,31 @@ These criteria define the Definition of Done for the initial product scope.
 - [ ] Initial admin load failure shows a single actionable error state with retry.
 - [ ] Initial admin load does not render partial operational data when required initial datasets fail.
 - [ ] In-flight operations display explicit loading state text for campaign, claims, CSV, and prize actions.
+
+### Mega Draw
+
+- [ ] Mega Draw is reachable only from the logged-in Admin page; an unauthenticated direct visit to `/admin/mega-draw` redirects to `/admin` without exposing Mega Draw data.
+- [ ] All Mega Draw configuration, preflight, execution, results, and reset APIs require Admin scope; ordinary approved Admin read APIs remain public.
+- [ ] Before its first successful selection, the Mega Draw supports adding, removing, renaming, and reordering 1 to 10 ordered, non-blank, uniquely named prizes; it does not reuse main-draw weights, active state, stock, or `Given` counts.
+- [ ] Execution is allowed only after the backend determines the current `Asia/Kolkata` campaign has ended.
+- [ ] Eligibility contains only active successful claims from the execution year; archived claims are excluded.
+- [ ] Candidate identity is the normalized bill number plus normalized phone number. Different bills with the same phone are separate candidates and may each win.
+- [ ] The first successful `draw next` validates the expiry-bound preflight reference, locks immutable candidate/campaign/prize snapshots, and selects only prize 1. A changed population, configuration, campaign state, or expired reference returns `PREFLIGHT_STALE` without a winner.
+- [ ] Each `draw next` action atomically selects one distinct candidate identity for the next configured prize using cryptographically secure random selection without replacement; partial results survive refresh and later prizes cannot be drawn out of order.
+- [ ] Fewer candidates than configured prizes before the first selection returns `INSUFFICIENT_ELIGIBLE_PARTICIPANTS` and records no snapshot or winner.
+- [ ] After first selection, prize configuration and order are locked; updates return the documented locked outcome and require reset to restore editable setup.
+- [ ] Concurrent next-prize requests result in exactly one result row for an ordinal. Same-key retry recovers the existing row/status; a different-key concurrent request receives the documented in-progress or current lifecycle outcome.
+- [ ] After a lost next-prize response, an Admin-scoped, operator-scoped idempotency-status lookup returns `NOT_FOUND`, `IN_PROGRESS`, or the recorded action/lifecycle outcome before any retry is attempted.
+- [ ] A presentation-only wheel displays backend-provided remaining ordered prizes as spokes, starts only after the authoritative selected row is returned, and never selects or determines a winner.
+- [ ] Reset requires Admin scope, acknowledgement, and exact typed confirmation `RESET MEGA DRAW <year>`.
+- [ ] Mega Draw has no separate winner export; the existing claims CSV remains the only export and excludes archived claims.
+- [ ] After campaign end, claim delete and clear-all archive active claims, decrement active aggregates, release normalized bills, and exclude archived records from normal claims views and CSV export.
+- [ ] An in-progress or completed Mega Draw remains historically unchanged when a referenced source claim is archived and marks the applicable selected row `SOURCE_CLAIM_ARCHIVED` without automatic replacement.
+- [ ] Reset atomically advances only the execution year's current Mega Draw epoch to a fresh empty editable setup; all configuration, preflight, lifecycle, winners, snapshots, idempotency/execution records, and result data in prior epochs are inaccessible immediately.
+- [ ] Separate cleanup deletes only prior-epoch Mega Draw records; it cannot change the current epoch or restore prior-epoch accessibility.
+- [ ] Reset does not alter main lucky-draw claims, prizes, campaign, claim archives, aggregate records, or ordinary claims CSV content or scope.
+- [ ] No Mega Draw audit trace, reset event, historical void/redraw relationship, or Mega Draw-specific retention history is created or retained.
+- [ ] Mega Draw configuration, confirmation, results, and failure states are keyboard-operable, visibly focused, screen-reader announced, and usable at 360px, 375px, 390px, and 430px widths.
 
 ## 8. Security
 

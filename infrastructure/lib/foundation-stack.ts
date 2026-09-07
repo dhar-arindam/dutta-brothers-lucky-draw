@@ -164,6 +164,7 @@ export class FoundationStack extends Stack {
         allowMethods: [
           apigwv2.CorsHttpMethod.GET,
           apigwv2.CorsHttpMethod.POST,
+          apigwv2.CorsHttpMethod.PUT,
           apigwv2.CorsHttpMethod.PATCH,
           apigwv2.CorsHttpMethod.OPTIONS,
         ],
@@ -209,6 +210,38 @@ export class FoundationStack extends Stack {
       adminUserPool.userPoolProviderUrl,
       { jwtAudience: [adminClient.userPoolClientId] },
     );
+
+    httpApi.addRoutes({
+      path: '/api/admin/mega-draw',
+      methods: [apigwv2.HttpMethod.GET],
+      integration,
+      authorizer: adminAuthorizer,
+      authorizationScopes: ['dutta-admin/admin'],
+    });
+
+    httpApi.addRoutes({
+      path: '/api/admin/mega-draw/status/{idempotencyKey}',
+      methods: [apigwv2.HttpMethod.GET],
+      integration,
+      authorizer: adminAuthorizer,
+      authorizationScopes: ['dutta-admin/admin'],
+    });
+
+    httpApi.addRoutes({
+      path: '/api/admin/mega-draw/configuration',
+      methods: [apigwv2.HttpMethod.PUT],
+      integration,
+      authorizer: adminAuthorizer,
+      authorizationScopes: ['dutta-admin/admin'],
+    });
+
+    httpApi.addRoutes({
+      path: '/api/admin/mega-draw/{operation}',
+      methods: [apigwv2.HttpMethod.POST],
+      integration,
+      authorizer: adminAuthorizer,
+      authorizationScopes: ['dutta-admin/admin'],
+    });
 
     httpApi.addRoutes({
       path: '/api/admin/{proxy+}',

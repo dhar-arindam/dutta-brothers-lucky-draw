@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 
 import { AdminPrizePage } from './AdminPrizePage';
 import { AdminAuthGate } from './AdminAuthGate';
+import { MegaDrawRoute } from './MegaDrawRoute';
 import { App } from './App';
 import './styles.css';
 
@@ -23,6 +24,12 @@ createRoot(rootElement).render(
             onSignOut={onSignOut}
             authMessage={authMessage}
           />
+        )}
+      </AdminAuthGate>
+    ) : window.location.pathname === '/admin/mega-draw' ? (
+      <AdminAuthGate>
+        {(isAuthenticated, _onSignIn, _onSignOut, _authMessage, isChecking) => (
+          <MegaDrawRoute isAuthenticated={isAuthenticated} isChecking={isChecking} />
         )}
       </AdminAuthGate>
     ) : (

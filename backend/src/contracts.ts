@@ -1,5 +1,17 @@
 export type AdminErrorCode =
-  'VALIDATION_ERROR' | 'REQUEST_TOO_LARGE' | 'EXPORT_TOO_LARGE' | 'INTERNAL_ERROR';
+  | 'VALIDATION_ERROR'
+  | 'REQUEST_TOO_LARGE'
+  | 'EXPORT_TOO_LARGE'
+  | 'MEGA_DRAW_NOT_CONFIGURED'
+  | 'CAMPAIGN_NOT_FOUND'
+  | 'CAMPAIGN_NOT_ENDED'
+  | 'INSUFFICIENT_ELIGIBLE_PARTICIPANTS'
+  | 'PREFLIGHT_STALE'
+  | 'MEGA_DRAW_IN_PROGRESS'
+  | 'MEGA_DRAW_ALREADY_COMPLETED'
+  | 'UNAUTHORIZED'
+  | 'FORBIDDEN'
+  | 'INTERNAL_ERROR';
 
 export interface AdminPrize {
   id: string;
@@ -101,7 +113,7 @@ export type AdminPrizeResponse =
   | AdminErrorResponse;
 
 export interface AdminHttpResponse {
-  statusCode: 200 | 201 | 400 | 413 | 500;
+  statusCode: 200 | 201 | 400 | 409 | 413 | 500;
   body: AdminPrizeResponse;
 }
 export type DrawErrorCode =

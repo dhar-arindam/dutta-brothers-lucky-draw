@@ -15,17 +15,17 @@
     "destroy": "cdk destroy"
   },
   "dependencies": {
-    "aws-cdk-lib": "^2.267.0",
+    "aws-cdk-lib": "^2.268.0",
     "constructs": "^10.4.2"
   },
   "devDependencies": {
-    "@types/node": "^26.4.0",
+    "@types/node": "^26.4.1",
     "@eslint/js": "^9.33.0",
     "aws-cdk": "^2.1139.0",
     "esbuild": "^0.28.2",
     "eslint": "^10.9.1",
     "vitest": "^4.1.11",
-    "typescript-eslint": "^8.68.0",
+    "typescript-eslint": "^8.69.0",
     "typescript": "^5.9.3"
   }
 }

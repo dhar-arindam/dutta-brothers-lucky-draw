@@ -43,7 +43,7 @@
     "lint-staged": "^17.4.1",
     "prettier": "^3.6.2",
     "typescript": "^5.9.3",
-    "vitest": "^4.1.11"
+    "vitest": "^5.0.0"
   },
   "lint-staged": {
     "*.{ts,tsx,css,html,json,md}": "prettier --write"

@@ -465,6 +465,7 @@ const megaErrorResponse = (error: MegaDrawError): AdminHttpResponse => ({
       : error.code === 'MEGA_DRAW_IN_PROGRESS' ||
           error.code === 'MEGA_DRAW_ALREADY_COMPLETED' ||
           error.code === 'MEGA_DRAW_CLOSED' ||
+          error.code === 'MEGA_DRAW_REOPEN_NOT_ALLOWED' ||
           error.code === 'CAMPAIGN_NOT_ENDED' ||
           error.code === 'INSUFFICIENT_ELIGIBLE_PARTICIPANTS'
         ? 409
@@ -619,18 +620,18 @@ interface NodeHandlers {
 }
 
 export const createDefaultNodeHandler = () => {
-  const seeded = isLocalMegaDrawSeedEnabled()
-    ? createLocalMegaDrawSeed()
-    : createLocalMegaDrawSeed();
-  const store = seeded.store;
+  const store = isLocalMegaDrawSeedEnabled()
+    ? createLocalMegaDrawSeed().store
+    : new InMemoryDrawStore();
   const drawService = createDefaultDrawService(store);
   const drawApiHandler = createDrawApiHandler(drawService);
   const adminPrizeApiHandler = createAdminPrizeApiHandler(store);
+  const megaDraw = new MegaDrawService(store);
 
   return createNodeHandler({
     drawApiHandler,
     adminPrizeApiHandler,
-    megaDraw: seeded.megaDraw,
+    megaDraw,
   });
 };
 
@@ -768,6 +769,11 @@ export const createNodeHandler = (handlers: NodeHandlers) => {
           }
           res.writeHead(200, jsonHeaders);
           res.end(JSON.stringify({ status: 'SUCCESS', ...handlers.megaDraw.close(parsed.value) }));
+          return;
+        }
+        if (method === 'POST' && parsedUrl.pathname === '/api/admin/mega-draw/reopen') {
+          res.statusCode = 200;
+          res.end(JSON.stringify({ status: 'SUCCESS', ...handlers.megaDraw.reopen() }));
           return;
         }
       } catch (error) {

@@ -103,18 +103,25 @@ describe('request-size policy enforcement (node application layer)', () => {
   });
 
   it('accepts draw payload exactly at limit and proceeds to normal processing path', async () => {
-    const baseUrl = await startServer();
-    const bodyText = buildDrawBodyWithExactBytes(REQUEST_BODY_SIZE_LIMIT_BYTES);
+    const previousSeed = process.env.LOCAL_MEGA_DRAW_SEED;
+    process.env.LOCAL_MEGA_DRAW_SEED = '1';
+    try {
+      const baseUrl = await startServer();
+      const bodyText = buildDrawBodyWithExactBytes(REQUEST_BODY_SIZE_LIMIT_BYTES);
 
-    const response = await fetch(`${baseUrl}/api/draw`, {
-      method: 'POST',
-      headers: jsonHeaders,
-      body: bodyText,
-    });
+      const response = await fetch(`${baseUrl}/api/draw`, {
+        method: 'POST',
+        headers: jsonHeaders,
+        body: bodyText,
+      });
 
-    expect(response.status).not.toBe(413);
-    const parsed = (await response.json()) as { status: string };
-    expect(parsed.status).toBe('ERROR');
+      expect(response.status).not.toBe(413);
+      const parsed = (await response.json()) as { status: string };
+      expect(parsed.status).toBe('ERROR');
+    } finally {
+      if (previousSeed === undefined) delete process.env.LOCAL_MEGA_DRAW_SEED;
+      else process.env.LOCAL_MEGA_DRAW_SEED = previousSeed;
+    }
   });
 
   it('rejects draw payload above limit with approved 413 error contract', async () => {

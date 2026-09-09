@@ -14,6 +14,7 @@ export type MegaDrawErrorCode =
   | 'MEGA_DRAW_IN_PROGRESS'
   | 'MEGA_DRAW_ALREADY_COMPLETED'
   | 'MEGA_DRAW_CLOSED'
+  | 'MEGA_DRAW_REOPEN_NOT_ALLOWED'
   | 'VALIDATION_ERROR';
 export class MegaDrawError extends Error {
   public constructor(
@@ -55,6 +56,7 @@ export interface MegaSelectedRow {
 export interface MegaDrawLifecycle {
   reference: string;
   executionYear: number;
+  cycleNumber: number;
   status: 'SETUP' | 'IN_PROGRESS' | 'COMPLETED' | 'CLOSED';
   campaign?: MegaCampaignSnapshot;
   prizes?: MegaPrize[];
@@ -63,7 +65,12 @@ export interface MegaDrawLifecycle {
   nextPrizeOrdinal: number;
   remainingPrizes: MegaPrize[];
   completedAt?: string;
+  closedAt?: string;
 }
+export type MegaDrawHistory = Pick<
+  MegaDrawLifecycle,
+  'reference' | 'executionYear' | 'cycleNumber' | 'selectedRows' | 'completedAt' | 'closedAt'
+> & { status: 'CLOSED' };
 export interface MegaDrawExecutionStatus {
   execution: 'NOT_FOUND' | 'IN_PROGRESS' | 'COMPLETED';
   operation?: 'DRAW_NEXT';
@@ -99,6 +106,7 @@ export class MegaDrawService {
   private readonly lifecycles = new Map<string, MegaDrawLifecycle>();
   private readonly executions = new Map<string, Execution>();
   private readonly epochs = new Map<number, number>();
+  private readonly histories = new Map<number, MegaDrawHistory[]>();
   private referenceSequence = 0;
 
   public constructor(
@@ -110,12 +118,14 @@ export class MegaDrawService {
   public get(executionYear = campaignYearInKolkata(this.now())): {
     configuration: MegaPrize[];
     lifecycle?: MegaDrawLifecycle;
+    history: MegaDrawHistory[];
   } {
     const epoch = this.currentEpoch(executionYear);
     const lifecycle = this.lifecycles.get(this.epochKey(executionYear, epoch));
     return {
       configuration: [...(this.configurations.get(this.configurationKey(executionYear)) ?? [])],
       ...(lifecycle ? { lifecycle } : {}),
+      history: [...(this.histories.get(executionYear) ?? [])].reverse(),
     };
   }
   public status(idempotencyKey: string, operatorSubject: string): MegaDrawExecutionStatus {
@@ -268,9 +278,22 @@ export class MegaDrawService {
         'MEGA_DRAW_NOT_CONFIGURED',
         'Mega Draw must be completed before closing.',
       );
-    const closed = { ...lifecycle, status: 'CLOSED' as const };
+    const closed = { ...lifecycle, status: 'CLOSED' as const, closedAt: this.now().toISOString() };
     this.lifecycles.set(key, closed);
+    const history = this.histories.get(year) ?? [];
+    this.histories.set(year, [...history, closed]);
     return { lifecycle: closed };
+  }
+  public reopen(): { executionYear: number; cycleNumber: number } {
+    const year = campaignYearInKolkata(this.now());
+    const current = this.lifecycles.get(this.epochKey(year, this.currentEpoch(year)));
+    if (!current || current.status !== 'CLOSED')
+      throw new MegaDrawError(
+        'MEGA_DRAW_REOPEN_NOT_ALLOWED',
+        'A new Mega Draw cycle can be created only after closing the current cycle.',
+      );
+    this.epochs.set(year, this.currentEpoch(year) + 1);
+    return { executionYear: year, cycleNumber: current.cycleNumber + 1 };
   }
   private startFromPreflight(reference: string | undefined, year: number): MegaDrawLifecycle {
     const preflight = reference
@@ -287,6 +310,7 @@ export class MegaDrawService {
     return {
       reference: this.nextReference(year),
       executionYear: year,
+      cycleNumber: (this.histories.get(year)?.length ?? 0) + 1,
       status: 'SETUP',
       campaign: preflight.campaign,
       prizes: [...preflight.prizes],
@@ -334,6 +358,11 @@ export class MegaDrawService {
           billNumber: claim.billNumberDisplay,
         });
     }
+    const historicalWinners = new Set(
+      (this.histories.get(year) ?? []).flatMap((history) =>
+        history.selectedRows.map((row) => row.candidate.identity),
+      ),
+    );
     return {
       year,
       campaign: {
@@ -344,7 +373,9 @@ export class MegaDrawService {
         ended: true,
       },
       prizes: [...configuration],
-      candidates: [...candidates.values()],
+      candidates: [...candidates.values()].filter(
+        (candidate) => !historicalWinners.has(candidate.identity),
+      ),
     };
   }
   private nextReference(year: number): string {

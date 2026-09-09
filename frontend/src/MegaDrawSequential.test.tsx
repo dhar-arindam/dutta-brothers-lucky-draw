@@ -72,6 +72,9 @@ describe('sequential Mega Draw', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add prize' }));
     fireEvent.change(screen.getByLabelText('Mega prize 2'), { target: { value: 'Silver Coin' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save configuration' }));
+    expect(
+      await screen.findByText('Mega prize configuration saved successfully.'),
+    ).toBeInTheDocument();
     await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(2));
     fireEvent.click(screen.getAllByRole('button', { name: 'Prepare draw' }).at(-1)!);
     await screen.findByText('Preflight summary');
@@ -180,6 +183,14 @@ describe('sequential Mega Draw', () => {
       )
       .mockResolvedValueOnce(
         success({ status: 'SUCCESS', lifecycle: { ...completed, status: 'CLOSED' } }),
+      )
+      .mockResolvedValueOnce(success({ status: 'SUCCESS', executionYear: 2026, cycleNumber: 2 }))
+      .mockResolvedValueOnce(
+        success({
+          status: 'SUCCESS',
+          configuration: prizes,
+          history: [{ ...completed, status: 'CLOSED' }],
+        }),
       );
     vi.stubGlobal('fetch', mockFetch);
 
@@ -196,11 +207,20 @@ describe('sequential Mega Draw', () => {
     expect(await screen.findByRole('heading', { name: 'Mega Draw closed' })).toBeInTheDocument();
     expect(screen.getByText('Amit Das (*****1234)')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Reset Mega Draw' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Reopen/New Cycle' }));
+    expect(
+      await screen.findByText(
+        'New Mega Draw cycle created. Configure prizes and prepare the draw.',
+      ),
+    ).toBeInTheDocument();
     expect(mockFetch).toHaveBeenLastCalledWith(
-      '/api/admin/mega-draw/close',
+      '/api/admin/mega-draw',
+      expect.objectContaining({ method: 'GET' }),
+    );
+    expect(mockFetch).toHaveBeenCalledWith(
+      '/api/admin/mega-draw/reopen',
       expect.objectContaining({
         method: 'POST',
-        body: JSON.stringify({ acknowledgement: true, confirmation: 'CLOSE MEGA DRAW 2026' }),
       }),
     );
   });

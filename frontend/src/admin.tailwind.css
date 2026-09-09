@@ -55,6 +55,209 @@ main[aria-label='Mega Draw operations page'] :where(button, input, select, texta
   outline-offset: 2px;
 }
 
+.admin-help-link {
+  display: inline-flex;
+  min-height: 2.5rem;
+  min-width: 2.5rem;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  padding: 0.5rem;
+  color: #ffffff;
+  background: transparent;
+  text-decoration: none;
+}
+
+.admin-header-account-actions {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.admin-header-actions {
+  position: relative;
+}
+
+.admin-mobile-menu-button,
+.admin-mobile-menu {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .admin-desktop-actions {
+    display: none;
+  }
+
+  .admin-mobile-menu-button {
+    position: absolute;
+    top: 0.75rem;
+    right: 1rem;
+    display: inline-flex;
+    min-height: 2.5rem;
+    min-width: 2.5rem;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    color: #ffffff;
+    background: transparent;
+  }
+
+  .admin-mobile-menu-button:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+  }
+
+  .admin-mobile-menu {
+    position: absolute;
+    top: 4rem;
+    right: 1rem;
+    z-index: 20;
+    display: grid;
+    min-width: 11rem;
+    gap: 0.25rem;
+    border: 1px solid rgb(191 219 254 / 65%);
+    border-radius: 0.75rem;
+    padding: 0.5rem;
+    background: #ffffff;
+    box-shadow: 0 8px 20px rgb(15 23 42 / 20%);
+  }
+
+  .admin-mobile-menu button,
+  .admin-mobile-menu-link {
+    display: flex;
+    min-height: 2.5rem;
+    align-items: center;
+    border: 0;
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    color: #24415f;
+    background: transparent;
+    font: inherit;
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  .admin-mobile-menu button:hover,
+  .admin-mobile-menu-link:hover {
+    background: #eff6ff;
+  }
+
+  .mega-draw-light .admin-mobile-menu,
+  .admin-help-light .admin-mobile-menu {
+    background: #ffffff;
+  }
+
+  main:not(.admin-light):not(.mega-draw-light):not(.admin-help-light) .admin-mobile-menu {
+    border-color: rgb(253 230 138 / 50%);
+    background: #151933;
+  }
+
+  main:not(.admin-light):not(.mega-draw-light):not(.admin-help-light) .admin-mobile-menu button,
+  main:not(.admin-light):not(.mega-draw-light):not(.admin-help-light) .admin-mobile-menu-link {
+    color: #ffeecf;
+  }
+
+  main:not(.admin-light):not(.mega-draw-light):not(.admin-help-light)
+    .admin-mobile-menu
+    button:hover,
+  main:not(.admin-light):not(.mega-draw-light):not(.admin-help-light)
+    .admin-mobile-menu-link:hover {
+    background: #27235d;
+  }
+}
+
+@media (min-width: 768px) {
+  main[aria-label='Admin operations page'] header {
+    padding-right: 26rem;
+  }
+
+  .admin-header-actions {
+    position: absolute;
+    top: 0.75rem;
+    right: 1rem;
+  }
+}
+
+.admin-help-link:hover {
+  color: #dbeafe;
+  background: transparent;
+}
+
+.admin-help-link:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+.admin-help-page-back-link {
+  position: absolute;
+  top: 1.25rem;
+  right: 1.25rem;
+}
+
+.admin-help-header-actions {
+  position: absolute;
+  top: 1.25rem;
+  right: 1.25rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.admin-help-light {
+  background-color: #f3f6fa;
+  color: #1e293b;
+}
+
+.admin-help-dark {
+  background-color: #0f1224;
+  color: #ffeecf;
+}
+
+.admin-help-dark .admin-help-surface {
+  border-color: rgb(251 191 36 / 35%);
+  background-color: #151933;
+  color: #ffeecf;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 20%);
+}
+
+.admin-help-muted {
+  color: #475569;
+}
+
+.admin-help-dark .admin-help-muted {
+  color: rgb(255 238 207 / 78%);
+}
+
+.admin-help-header {
+  padding: 1.25rem 10rem 1.25rem 1.25rem;
+}
+
+.admin-help-header-content {
+  max-width: 100%;
+}
+
+@media (max-width: 640px) {
+  .admin-help-header {
+    padding: 1.25rem;
+  }
+
+  .admin-help-header-content {
+    padding-bottom: 3.5rem;
+  }
+
+  .admin-help-page-back-link {
+    position: static;
+  }
+
+  .admin-help-header-actions {
+    top: auto;
+    right: 1.25rem;
+    bottom: 1.25rem;
+  }
+}
+
 main:not(.admin-light):not(.mega-draw-light) .admin-nav-link {
   border-color: rgb(253 230 138 / 70%);
   color: #fef3c7;
@@ -336,6 +539,10 @@ main[aria-label='Mega Draw operations page'] .mega-prize-wheel__spoke {
   font-size: 0.75rem;
   font-weight: 700;
   text-align: center;
+}
+
+main[aria-label='Mega Draw operations page']:not(.mega-draw-light) .mega-prize-wheel__spoke {
+  color: #ffeecf;
 }
 
 @keyframes mega-wheel-settle {

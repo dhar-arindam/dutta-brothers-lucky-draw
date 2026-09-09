@@ -9,6 +9,7 @@ import {
   type MegaCandidate,
   type MegaCampaignSnapshot,
   type MegaDrawExecutionStatus,
+  type MegaDrawHistory,
   type MegaDrawLifecycle,
   type MegaPreflight,
   type MegaPrize,
@@ -53,14 +54,23 @@ export class DurableMegaDrawService {
     private readonly secureIndex: (upperExclusive: number) => number = randomInt,
   ) {}
 
-  public async get(): Promise<{ configuration: MegaPrize[]; lifecycle?: MegaDrawLifecycle }> {
+  public async get(): Promise<{
+    configuration: MegaPrize[];
+    lifecycle?: MegaDrawLifecycle;
+    history: MegaDrawHistory[];
+  }> {
     const year = campaignYearInKolkata(this.now());
     const current = await this.currentEpoch(year);
-    const [configuration, state] = await Promise.all([
+    const [configuration, state, history] = await Promise.all([
       this.readValue<MegaPrize[]>(year, 'CONFIG'),
       this.readValue<MegaDrawLifecycle>(year, scoped(current, 'STATE')),
+      this.readValue<MegaDrawHistory[]>(year, 'HISTORY'),
     ]);
-    return { configuration: configuration ?? [], ...(state ? { lifecycle: state } : {}) };
+    return {
+      configuration: configuration ?? [],
+      ...(state ? { lifecycle: state } : {}),
+      history: history ?? [],
+    };
   }
 
   public async status(
@@ -301,7 +311,8 @@ export class DurableMegaDrawService {
         'MEGA_DRAW_NOT_CONFIGURED',
         'Mega Draw must be completed before closing.',
       );
-    const closed = { ...lifecycle, status: 'CLOSED' as const };
+    const closed = { ...lifecycle, status: 'CLOSED' as const, closedAt: this.now().toISOString() };
+    const history = (await this.readValue<MegaDrawHistory[]>(year, 'HISTORY')) ?? [];
     try {
       await this.client.send(
         new TransactWriteCommand({
@@ -334,6 +345,12 @@ export class DurableMegaDrawService {
                 },
               },
             },
+            {
+              Put: {
+                TableName: this.tableName,
+                Item: retained(year, 'HISTORY', 'MEGA_HISTORY', [...history, closed]),
+              },
+            },
           ],
         }),
       );
@@ -341,6 +358,40 @@ export class DurableMegaDrawService {
       throw new MegaDrawError('MEGA_DRAW_IN_PROGRESS', 'Mega Draw state changed while closing.');
     }
     return { lifecycle: closed };
+  }
+
+  public async reopen(): Promise<{ executionYear: number; cycleNumber: number }> {
+    const year = campaignYearInKolkata(this.now());
+    const current = await this.currentEpoch(year);
+    const state = await this.readValue<MegaDrawLifecycle>(year, scoped(current, 'STATE'));
+    if (!state || state.status !== 'CLOSED')
+      throw new MegaDrawError(
+        'MEGA_DRAW_REOPEN_NOT_ALLOWED',
+        'A new Mega Draw cycle can be created only after closing the current cycle.',
+      );
+    const history = (await this.readValue<MegaDrawHistory[]>(year, 'HISTORY')) ?? [];
+    const next = { epoch: randomUUID() };
+    await this.client.send(
+      new TransactWriteCommand({
+        TransactItems: [
+          {
+            Update: {
+              TableName: this.tableName,
+              Key: { pk: key(year), sk: 'CURRENT' },
+              ConditionExpression: '#value.#epoch = :epoch',
+              UpdateExpression: 'SET #value = :next, updatedAt = :updatedAt',
+              ExpressionAttributeNames: { '#value': 'value', '#epoch': 'epoch' },
+              ExpressionAttributeValues: {
+                ':epoch': current,
+                ':next': next,
+                ':updatedAt': this.now().toISOString(),
+              },
+            },
+          },
+        ],
+      }),
+    );
+    return { executionYear: year, cycleNumber: history.length + 1 };
   }
 
   private async startFromPreflight(
@@ -359,9 +410,11 @@ export class DurableMegaDrawService {
     )
       throw stale();
     if (preflight.candidates.length < preflight.prizes.length) throw insufficient();
+    const history = (await this.readValue<MegaDrawHistory[]>(year, 'HISTORY')) ?? [];
     return {
       reference: `MD-${year}-${randomUUID()}`,
       executionYear: year,
+      cycleNumber: history.length + 1,
       status: 'SETUP',
       campaign: preflight.campaign,
       prizes: preflight.prizes,
@@ -379,10 +432,11 @@ export class DurableMegaDrawService {
     candidates: MegaCandidate[];
   }> {
     const year = campaignYearInKolkata(this.now());
-    const [campaign, prizes, claims] = await Promise.all([
+    const [campaign, prizes, claims, history] = await Promise.all([
       this.drawStore.getCampaign(),
       this.readValue<MegaPrize[]>(year, 'CONFIG'),
       this.drawStore.listActiveClaims(),
+      this.readValue<MegaDrawHistory[]>(year, 'HISTORY'),
     ]);
     if (!campaign || Number(campaign.fromDate.slice(0, 4)) !== year)
       throw new MegaDrawError(
@@ -413,6 +467,9 @@ export class DurableMegaDrawService {
           billNumber: claim.billNumberDisplay,
         });
     }
+    const historicalWinners = new Set(
+      (history ?? []).flatMap((cycle) => cycle.selectedRows.map((row) => row.candidate.identity)),
+    );
     return {
       year,
       campaign: {
@@ -423,7 +480,9 @@ export class DurableMegaDrawService {
         ended: true,
       },
       prizes,
-      candidates: [...candidates.values()],
+      candidates: [...candidates.values()].filter(
+        (candidate) => !historicalWinners.has(candidate.identity),
+      ),
     };
   }
 

@@ -181,7 +181,7 @@ it('retains editable configuration without retaining winner history or audit rec
   await service.reset({ acknowledgement: true, confirmation: 'RESET MEGA DRAW 2026' });
   const read = await serviceFor(client).get();
 
-  expect(read).toEqual({ configuration: [{ position: 1, name: 'First' }] });
+  expect(read).toEqual({ configuration: [{ position: 1, name: 'First' }], history: [] });
   expect([...client.items.values()].filter((item) => item.entityType === 'MEGA_AUDIT')).toEqual([]);
   expect(original.lifecycle.selectedRows).toHaveLength(1);
 });

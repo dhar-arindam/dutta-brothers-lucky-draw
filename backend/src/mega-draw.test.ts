@@ -128,6 +128,7 @@ describe('MegaDrawService', () => {
         { position: 1, name: 'First' },
         { position: 2, name: 'Second' },
       ],
+      history: [],
     });
     expect(activeClaims).toHaveLength(4);
     const redrawPreflight = service.preflight();
@@ -174,5 +175,38 @@ describe('MegaDrawService', () => {
     expect(() =>
       service.reset({ acknowledgement: true, confirmation: 'RESET MEGA DRAW 2026' }),
     ).toThrow(/closed/i);
+  });
+
+  it('reopens only closed cycles and excludes winners from earlier cycles', () => {
+    const activeClaims = [
+      claim('DB26-1', 'BILL-1', '9876543210'),
+      claim('DB26-2', 'BILL-2', '9123456789'),
+    ];
+    const service = new MegaDrawService(
+      { getCampaign: () => campaign, listActiveClaims: () => activeClaims },
+      () => now,
+      () => 0,
+    );
+    service.configure(['Only prize']);
+    const firstPreflight = service.preflight();
+    const first = service.drawNext({
+      preflightReference: firstPreflight.reference,
+      idempotencyKey: 'cycle-1',
+      operatorSubject: 'admin',
+    });
+    service.close({ acknowledgement: true, confirmation: 'CLOSE MEGA DRAW 2026' });
+
+    expect(service.reopen()).toEqual({ executionYear: 2026, cycleNumber: 2 });
+    const secondPreflight = service.preflight();
+    expect(secondPreflight.candidateCount).toBe(1);
+    const second = service.drawNext({
+      preflightReference: secondPreflight.reference,
+      idempotencyKey: 'cycle-2',
+      operatorSubject: 'admin',
+    });
+
+    expect(second.selectedRow.candidate.identity).not.toBe(first.selectedRow.candidate.identity);
+    expect(service.get().history).toHaveLength(1);
+    expect(service.get().history[0]).toMatchObject({ cycleNumber: 1, status: 'CLOSED' });
   });
 });

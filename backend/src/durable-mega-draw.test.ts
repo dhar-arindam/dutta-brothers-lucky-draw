@@ -8,6 +8,7 @@ const now = new Date('2026-11-02T00:00:00.000Z');
 const original: MegaDrawLifecycle = {
   reference: 'MD-2026-original',
   executionYear: 2026,
+  cycleNumber: 1,
   status: 'COMPLETED',
   completedAt: now.toISOString(),
   campaign: {
@@ -55,6 +56,7 @@ describe('DurableMegaDrawService reads', () => {
     await expect(service.get()).resolves.toEqual({
       configuration: [{ position: 1, name: 'First' }],
       lifecycle: current,
+      history: [],
     });
     await expect(service.status('lost-response', 'admin-1')).resolves.toEqual({
       execution: 'COMPLETED',

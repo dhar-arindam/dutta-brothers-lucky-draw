@@ -32,16 +32,16 @@ export const createLocalMegaDrawSeed = (
   }
 
   const year = campaignYearInKolkata(now);
-  const claims = Array.from({ length: 12 }, (_, index): Claim => {
+  const claims = Array.from({ length: 200 }, (_, index): Claim => {
     const prize = localMainPrizes[index % localMainPrizes.length];
     if (!prize) {
       throw new Error('Local Mega Draw seed requires main prizes.');
     }
     const sequence = (index + 1).toString().padStart(6, '0');
-    const day = (index + 1).toString().padStart(2, '0');
+    const claimDate = new Date(Date.UTC(year, 0, 1 + Math.floor(index / 7), 10 + (index % 7)));
     return {
       claimId: `DB${year.toString().slice(-2)}-${sequence}`,
-      claimTimestamp: `${year}-01-${day}T10:00:00.000Z`,
+      claimTimestamp: claimDate.toISOString(),
       customerName: `Mega Draw Customer ${index + 1}`,
       phone: `900000${(1000 + index).toString().slice(-4)}`,
       billNumberDisplay: `MEGA-${year}-${sequence}`,

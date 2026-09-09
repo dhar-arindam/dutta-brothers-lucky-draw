@@ -188,7 +188,7 @@ These criteria define the Definition of Done for the initial product scope.
 ### Mega Draw
 
 - [ ] Mega Draw is reachable only from the logged-in Admin page; an unauthenticated direct visit to `/admin/mega-draw` redirects to `/admin` without exposing Mega Draw data.
-- [ ] All Mega Draw configuration, preflight, execution, results, and reset APIs require Admin scope; ordinary approved Admin read APIs remain public.
+- [ ] All Mega Draw configuration, preflight, execution, results, reset, close, and Reopen/New Cycle APIs require Admin scope; ordinary approved Admin read APIs remain public.
 - [ ] Before its first successful selection, the Mega Draw supports adding, removing, renaming, and reordering 1 to 10 ordered, non-blank, uniquely named prizes; it does not reuse main-draw weights, active state, stock, or `Given` counts.
 - [ ] Execution is allowed only after the backend determines the current `Asia/Kolkata` campaign has ended.
 - [ ] Eligibility contains only active successful claims from the execution year; archived claims are excluded.
@@ -211,8 +211,11 @@ These criteria define the Definition of Done for the initial product scope.
 - [ ] Reset clears only active winner, lifecycle, preflight, locked-snapshot, and idempotency/execution state; it preserves editable ordered Mega prizes and makes all previously selected candidates eligible for the new lifecycle.
 - [ ] Results display all winners in chronological selection order.
 - [ ] Completed Mega Draw close requires acknowledgement and exact typed confirmation `CLOSE MEGA DRAW <year>`; `CLOSED` results remain viewable, while new draw, configuration update, preflight, and reset are prohibited for that execution year.
+- [ ] Reopen/New Cycle is enabled only when the current cycle is `CLOSED`; it creates the next sequential cycle while preserving the closed cycle and its winners.
+- [ ] A reopened cycle excludes every candidate identity selected in all earlier closed cycles for that execution year.
+- [ ] Closed cycles are shown in collapsed history panels with headers containing the cycle number and close time; expanding a panel shows its preserved winners in chronological order.
 - [ ] Reset does not alter main lucky-draw claims, prizes, campaign, claim archives, aggregate records, or ordinary claims CSV content or scope.
-- [ ] No Mega Draw audit trace, reset event, close event, historical void/redraw relationship, or Mega-specific retention history is created or retained.
+- [ ] Reset creates no history, while closed-cycle results and close timestamps remain retained and viewable across later Reopen/New Cycle operations.
 - [ ] Mega Draw configuration, confirmation, results, and failure states are keyboard-operable, visibly focused, screen-reader announced, and usable at 360px, 375px, 390px, and 430px widths.
 
 ## 8. Security

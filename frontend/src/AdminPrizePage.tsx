@@ -1,4 +1,5 @@
 import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { HelpCircle, LogOut, Menu, Moon, Sun, X } from 'lucide-react';
 
 import type {
   AdminCampaignResponse,
@@ -100,6 +101,7 @@ export const AdminPrizePage = ({
 
     return window.localStorage.getItem('dutta-draw-admin-theme') !== 'dark';
   });
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [state, setState] = useState<AdminPageState>({ type: 'READY' });
   const [busyAction, setBusyAction] = useState<BusyAction>('NONE');
   const [statusMessage, setStatusMessage] = useState('');
@@ -242,16 +244,10 @@ export const AdminPrizePage = ({
         setErrorState(failure.message);
         return;
       }
-
-      if (
-        !('items' in prizesResponse) ||
-        !('items' in claimsResponse) ||
-        !('campaign' in campaignResponse)
-      ) {
+      if (!('items' in prizesResponse) || !('campaign' in campaignResponse)) {
         setErrorState('We could not complete the admin request. Please try again.');
         return;
       }
-
       setSummary(summaryResponse as AdminSummaryResponse);
       setCampaign((campaignResponse as AdminCampaignResponse).campaign);
       setCampaignForm({
@@ -331,7 +327,6 @@ export const AdminPrizePage = ({
       isLoadingMoreClaimsRef.current = true;
       void loadClaims(buildClaimsQuery(nextPageToken), true);
     });
-
     observer.observe(sentinel);
     return () => observer.disconnect();
     // The observer must be recreated when the cursor or loading state changes.
@@ -785,7 +780,7 @@ export const AdminPrizePage = ({
               Operational view for campaign control, prize status, and claims reporting.
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="admin-header-actions admin-desktop-actions flex flex-wrap items-center gap-2">
             {isAuthenticated ? (
               <a href="/admin/mega-draw" className={`${secondaryButtonClass} admin-nav-link`}>
                 Mega Draw
@@ -800,32 +795,96 @@ export const AdminPrizePage = ({
             >
               {busyAction === 'INITIAL' ? 'Refreshing...' : 'Refresh'}
             </button>
-            {isAuthenticated ? (
+            <span className="admin-header-account-actions">
+              {isAuthenticated ? (
+                <a
+                  href="/admin/help"
+                  className="admin-help-link"
+                  aria-label="Open admin user guide"
+                  title="Open admin user guide"
+                >
+                  <HelpCircle aria-hidden="true" size={18} />
+                </a>
+              ) : null}
               <button
                 type="button"
-                className={`${secondaryButtonClass} absolute right-4 top-3`}
-                onClick={onSignOut}
+                className="admin-help-link"
+                onClick={() => setIsLightTheme((current) => !current)}
+                aria-label={isLightTheme ? 'Switch to Dark' : 'Switch to Light'}
+                title={isLightTheme ? 'Switch to Dark' : 'Switch to Light'}
               >
-                Sign out
+                {isLightTheme ? (
+                  <Moon aria-hidden="true" size={18} />
+                ) : (
+                  <Sun aria-hidden="true" size={18} />
+                )}
               </button>
-            ) : (
-              <button
-                type="button"
-                className={`${primaryButtonClass} absolute right-4 top-3`}
-                onClick={onSignIn}
-              >
-                Sign in
-              </button>
-            )}
-            <button
-              type="button"
-              className={secondaryButtonClass}
-              onClick={() => setIsLightTheme((current) => !current)}
-              title="Toggle admin color theme"
-            >
-              {isLightTheme ? 'Switch to Dark' : 'Switch to Light'}
-            </button>
+              {isAuthenticated ? (
+                <button
+                  type="button"
+                  className="admin-help-link"
+                  onClick={onSignOut}
+                  aria-label="Sign out"
+                  title="Sign out"
+                >
+                  <LogOut aria-hidden="true" size={18} />
+                </button>
+              ) : (
+                <button type="button" className={primaryButtonClass} onClick={onSignIn}>
+                  Sign in
+                </button>
+              )}
+            </span>
           </div>
+          <button
+            type="button"
+            className="admin-mobile-menu-button"
+            onClick={() => setIsMobileMenuOpen((current) => !current)}
+            aria-label={isMobileMenuOpen ? 'Close admin menu' : 'Open admin menu'}
+            aria-expanded={isMobileMenuOpen}
+            aria-controls="admin-mobile-menu"
+          >
+            {isMobileMenuOpen ? (
+              <X aria-hidden="true" size={20} />
+            ) : (
+              <Menu aria-hidden="true" size={20} />
+            )}
+          </button>
+          {isMobileMenuOpen ? (
+            <nav id="admin-mobile-menu" className="admin-mobile-menu" aria-label="Admin actions">
+              {isAuthenticated ? (
+                <a href="/admin/mega-draw" className="admin-mobile-menu-link">
+                  Mega Draw
+                </a>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  void loadAdminData();
+                }}
+              >
+                Refresh
+              </button>
+              {isAuthenticated ? (
+                <a href="/admin/help" className="admin-mobile-menu-link">
+                  Help
+                </a>
+              ) : null}
+              <button type="button" onClick={() => setIsLightTheme((current) => !current)}>
+                {isLightTheme ? 'Switch to Dark' : 'Switch to Light'}
+              </button>
+              {isAuthenticated ? (
+                <button type="button" onClick={onSignOut}>
+                  Sign out
+                </button>
+              ) : (
+                <button type="button" onClick={onSignIn}>
+                  Sign in
+                </button>
+              )}
+            </nav>
+          ) : null}
         </header>
 
         {authMessage ? (

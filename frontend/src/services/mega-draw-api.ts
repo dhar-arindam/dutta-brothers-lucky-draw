@@ -7,6 +7,7 @@ import type {
   MegaDrawLifecycle,
   MegaDrawPreflightResponse,
   MegaDrawResetResponse,
+  MegaDrawReopenResponse,
   MegaDrawStatusResponse,
 } from '../types';
 import { expireAdminSession, getAdminAccessToken } from './cognito-auth';
@@ -130,6 +131,9 @@ export const closeMegaDraw = (payload: {
     method: 'POST',
     body: JSON.stringify(payload),
   });
+
+export const reopenMegaDraw = (): Promise<MegaDrawReopenResponse> =>
+  request('/api/admin/mega-draw/reopen', { method: 'POST' });
 
 export const getMegaDrawStatus = async (
   idempotencyKey: string,

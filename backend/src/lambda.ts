@@ -213,6 +213,7 @@ const megaErrorResponse = (
       : error.code === 'MEGA_DRAW_IN_PROGRESS' ||
           error.code === 'MEGA_DRAW_ALREADY_COMPLETED' ||
           error.code === 'MEGA_DRAW_CLOSED' ||
+          error.code === 'MEGA_DRAW_REOPEN_NOT_ALLOWED' ||
           error.code === 'CAMPAIGN_NOT_ENDED' ||
           error.code === 'INSUFFICIENT_ELIGIBLE_PARTICIPANTS'
         ? 409
@@ -537,6 +538,8 @@ export const handler = async (event: {
           return responseJson(400, validationErrorResponse().body);
         return responseJson(200, { status: 'SUCCESS', ...(await megaDraw.close(parsed.value)) });
       }
+      if (method === 'POST' && path === '/api/admin/mega-draw/reopen')
+        return responseJson(200, { status: 'SUCCESS', ...(await megaDraw.reopen()) });
     }
 
     if (method === 'POST' && path === '/api/draw') {

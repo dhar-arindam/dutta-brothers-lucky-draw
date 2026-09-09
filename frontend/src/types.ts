@@ -170,6 +170,7 @@ export interface MegaDrawSelectedRow {
 export interface MegaDrawLifecycle {
   reference: string;
   executionYear: number;
+  cycleNumber: number;
   status: 'SETUP' | 'IN_PROGRESS' | 'COMPLETED' | 'CLOSED';
   campaign?: MegaCampaignSnapshot;
   prizes?: MegaPrize[];
@@ -177,7 +178,13 @@ export interface MegaDrawLifecycle {
   nextPrizeOrdinal: number;
   remainingPrizes: MegaPrize[];
   completedAt?: string;
+  closedAt?: string;
 }
+
+export type MegaDrawHistory = Pick<
+  MegaDrawLifecycle,
+  'reference' | 'executionYear' | 'cycleNumber' | 'selectedRows' | 'completedAt' | 'closedAt'
+> & { status: 'CLOSED' };
 
 export interface MegaDrawPreflight {
   reference: string;
@@ -192,6 +199,7 @@ export interface MegaDrawGetResponse {
   status: 'SUCCESS';
   configuration: MegaPrize[];
   lifecycle?: MegaDrawLifecycle;
+  history: MegaDrawHistory[];
 }
 
 export interface MegaDrawConfigurationResponse {
@@ -226,6 +234,12 @@ export interface MegaDrawResetResponse {
 export interface MegaDrawCloseResponse {
   status: 'SUCCESS';
   lifecycle: MegaDrawLifecycle;
+}
+
+export interface MegaDrawReopenResponse {
+  status: 'SUCCESS';
+  executionYear: number;
+  cycleNumber: number;
 }
 
 export interface MegaDrawErrorResponse {

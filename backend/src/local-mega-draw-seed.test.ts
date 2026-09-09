@@ -24,18 +24,18 @@ describe('local Mega Draw seed', () => {
       toDate: '2026-01-31',
       status: 'ENDED',
     });
-    expect(store.listActiveClaims()).toHaveLength(12);
+    expect(store.listActiveClaims()).toHaveLength(200);
     expect(new Set(store.listActiveClaims().map((claim) => claim.billNumberNormalized)).size).toBe(
-      12,
+      200,
     );
-    expect(new Set(store.listActiveClaims().map((claim) => claim.phone)).size).toBe(12);
-    expect(store.summary().totalSuccessfulSpins).toBe(12);
+    expect(new Set(store.listActiveClaims().map((claim) => claim.phone)).size).toBe(200);
+    expect(store.summary().totalSuccessfulSpins).toBe(200);
     expect(
       store.summary().prizeDistribution.reduce((sum, prize) => sum + prize.givenCount, 0),
-    ).toBe(12);
+    ).toBe(200);
 
     const preflight = megaDraw.preflight();
-    expect(preflight).toMatchObject({ executionYear: 2026, candidateCount: 12 });
+    expect(preflight).toMatchObject({ executionYear: 2026, candidateCount: 200 });
     expect(preflight.prizes).toHaveLength(3);
 
     const result = megaDraw.drawNext({

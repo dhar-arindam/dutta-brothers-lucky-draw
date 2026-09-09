@@ -1,7 +1,23 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
-import { ClipboardCheck, Maximize2, Minimize2, RotateCcw, Save, X } from 'lucide-react';
+import {
+  ClipboardCheck,
+  HelpCircle,
+  Menu,
+  Maximize2,
+  Minimize2,
+  Moon,
+  RotateCcw,
+  Save,
+  Sun,
+  X,
+} from 'lucide-react';
 
-import type { MegaDrawLifecycle, MegaDrawPreflight, MegaDrawSelectedRow } from './types';
+import type {
+  MegaDrawHistory,
+  MegaDrawLifecycle,
+  MegaDrawPreflight,
+  MegaDrawSelectedRow,
+} from './types';
 import {
   closeMegaDraw,
   drawNextMegaPrize,
@@ -9,6 +25,7 @@ import {
   getMegaDrawStatus,
   MegaDrawApiError,
   prepareMegaDraw,
+  reopenMegaDraw,
   resetMegaDraw,
   saveMegaDrawConfiguration,
 } from './services/mega-draw-api';
@@ -42,14 +59,17 @@ export const MegaDrawPage = () => {
       typeof window === 'undefined' ||
       window.localStorage.getItem('dutta-draw-admin-theme') !== 'dark',
   );
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [uiState, setUiState] = useState<UiState>('LOADING');
   const [prizeNames, setPrizeNames] = useState<string[]>(['']);
   const [preflight, setPreflight] = useState<MegaDrawPreflight | null>(null);
   const [lifecycle, setLifecycle] = useState<MegaDrawLifecycle | null>(null);
+  const [history, setHistory] = useState<MegaDrawHistory[]>([]);
   const [dialog, setDialog] = useState<Dialog>(null);
   const [acknowledged, setAcknowledged] = useState(false);
   const [confirmation, setConfirmation] = useState('');
   const [message, setMessage] = useState('');
+  const [toastMessage, setToastMessage] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Record<number, string>>({});
   const [attemptKey, setAttemptKey] = useState<string | null>(null);
   const [newWinner, setNewWinner] = useState<MegaDrawSelectedRow | null>(null);
@@ -67,6 +87,7 @@ export const MegaDrawPage = () => {
         response.configuration.length ? response.configuration.map((prize) => prize.name) : [''],
       );
       setLifecycle(response.lifecycle ?? null);
+      setHistory(response.history ?? []);
       const status = response.lifecycle?.status;
       setUiState(
         status === 'CLOSED'
@@ -100,6 +121,11 @@ export const MegaDrawPage = () => {
     const timer = window.setTimeout(() => setHeldPrize(null), 8500);
     return () => window.clearTimeout(timer);
   }, [heldPrize]);
+  useEffect(() => {
+    if (!toastMessage) return;
+    const timer = window.setTimeout(() => setToastMessage(''), 3000);
+    return () => window.clearTimeout(timer);
+  }, [toastMessage]);
   useEffect(() => {
     if (dialog !== 'RUN' || lifecycle?.status !== 'COMPLETED') {
       setShowFinalWinners(false);
@@ -137,7 +163,8 @@ export const MegaDrawPage = () => {
       setPrizeNames(response.prizes.map((prize) => prize.name));
       setPreflight(null);
       setUiState('SETUP');
-      setMessage('Mega prize configuration saved. Prepare a new draw snapshot.');
+      setMessage('Mega prize configuration saved successfully. Prepare a new draw snapshot.');
+      setToastMessage('Mega prize configuration saved successfully.');
     } catch (error) {
       setUiState('ERROR');
       setMessage(error instanceof Error ? error.message : 'Unable to save configuration.');
@@ -284,6 +311,20 @@ export const MegaDrawPage = () => {
     }
   };
 
+  const reopen = async () => {
+    try {
+      await reopenMegaDraw();
+      setLifecycle(null);
+      setPreflight(null);
+      setNewWinner(null);
+      setHeldPrize(null);
+      await load('New Mega Draw cycle created. Configure prizes and prepare the draw.');
+    } catch (error) {
+      setUiState('ERROR');
+      setMessage(error instanceof Error ? error.message : 'Mega Draw cycle could not be reopened.');
+    }
+  };
+
   const movePrize = (index: number, offset: number) =>
     setPrizeNames((current) => {
       const target = index + offset;
@@ -346,7 +387,7 @@ export const MegaDrawPage = () => {
               Year-end winner selection
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="admin-desktop-actions flex flex-wrap items-center gap-2">
             <a
               href="/admin"
               className={`${secondaryButtonClass} admin-nav-link`}
@@ -354,15 +395,59 @@ export const MegaDrawPage = () => {
             >
               Back to Admin
             </a>
+            <a
+              href="/admin/help"
+              className="admin-help-link"
+              aria-label="Open admin user guide"
+              title="Open admin user guide"
+            >
+              <HelpCircle aria-hidden="true" size={18} />
+            </a>
             <button
               type="button"
-              className={secondaryButtonClass}
+              className="admin-help-link"
               onClick={() => setIsLightTheme((current) => !current)}
-              title="Toggle admin color theme"
+              aria-label={isLightTheme ? 'Switch to Dark' : 'Switch to Light'}
+              title={isLightTheme ? 'Switch to Dark' : 'Switch to Light'}
             >
-              {isLightTheme ? 'Switch to Dark' : 'Switch to Light'}
+              {isLightTheme ? (
+                <Moon aria-hidden="true" size={18} />
+              ) : (
+                <Sun aria-hidden="true" size={18} />
+              )}
             </button>
           </div>
+          <button
+            type="button"
+            className="admin-mobile-menu-button"
+            onClick={() => setIsMobileMenuOpen((current) => !current)}
+            aria-label={isMobileMenuOpen ? 'Close Mega Draw menu' : 'Open Mega Draw menu'}
+            aria-expanded={isMobileMenuOpen}
+            aria-controls="mega-draw-mobile-menu"
+          >
+            {isMobileMenuOpen ? (
+              <X aria-hidden="true" size={20} />
+            ) : (
+              <Menu aria-hidden="true" size={20} />
+            )}
+          </button>
+          {isMobileMenuOpen ? (
+            <nav
+              id="mega-draw-mobile-menu"
+              className="admin-mobile-menu"
+              aria-label="Mega Draw actions"
+            >
+              <a href="/admin" className="admin-mobile-menu-link">
+                Back to Admin
+              </a>
+              <a href="/admin/help" className="admin-mobile-menu-link">
+                Help
+              </a>
+              <button type="button" onClick={() => setIsLightTheme((current) => !current)}>
+                {isLightTheme ? 'Switch to Dark' : 'Switch to Light'}
+              </button>
+            </nav>
+          ) : null}
         </header>
         <p className="sr-only" aria-live="polite">
           {message}
@@ -390,6 +475,15 @@ export const MegaDrawPage = () => {
             <button type="button" className={secondaryButtonClass} onClick={() => void load()}>
               Retry load
             </button>
+          </div>
+        ) : null}
+        {toastMessage ? (
+          <div
+            className={`fixed bottom-4 right-4 z-50 max-w-sm rounded-lg border px-4 py-3 text-sm font-medium shadow-lg ${isLightTheme ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : 'border-emerald-300/45 bg-emerald-950/95 text-emerald-100'}`}
+            role="status"
+            aria-live="polite"
+          >
+            {toastMessage}
           </div>
         ) : null}
         {!isLocked && uiState !== 'LOADING' ? (
@@ -550,6 +644,47 @@ export const MegaDrawPage = () => {
             isLightTheme={isLightTheme}
           />
         ) : null}
+        {isClosed ? (
+          <button
+            type="button"
+            className={`mt-4 ${primaryButtonClass}`}
+            onClick={() => void reopen()}
+          >
+            Reopen/New Cycle
+          </button>
+        ) : null}
+        {history.some((cycle) => cycle.reference !== lifecycle?.reference) ? (
+          <section className={`mt-4 border-t pt-4 ${sectionBorderClass}`}>
+            <h2
+              className={`m-0 text-base font-semibold uppercase tracking-[0.04em] ${headingTextClass}`}
+            >
+              Closed Mega Draw cycles
+            </h2>
+            <div className="mt-3 grid gap-2">
+              {history
+                .filter((cycle) => cycle.reference !== lifecycle?.reference)
+                .map((cycle) => (
+                  <details
+                    key={cycle.reference}
+                    className={`rounded-lg border p-3 ${surfaceClass}`}
+                  >
+                    <summary className={`cursor-pointer font-semibold ${headingTextClass}`}>
+                      Cycle {cycle.cycleNumber} - closed{' '}
+                      {cycle.closedAt ? formatKolkata(cycle.closedAt) : 'time unavailable'}
+                    </summary>
+                    <div className="mt-3 grid gap-2 text-sm">
+                      {cycle.selectedRows.map((row) => (
+                        <p key={`${cycle.reference}-${row.prize.position}`} className="m-0">
+                          {row.prize.name}: {row.candidate.customerName} (
+                          {row.candidate.maskedPhone})
+                        </p>
+                      ))}
+                    </div>
+                  </details>
+                ))}
+            </div>
+          </section>
+        ) : null}
         {dialog ? (
           <DialogView
             dialog={dialog}
@@ -627,10 +762,12 @@ const Results = ({
           This terminal lifecycle is read-only. Results remain available.
         </p>
       )}
-      <WinnerRows lifecycle={lifecycle} newWinner={newWinner} />
+      <WinnerRows lifecycle={lifecycle} newWinner={newWinner} isLightTheme={isLightTheme} />
       <p className="mt-3 text-sm">
-        {lifecycle.remainingPrizes.length} prizes remain. Reference: {lifecycle.reference}
+        {lifecycle.remainingPrizes.length} prizes remain. Cycle {lifecycle.cycleNumber}. Reference:{' '}
+        {lifecycle.reference}
         {lifecycle.completedAt ? ` Completed ${formatKolkata(lifecycle.completedAt)}.` : ''}
+        {lifecycle.closedAt ? ` Closed ${formatKolkata(lifecycle.closedAt)}.` : ''}
       </p>
       {!isClosed ? (
         <div className={`mt-4 flex flex-wrap gap-2 border-t pt-4 ${border}`}>
@@ -656,15 +793,17 @@ const Results = ({
 const WinnerRows = ({
   lifecycle,
   newWinner,
+  isLightTheme,
 }: {
   lifecycle: MegaDrawLifecycle;
   newWinner: MegaDrawSelectedRow | null;
+  isLightTheme: boolean;
 }) => (
   <ol className="mt-3 grid list-none gap-2 p-0">
     {lifecycle.selectedRows.map((winner) => (
       <li
         key={`${winner.prize.position}-${winner.candidate.sourceClaimId}`}
-        className={`mega-result-row rounded-lg border border-slate-300/70 bg-white p-3 ${newWinner?.prize.position === winner.prize.position ? 'mega-result-row--new' : ''}`}
+        className={`mega-result-row rounded-lg border p-3 ${isLightTheme ? 'border-slate-300/70 bg-white text-slate-900' : 'border-amber-300/30 bg-[#151933] text-amber-100'} ${newWinner?.prize.position === winner.prize.position ? 'mega-result-row--new' : ''}`}
       >
         <strong>
           {winner.prize.position}. {winner.prize.name}

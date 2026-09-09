@@ -26,12 +26,14 @@ The administrator can configure Mega prizes, review a backend-derived eligible-p
 
 ### In Scope
 
-- One Mega Draw for a single `Asia/Kolkata` calendar year.
+- Multiple sequential Mega Draw cycles for a single `Asia/Kolkata` calendar year.
 - A configurable number of ordered, separately configured Mega prizes; four prizes are an example, not a fixed product limit.
 - Server-side random selection of one distinct candidate per configured Mega prize.
 - Authenticated Admin-scope configuration, execution, and result access.
 - Admin-authorized reset that creates a new Mega Draw lifecycle while retaining its editable ordered prize configuration.
 - Admin-authorized terminal close of a completed Mega Draw for its execution year.
+- Admin-authorized creation of a new cycle only after the previous cycle is closed.
+- Collapsed authenticated history panels for all closed cycles in the execution year.
 
 ### Out of Scope
 
@@ -59,7 +61,7 @@ The administrator can configure Mega prizes, review a backend-derived eligible-p
 - At least one and no more than 10 prize slots must be configured before the Mega Draw can be executed.
 - Before the first successful `draw next` selection, an administrator may add, remove, rename, or reorder the 1 to 10 prize slots.
 - The first successful selection locks an immutable ordered prize snapshot and candidate snapshot. From that point, Mega prize configuration and order are immutable for that draw.
-- A change required after the first successful selection requires the controlled reset in MD-008. Reset preserves the configured ordered prize slots but clears active lifecycle state and does not preserve access to historical Mega Draw results.
+- A change required after the first successful selection requires the controlled reset in MD-008. Reset preserves the configured ordered prize slots but clears active lifecycle state and does not create a historical cycle.
 - A successful configuration save provides an explicit success notification.
 
 ### MD-003 - Eligibility Year and Candidate Population
@@ -90,7 +92,9 @@ The administrator can configure Mega prizes, review a backend-derived eligible-p
 - Each later `draw next` action atomically selects and persists exactly one distinct winner for the next unselected configured prize in reverse order. It excludes every candidate identity already selected in that draw.
 - A partially completed draw is valid, immutable for its selected rows, and resumable after refresh. Prizes must be selected strictly in reverse configured order: the last configured prize first through prize 1 last.
 - The Admin explicitly clicks the presented wheel to initiate each `draw next` request. The backend selects and persists a winner only after that click. After receiving the authoritative persisted result, any wheel rotation is presentation-only and cannot select, rank, remove, or determine a winner.
-- Only the current Mega Draw lifecycle may be read or operated for an execution year. It has at most one lifecycle: `SETUP` before selection, `IN_PROGRESS` after one or more but fewer than all prize selections, `COMPLETED` after the last configured prize, and terminal `CLOSED` after MD-009. An Admin may reset `SETUP`, `IN_PROGRESS`, or `COMPLETED` only through MD-008.
+- The active Mega Draw lifecycle has status `SETUP`, `IN_PROGRESS`, `COMPLETED`, or terminal `CLOSED`. An Admin may reset `SETUP`, `IN_PROGRESS`, or `COMPLETED` only through MD-008. A new cycle may be created only from a `CLOSED` lifecycle through MD-010.
+- Every cycle has a sequential cycle number for the execution year. Closed cycles remain readable as historical records, including their winners, reference, cycle number, and close timestamp.
+- A new cycle excludes every candidate identity selected as a winner in any earlier cycle for the same execution year. Resetting an active cycle does not create history and returns its selected candidates to eligibility for that active cycle.
 - The backend maintains one conditional draw-state record per execution year to serialize each next-prize action and recover a stale in-progress operation without selecting a second winner for the same prize ordinal.
 - The Admin UI creates and retains one opaque idempotency key for each `draw next` action. The backend binds the key to the authenticated Admin subject, execution year, draw reference, next prize ordinal, and request fingerprint.
 - A retry with the same idempotency key returns the original selected row or its current operation status. Reusing a key with different request details is rejected.
@@ -114,7 +118,7 @@ The administrator can configure Mega prizes, review a backend-derived eligible-p
 - An active draw lifecycle preserves the execution year, current epoch, locked campaign/candidate/prize snapshots, ordered selected rows, current next prize ordinal, status, and completed UTC timestamp when complete. Each row preserves its selected candidate identity, source claim ID, source claim timestamp, and candidate-pool count until reset.
 - Admin result views mask phone numbers by default, consistent with existing claims reporting. The authenticated festive winner reveal modal may show the selected candidate's full normalized phone number for operator confirmation.
 - Mega Draw winners, snapshots, and results have no separate export. The existing year-based claims CSV remains the only export and retains its approved scope and format.
-- No Mega Draw audit trace, reset event, close event, historical void/redraw history, or Mega Draw-specific retention requirement exists. Reset immediately removes the active lifecycle results and state; no Mega history is retained.
+- Closed cycles, winners, snapshots, and close timestamps are retained as Mega Draw history. Reset immediately removes only the active lifecycle results and state; reset does not create history.
 - In-progress and completed results remain viewable to authenticated administrators after main-draw prize configuration changes.
 
 ### MD-008 - Reset Mega Draw
@@ -136,7 +140,16 @@ The administrator can configure Mega prizes, review a backend-derived eligible-p
 - Only an authenticated Admin-scope user may close a `COMPLETED` Mega Draw.
 - Close requires a strong confirmation consisting of acknowledgement and exact typed confirmation `CLOSE MEGA DRAW <year>`.
 - A successful close changes the execution year's lifecycle to terminal `CLOSED`. Results remain viewable in chronological selection order, but no new draw, configuration update, preflight, or reset is allowed for that execution year.
-- Closing creates and retains no Mega Draw audit, close event, or historical record. No Mega history is retained.
+- Closing retains the cycle's results and close timestamp as history, but creates no separate close-event audit record.
+
+### MD-010 - Reopen/New Cycle
+
+- Only an authenticated Admin-scope user may create a new cycle when the current execution-year lifecycle is `CLOSED`.
+- Reopen/New Cycle is unavailable for `SETUP`, `IN_PROGRESS`, or `COMPLETED` lifecycles.
+- A successful Reopen/New Cycle preserves the closed cycle and creates the next sequential cycle in `SETUP` with the existing ordered Mega prize configuration editable.
+- The new cycle's candidate population excludes every candidate identity selected in all earlier closed cycles for the execution year, in addition to normal eligibility rules.
+- The new cycle receives a new reference and independent preflight, lifecycle, winner rows, and close timestamp.
+- The Admin view displays each closed cycle in a collapsed history panel whose header includes the cycle number and close time. Expanding a panel shows its preserved winners in chronological selection order.
 
 ## 4. API and Data Implications
 
@@ -189,10 +202,10 @@ The persistence design must enforce one selection per prize ordinal, configured-
 - [ ] Reset clears only active winner, lifecycle, preflight, locked-snapshot, and idempotency/execution state, preserves the editable ordered Mega prizes, and makes every previously selected candidate eligible for the new lifecycle.
 - [ ] Reset uses a normal destructive confirmation dialog without checkbox or typed phrase.
 - [ ] A completed Mega Draw requires acknowledgement and exact typed confirmation `CLOSE MEGA DRAW <year>` to enter terminal `CLOSED`; results remain viewable, but draw, configuration update, preflight, and reset are unavailable for that execution year.
-- [ ] No Mega Draw audit trace, reset event, close event, historical void/redraw relationship, or Mega-specific retention history is created or retained.
+- [ ] Reset creates no history; closed-cycle results and close timestamps are retained and viewable through collapsed cycle history panels.
 - [ ] No Mega Draw winner export is available. The existing claims CSV remains the only export and retains its approved scope and format.
 - [ ] Mega Draw configuration and results are usable with keyboard navigation, visible focus, screen-reader status announcements, and at 360px, 375px, 390px, and 430px widths.
 
 ## 6. Approved Decisions
 
-Approved changes: reset preserves the editable ordered Mega prizes while clearing only the active winner/lifecycle/preflight/idempotency state; previously selected candidates become eligible again after reset; saving configuration provides explicit success notification; `Prepare draw` opens a customer-page-themed festive modal with a flashing colorful rainbow-spoked wheel and surrounding glowing bulbs; an explicit wheel click initiates each backend selection, with rotation only after the authoritative persisted result; prizes select in reverse configured order; results are displayed in chronological selection order; and a completed lifecycle may be terminally closed with acknowledgement and exact phrase `CLOSE MEGA DRAW <year>`. `CLOSED` retains viewable results but prohibits draw, configuration changes, preflight, and reset for that execution year. No Mega history or audit is retained. Main draw behaviour remains unchanged.
+Approved changes: reset preserves the editable ordered Mega prizes while clearing only the active winner/lifecycle/preflight/idempotency state; previously selected candidates become eligible again after reset; saving configuration provides explicit success notification; `Prepare draw` opens a customer-page-themed festive modal with a flashing colorful rainbow-spoked wheel and surrounding glowing bulbs; an explicit wheel click initiates each backend selection, with rotation only after the authoritative persisted result; prizes select in reverse configured order; results are displayed in chronological selection order; and a completed lifecycle may be terminally closed with acknowledgement and exact phrase `CLOSE MEGA DRAW <year>`. `CLOSED` retains viewable results and close time, prohibits draw, configuration changes, preflight, and reset for that cycle, and enables Reopen/New Cycle. Closed-cycle history is retained in collapsed Admin panels; reset creates no history. Main draw behaviour remains unchanged.

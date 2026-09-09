@@ -100,6 +100,13 @@ describe('node handler admin and routing coverage', () => {
       expect(response.status).toBe(200);
       const payload = (await response.json()) as { status: string };
       expect(payload.status).toBe('SUCCESS');
+
+      const summaryResponse = await fetch(`http://127.0.0.1:${address.port}/api/admin/summary`);
+      expect(summaryResponse.status).toBe(200);
+      const summaryPayload = (await summaryResponse.json()) as {
+        totalSuccessfulSpins?: number;
+      };
+      expect(summaryPayload.totalSuccessfulSpins).toBe(0);
     } finally {
       if (previousRuntime === undefined) delete process.env.APP_RUNTIME;
       else process.env.APP_RUNTIME = previousRuntime;

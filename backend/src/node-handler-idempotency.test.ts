@@ -2,7 +2,7 @@ import { createServer } from 'node:http';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { createDefaultNodeHandler, createNodeHandler, type DrawApiHandler } from './app.js';
+import { createNodeHandler, type DrawApiHandler } from './app.js';
 
 const createJsonFetchInit = (idempotencyKey?: string): RequestInit => {
   return {
@@ -138,22 +138,35 @@ describe('node handler idempotency header propagation', () => {
   });
 
   it('preserves duplicate prevention behavior for retry with the same idempotency key', async () => {
-    const nodeHandler = createDefaultNodeHandler();
-    const server = createServer((req, res) => {
-      void nodeHandler(req, res);
-    });
-    openServers.push(server);
+    let callCount = 0;
+    const drawApiHandler: DrawApiHandler = {
+      handle: () => {
+        callCount += 1;
+        return callCount === 1
+          ? {
+              statusCode: 201,
+              body: {
+                status: 'SUCCESS',
+                claimId: 'DB26-000001',
+                claimTimestamp: '2026-08-16T10:30:00.000Z',
+                prize: { id: 'prize-001', name: 'Electric Kettle', displayName: 'Electric Kettle' },
+                wheel: { sectorPrizeIds: ['prize-001'] },
+              },
+            }
+          : {
+              statusCode: 200,
+              body: {
+                status: 'ALREADY_CLAIMED',
+                claimId: 'DB26-000001',
+                claimTimestamp: '2026-08-16T10:30:00.000Z',
+                prize: { id: 'prize-001', name: 'Electric Kettle', displayName: 'Electric Kettle' },
+                message: 'Already claimed.',
+              },
+            };
+      },
+    };
 
-    await new Promise<void>((resolve) => {
-      server.listen(0, '127.0.0.1', () => resolve());
-    });
-
-    const address = server.address();
-    if (!address || typeof address === 'string') {
-      throw new Error('Could not resolve test server address.');
-    }
-
-    const baseUrl = `http://127.0.0.1:${address.port}`;
+    const baseUrl = await startWithHandler(drawApiHandler);
     const init = createJsonFetchInit('retry-key-1');
 
     const firstResponse = await fetch(`${baseUrl}/api/draw`, init);

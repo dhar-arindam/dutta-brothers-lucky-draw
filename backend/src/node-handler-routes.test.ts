@@ -2,7 +2,12 @@ import { createServer } from 'node:http';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { createNodeHandler, type AdminPrizeApiHandler, type DrawApiHandler } from './app.js';
+import {
+  createDefaultNodeHandler,
+  createNodeHandler,
+  type AdminPrizeApiHandler,
+  type DrawApiHandler,
+} from './app.js';
 import type { AdminPrize, DrawHttpResponse } from './contracts.js';
 
 const drawSuccess: DrawHttpResponse = {
@@ -68,6 +73,40 @@ describe('node handler admin and routing coverage', () => {
 
     return `http://127.0.0.1:${address.port}`;
   };
+
+  it('enables Mega Draw routes by default in local runtime', async () => {
+    const previousRuntime = process.env.APP_RUNTIME;
+    const previousSeed = process.env.LOCAL_MEGA_DRAW_SEED;
+    process.env.APP_RUNTIME = 'LOCAL';
+    delete process.env.LOCAL_MEGA_DRAW_SEED;
+
+    try {
+      const handler = createDefaultNodeHandler();
+      const server = createServer((req, res) => {
+        void handler(req, res);
+      });
+      openServers.push(server);
+
+      await new Promise<void>((resolve) => {
+        server.listen(0, '127.0.0.1', () => resolve());
+      });
+
+      const address = server.address();
+      if (!address || typeof address === 'string') {
+        throw new Error('Could not resolve address.');
+      }
+
+      const response = await fetch(`http://127.0.0.1:${address.port}/api/admin/mega-draw`);
+      expect(response.status).toBe(200);
+      const payload = (await response.json()) as { status: string };
+      expect(payload.status).toBe('SUCCESS');
+    } finally {
+      if (previousRuntime === undefined) delete process.env.APP_RUNTIME;
+      else process.env.APP_RUNTIME = previousRuntime;
+      if (previousSeed === undefined) delete process.env.LOCAL_MEGA_DRAW_SEED;
+      else process.env.LOCAL_MEGA_DRAW_SEED = previousSeed;
+    }
+  });
 
   it('routes all admin endpoints and 404 correctly', async () => {
     const drawHandler: DrawApiHandler = {

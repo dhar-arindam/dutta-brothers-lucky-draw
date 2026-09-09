@@ -1,9 +1,9 @@
 # Mega Draw UX Design
 
-Status: IMPLEMENTATION READY
+Status: PENDING Principal Backend Engineer review
 Owner: UI UX Expert
 Product Specification: `/docs/specs/03-admin/mega-draw.md`
-Version: 1.3
+Version: 1.4
 Last Updated: 2026-09-08
 
 ## Purpose
@@ -19,45 +19,52 @@ Mega Draw is a high-consequence operational task, not a customer experience. The
 
 ## Visual Direction
 
-Use the existing Admin operational visual language: compact Tailwind panels, clear borders, utility typography, light/dark theme support, and restrained status color. Do not use the customer gift-box imagery or celebration overlay. Motion is reserved for execution feedback and result disclosure, never decorative background movement.
+Use the existing Admin operational visual language for the page: compact Tailwind panels, clear borders, utility typography, light/dark theme support, and restrained status color. `Prepare draw` is the explicit exception: its modal uses the customer page's festive theme, with a flashing colorful rainbow-spoked wheel and surrounding glowing bulbs. This themed presentation is limited to the modal and must not alter the customer page.
 
-- Page header: `Mega Draw` with one compact status badge: `SETUP`, `READY`, `RUNNING`, or `COMPLETED`.
+- Page header: `Mega Draw` with one compact status badge: `SETUP`, `READY`, `RUNNING`, `COMPLETED`, or `CLOSED`.
 - Page structure: a single-column operational workspace, with no nested cards.
 - Destructive controls use the established red/error treatment only at the final confirmation stage.
 - Use labels, icons, and text for every state; color is secondary.
 
 ## Motion Direction
 
-The Mega Draw should feel like a controlled ceremony: anticipation builds at the instant an irreversible operation is committed, then winners arrive with clear, measured emphasis. Animation starts only after the backend returns an authoritative completed result; it never simulates selection or delays the API request.
+The Mega Draw should feel like a controlled ceremony: anticipation builds when the administrator clicks the wheel, then winners arrive with clear, measured emphasis. The wheel begins its presentation rotation only after the backend returns an authoritative persisted result; it never simulates selection or delays the API request.
 
 ### Preflight Ready
 
 - On a successful preflight, the eligibility strip resolves from a brief skeleton shimmer into its final values over 180 to 240ms.
-- The `Draw next prize` action receives one restrained emphasis pulse when it becomes available. Do not loop the pulse.
+- The `Prepare draw` action receives one restrained emphasis pulse when it becomes available. Do not loop the pulse.
 - A stale preflight uses a short horizontal shift of the freshness label only; it must not shake the whole page.
 
 ### Draw Next
 
-- Immediately after confirmed submission, lock configuration after the first selection begins and replace the action area with a three-step progress rail: `Validating snapshot`, `Selecting next prize`, `Loading winner`.
-- Progress is status-driven by the request lifecycle, not a fake timed percentage. The active step uses a subtle indeterminate line sweep.
+- An explicit wheel click initiates the request directly. Do not show a checkbox, typed confirmation field, secondary submit button, or transient validation/progress copy in the modal for RUN.
+- Progress is status-driven by the request lifecycle and may be announced outside the ceremonial modal; the modal itself remains visually stable during the request.
 - The page header status badge changes to `RUNNING` with a low-amplitude breathing opacity effect. Keep this effect below 1.0Hz and stop it on completion or error.
-- A wheel may animate only after the backend returns the authoritative selected row. Its spokes show the remaining ordered prizes returned by the backend; it does not spin to choose a prize, select a winner, or alter persisted state.
+- The modal wheel may rotate only after the backend returns the authoritative selected row. Its spokes show backend-provided prize names split into readable lines; the just-drawn prize remains visible until its winner label is shown. The wheel rotates no more than seven full turns and does not choose a prize, select a winner, or alter persisted state.
 
 ### Result Reveal
 
 - Begin the result sequence only after the authoritative selected-row response is available.
-- Reveal only the newly persisted row with a 220 to 280ms fade-and-rise motion. Preserve previously selected rows in configured order without replaying them.
-- Briefly draw a gold divider for the new row from left to right, then settle it to the normal Admin border treatment.
-- Move focus after the new-row sequence completes to the result status heading. Announce the newly selected prize and the remaining-prize count through the live region.
+- Reveal the newly persisted row in a winner label over the wheel, with the prize name as the highlighted reveal, the winner name, and the full phone number on its own line for the authenticated operator.
+- Preserve previously selected rows in chronological selection order without replaying them.
+- Do not move focus to the results heading while the RUN modal is open; this prevents modal jump during the reveal sequence. Announce the newly selected prize and the remaining-prize count through the page live region.
 - Do not use confetti, full-page flashes, audio, or autoplaying effects. The result list, not motion, remains the visual focal point.
 
 ### Reset
 
-- Reset uses a destructive dialog with a red status accent and a clear in-progress state. On success, the UI removes the completed or partial result display and returns to empty editable prize configuration.
+- Reset uses a destructive dialog with a red status accent and a clear in-progress state. On success, the UI removes the completed or partial result display and returns to editable prize configuration with the preserved ordered prizes.
+- Reset uses a normal destructive confirmation dialog. It does not require a checkbox or typed phrase.
+
+### Final Winners
+
+- After the last draw's winner reveal completes, hide the wheel in the modal and show all winner labels in a responsive grid.
+- The final winners modal is a celebratory summary; the page result list remains the durable operational record with masked contact information by default.
+- The fullscreen toggle is available only on desktop-sized screens and expands the modal/winner grid without changing mobile layout.
 
 ### Reduced Motion and Failure
 
-- Under `prefers-reduced-motion: reduce`, replace all movement with immediate state changes, no stagger, and a visible status transition. Results still appear in configured order.
+- Under `prefers-reduced-motion: reduce`, replace all movement with immediate state changes, no stagger, and a visible status transition. Results still appear in chronological selection order.
 - On API, network, or stale-preflight error, stop all motion immediately and focus the error summary or the recovery action. Do not replay the execution sequence on retry until a new authoritative result is returned.
 
 ## Page States
@@ -66,11 +73,12 @@ The Mega Draw should feel like a controlled ceremony: anticipation builds at the
 | --------------- | ---------------------------------------------------------------- | ------------------------------------ |
 | Loading         | Section skeletons and a polite live update                       | None                                 |
 | Setup           | Prize configuration and campaign status                          | Save configuration                   |
-| Ready           | Current preflight summary                                        | Draw next prize                      |
+| Ready           | Current preflight summary                                        | Prepare draw                         |
 | Preflight stale | Changed-data explanation and refreshed summary action            | Refresh preflight                    |
 | Running         | Locked summary and progress status                               | None                                 |
-| In progress     | Immutable selected rows and remaining prizes                     | Draw next prize                      |
-| Completed       | Winner results and reset control                                 | Reset Mega Draw                      |
+| In progress     | Immutable selected rows and remaining prizes                     | Prepare draw                         |
+| Completed       | Winner results, reset control, and close control                 | Close Mega Draw                      |
+| Closed          | Read-only winner results                                         | None                                 |
 | Blocked         | Campaign not ended, missing campaign, or insufficient candidates | Return to setup or refresh           |
 | Error           | Scoped operational error with safe recovery                      | Retry the failed read/preflight only |
 
@@ -102,7 +110,7 @@ Editable only before the first successful selection. After that selection, show 
 - `Add prize` is a text command button and is disabled at 10 rows.
 - Preserve row order; do not add drag-and-drop. Use up/down icon buttons with accessible labels for reordering.
 - Validate inline on blur and save. Duplicate or blank prize names produce field-level messages.
-- Save configuration is distinct from preflight. A saved change invalidates the prior preflight.
+- Save configuration is distinct from preflight. A saved change invalidates the prior preflight and shows an explicit success notification.
 
 ### 4. Preflight Panel
 
@@ -120,12 +128,12 @@ Display only backend-derived data:
 Actions:
 
 - `Prepare draw` requests a new preflight.
-- `Draw next prize` opens the confirmation dialog only when the first-selection preflight is current and candidate count is sufficient, or when a locked lifecycle has a remaining prize.
+- `Prepare draw` opens the festive preparation modal only when the first-selection preflight is current and candidate count is sufficient, or when a locked lifecycle has a remaining prize.
 - Any candidate/configuration/campaign change before the first selection yields `PREFLIGHT_STALE`, returns focus to `Prepare draw`, and requires a new confirmation. After snapshot lock, subsequent selections use the immutable snapshot.
 
 ### 5. Draw Results
 
-Use a numbered vertical result list rather than a table. Each result row shows:
+Use a numbered vertical result list rather than a table, ordered chronologically by selection. Each result row shows:
 
 - Prize ordinal and immutable prize name.
 - Winner customer name.
@@ -138,27 +146,41 @@ Below the list, show remaining prize count and the persistent draw reference. On
 
 ### 6. Reset Mega Draw
 
-Place `Reset Mega Draw` after the completed-results summary, separated by a plain divider and marked destructive. It is not part of the primary result action area.
+Place `Reset Mega Draw` after the completed-results summary, separated by a plain divider and marked destructive. It is unavailable after terminal close.
 
-- Opening the dialog shows the execution year and the number of selected rows that will be permanently removed.
-- The dialog requires an acknowledgement checkbox and exact typed confirmation: `RESET MEGA DRAW <year>`.
-- Submitting locks the dialog and announces progress. On success, remove the Mega Draw-only configuration, preflight, results, and lifecycle display, then focus the empty editable configuration heading.
+- Opening the dialog shows the execution year and the number of selected rows that will be removed from the active lifecycle.
+- The dialog uses a normal destructive confirmation action. It does not require an acknowledgement checkbox or typed phrase.
+- Submitting locks the dialog and announces progress. On success, remove active preflight, results, and lifecycle display, retain the ordered prizes as editable configuration, then focus the editable configuration heading.
 - The dialog explains that reset does not alter main lucky-draw claims, prizes, campaign, claim archives, aggregate records, or ordinary claims CSV.
+
+### 7. Close Mega Draw
+
+Place `Close Mega Draw` after a completed-results summary and before reset. It is destructive and requires a stronger confirmation than routine actions.
+
+- The dialog requires acknowledgement and the recommended exact typed confirmation `CLOSE MEGA DRAW <year>`, pending Principal Backend Engineer confirmation.
+- On success, display a terminal `CLOSED` status. Keep results viewable in chronological selection order and remove or disable every draw, configuration, preflight, and reset control for the execution year.
+- Explain that closing keeps no Mega Draw history or audit beyond the visible terminal lifecycle results.
 
 ## Dialog Behavior
 
-### Draw Next Prize
+### Prepare Draw
 
-- Use a semantic modal dialog with heading `Draw next Mega prize for <year>?`.
-- Display the next prize, already selected rows, remaining ordered prizes, and the preflight expiry when starting the lifecycle.
-- Require acknowledgement and typed confirmation: `DRAW NEXT MEGA PRIZE <year>`.
-- Disabled submit has visible explanatory text until both requirements are met.
+- Use a semantic modal dialog with heading `Prepare next Mega prize for <year>?` and the customer page's festive theme.
+- Display the next prize in reverse configured order, already selected rows, remaining ordered prizes, and the preflight expiry when starting the lifecycle.
+- Display the flashing colorful rainbow-spoked wheel with surrounding glowing bulbs. The wheel is the explicit action control and has an accessible name that identifies the next prize.
+- Do not require acknowledgement or typed confirmation for RUN. Clicking the enabled wheel initiates the backend request; only after the authoritative result returns may it rotate as presentation.
+- On desktop screens, provide a fullscreen toggle for the festive modal. Do not show this control on mobile screens.
 - On open, focus the heading; on validation failure, focus the first invalid control; on close, return focus to the invoking action.
 
 ### Reset Mega Draw
 
 - Use the same dialog semantics.
-- Require acknowledgement and the exact typed confirmation `RESET MEGA DRAW <year>`.
+- Use a normal destructive confirmation dialog without checkbox or typed phrase.
+- Escape and backdrop dismissal are available before submission but disabled during the in-flight operation.
+
+### Close Mega Draw
+
+- Use the same dialog semantics and require acknowledgement plus the recommended exact typed confirmation `CLOSE MEGA DRAW <year>`.
 - Escape and backdrop dismissal are available before submission but disabled during the in-flight operation.
 
 ## Frontend State Model
@@ -174,6 +196,9 @@ type MegaDrawUiState =
   | 'DRAW_NEXT_CONFIRMATION'
   | 'RUNNING'
   | 'COMPLETED'
+  | 'CLOSE_CONFIRMATION'
+  | 'CLOSING'
+  | 'CLOSED'
   | 'RESET_CONFIRMATION'
   | 'RESETTING'
   | 'BLOCKED'
@@ -188,9 +213,10 @@ AdminAuthGate
     -> MegaDrawPage
       -> MegaPrizeConfiguration
       -> MegaDrawPreflight
-      -> MegaDrawConfirmationDialog
+      -> MegaDrawPreparationModal
       -> MegaDrawResults
       -> ResetMegaDrawDialog
+      -> CloseMegaDrawDialog
 ```
 
 The route guard performs the redirect before rendering `MegaDrawPage`. API calls use dedicated typed Mega Draw service methods; the browser generates and persists one idempotency key per `draw next` attempt until its terminal backend state is known.
@@ -204,12 +230,12 @@ The route guard performs the redirect before rendering `MegaDrawPage`. API calls
 - Do not rely on color for `COMPLETED`, `BLOCKED`, or `SOURCE_CLAIM_ARCHIVED` state.
 - At 360px, 375px, 390px, and 430px, stack result metadata below the prize name and keep all controls at least 44 by 44 pixels.
 - At desktop widths, align result metadata into stable columns without requiring a wide table.
-- Preserve entered configuration and dialog input after recoverable read/network failure. Never preserve a completed or reset action as editable state.
+- Preserve entered configuration and dialog input after recoverable read/network failure. Never preserve a completed, reset, or close action as editable state.
 
 ## Implementation Handoff
 
 - Add route recognition for `/admin/mega-draw` beside the existing `/admin` branch in `main.tsx`.
 - Reuse `AdminAuthGate` for route protection, and add a route guard that redirects signed-out direct access to `/admin`.
-- Create an isolated Mega Draw page, API client module, types, and tests rather than expanding `AdminPrizePage` into another large state surface. The page derives wheel spokes from backend `remainingPrizes` and never computes a winner.
+- Create an isolated Mega Draw page, API client module, types, and tests rather than expanding `AdminPrizePage` into another large state surface. The page derives wheel spokes from backend `remainingPrizes`, sends the draw request only on explicit wheel click, and never computes a winner.
 - Reuse the existing Admin Tailwind stylesheet and theme classes; scope any new styles to the Mega Draw page.
-- Cover route protection, setup editing through the first selection, locked configuration, ordered resumable next-prize actions, wheel/result parity, stale-preflight and idempotency recovery, reset confirmation and isolation conditions, keyboard dialogs, and the four required mobile widths.
+- Cover route protection, save-success feedback, setup editing through the first selection, locked configuration, reverse-ordered resumable next-prize actions, festive wheel/result parity, stale-preflight and idempotency recovery, reset preservation and renewed eligibility, terminal-close confirmation, keyboard dialogs, and the four required mobile widths.

@@ -1,11 +1,11 @@
 # Conceptual Data Model
 
-Status: APPROVED  
+Status: APPROVED
 Owner: Principal Software Engineer  
-Version: 1.7
+Version: 1.8
 Last Updated: 2026-09-08
-Change: Approved epoch-based Mega Draw reset policy
-Reason: Record confirmed immediate isolation and separate cleanup of prior Mega Draw epochs
+Change: Pending Mega Draw reset preservation, reverse order, click-to-draw, and terminal close review
+Reason: Approved Mega Draw reset preservation, reverse order, click-to-draw, and terminal close changes
 
 This document defines the conceptual model only. The Principal Software Engineer must determine the final DynamoDB partition/sort key strategy.
 
@@ -92,8 +92,8 @@ The data model must support these logical operations without prescribing the phy
 18. Archive all active post-campaign claims while preserving archived records and Mega Draw records.
 19. Create and retrieve an immutable campaign snapshot and expiry-bound Mega Draw preflight for an execution year.
 20. Atomically select or recover one next Mega Draw prize ordinal per action, including its immutable snapshot, idempotency, and execution-state records.
-21. Atomically advance an execution year's current Mega Draw epoch to a fresh empty epoch, making all prior-epoch Mega Draw-only configuration, preflight, lifecycle, winner, snapshot, idempotency/execution, and result records inaccessible without changing main lucky-draw records.
-22. Separately delete Mega Draw-only records for prior epochs without changing or exposing the current epoch.
+21. Clear only an execution year's active Mega Draw lifecycle, including winners, preflight, locked snapshots, and idempotency/execution records, while preserving editable ordered prize configuration and without changing main lucky-draw records.
+22. Terminally close a completed execution-year Mega Draw while retaining viewable results and rejecting further lifecycle operations.
 
 The Principal Software Engineer will determine the final DynamoDB key and index design during implementation design. The physical design must preserve the atomic uniqueness and immutable-claim requirements.
 
@@ -107,11 +107,11 @@ After campaign end, deletion is archival rather than physical removal. Archived 
 
 ## 5. Mega Draw
 
-A Mega Draw current-epoch record represents the one resumable year-end Admin lifecycle that is accessible for an execution year. Before its first successful selection, its 1 to 10 ordered prize slots may be added, removed, renamed, or reordered. That first selection atomically locks campaign, preflight, candidate, and ordered-prize snapshots and persists exactly the winner row for prize 1. Thereafter the configuration is locked until reset.
+A Mega Draw configuration and active lifecycle represent one resumable year-end Admin draw for an execution year. Before its first successful selection, its 1 to 10 ordered prize slots may be added, removed, renamed, or reordered. That first wheel-initiated selection atomically locks campaign, preflight, candidate, and ordered-prize snapshots and persists exactly the winner row for the last configured prize. Thereafter the configuration is locked until reset.
 
-Candidate snapshots contain active successful source claims for the execution year, identified by normalized bill number and normalized phone number. The record stores ordered selected winner rows, next prize ordinal, and `SETUP`, `IN_PROGRESS`, or `COMPLETED` status. Each `draw next` action atomically persists one row for the next ordinal and excludes identities in prior rows. The active lifecycle is readable only through Admin-authorized access paths.
+Candidate snapshots contain active successful source claims for the execution year, identified by normalized bill number and normalized phone number. The record stores selected winner rows in chronological selection order, the next reverse prize ordinal, and `SETUP`, `IN_PROGRESS`, `COMPLETED`, or `CLOSED` status. Each wheel-initiated `draw next` action atomically persists one row for the next reverse ordinal and excludes identities in prior rows. The active lifecycle is readable only through Admin-authorized access paths.
 
-The model must atomically advance an execution year's current epoch when reset is authorized with acknowledgement and exact typed confirmation. The new epoch starts with no configuration, preflight, lifecycle, winner, campaign/candidate/prize snapshot, idempotency/execution, or result records. All Mega Draw reads and operations must be scoped through the current-epoch record, so prior-epoch records are inaccessible immediately after the advance. A separate cleanup process deletes prior-epoch Mega Draw-only records and must neither change the current-epoch record nor make prior records accessible. Reset must not remove or modify main lucky-draw claims, prizes, campaign, claim archives, aggregate records, or ordinary claims CSV data. No Mega Draw audit, reset-event, void, redraw, replacement, or retention record is required. Browser-wheel display data is derived from persisted remaining prize rows only and is never selection input.
+An authorized reset atomically clears the active lifecycle's preflight, winners, campaign/candidate/prize snapshots, and idempotency/execution records while retaining the ordered prize configuration as editable data. Cleared candidate selections must not remain as exclusions, allowing previously selected candidates to participate in the new lifecycle. A completed lifecycle can be terminally closed using exact typed confirmation `CLOSE MEGA DRAW <year>`; `CLOSED` retains results but rejects draw, configuration, preflight, and reset operations. Reset must not remove or modify main lucky-draw claims, prizes, campaign, claim archives, aggregate records, or ordinary claims CSV data. No Mega Draw audit, reset-event, close-event, void, redraw, replacement, history, or retention record is required. Browser-wheel display data is derived from persisted prize rows for presentation only; the wheel click initiates the action but is never selection input.
 
 ## 4. Dashboard Summary Aggregates
 

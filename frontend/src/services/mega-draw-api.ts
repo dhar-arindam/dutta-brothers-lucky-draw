@@ -1,4 +1,5 @@
 import type {
+  MegaDrawCloseResponse,
   MegaDrawConfigurationResponse,
   MegaDrawDrawNextResponse,
   MegaDrawErrorResponse,
@@ -31,6 +32,7 @@ const toPublicLifecycle = (lifecycle: MegaDrawLifecycle): MegaDrawLifecycle => (
       sourceClaimId: row.candidate.sourceClaimId,
       sourceClaimTimestamp: row.candidate.sourceClaimTimestamp,
       customerName: row.candidate.customerName,
+      normalizedPhone: row.candidate.normalizedPhone,
       maskedPhone: row.candidate.maskedPhone,
       billNumber: row.candidate.billNumber,
     },
@@ -100,7 +102,7 @@ export const prepareMegaDraw = (): Promise<MegaDrawPreflightResponse> =>
   request('/api/admin/mega-draw/preflight', { method: 'POST' });
 
 export const drawNextMegaPrize = async (
-  payload: { preflightReference?: string; acknowledgement: boolean; confirmation: string },
+  payload: { preflightReference?: string },
   idempotencyKey: string,
 ): Promise<MegaDrawDrawNextResponse> => {
   const response = await request<MegaDrawDrawNextResponse>('/api/admin/mega-draw/draw-next', {
@@ -116,6 +118,15 @@ export const resetMegaDraw = (payload: {
   confirmation: string;
 }): Promise<MegaDrawResetResponse> =>
   request('/api/admin/mega-draw/reset', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+
+export const closeMegaDraw = (payload: {
+  acknowledgement: boolean;
+  confirmation: string;
+}): Promise<MegaDrawCloseResponse> =>
+  request('/api/admin/mega-draw/close', {
     method: 'POST',
     body: JSON.stringify(payload),
   });

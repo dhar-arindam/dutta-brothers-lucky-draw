@@ -415,6 +415,39 @@ flowchart LR
 
 Prize edits never rewrite history: each claim stores its own snapshot of the prize name.
 
+### Mega Draw flow
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor A as Admin
+    participant UI as MegaDrawPage
+    participant API as REST API
+    participant D as DynamoDB
+
+    A->>UI: Configure ordered Mega prizes
+    UI->>API: PUT /api/admin/mega-draw/configuration
+    API-->>UI: saved ordered prizes
+    A->>UI: Prepare draw
+    UI->>API: POST /api/admin/mega-draw/preflight
+    API->>D: derive campaign, candidates, prize snapshot
+    D-->>API: preflight snapshot
+    API-->>UI: reference, candidate count, prizes
+    A->>UI: Click festive wheel
+    UI->>API: POST /api/admin/mega-draw/draw-next<br/>Idempotency-Key, preflight reference for first draw
+    API->>D: atomically lock or read lifecycle<br/>and persist next reverse-order winner
+    D-->>API: selected row + lifecycle
+    API-->>UI: authoritative selected row
+    UI->>UI: rotate wheel up to seven turns<br/>then reveal winner label
+    alt Final prize selected
+        UI->>UI: hide wheel after reveal<br/>show responsive all-winners grid
+    else Remaining prizes exist
+        UI->>UI: keep modal ready for next wheel click
+    end
+```
+
+RUN has no checkbox, typed phrase, or secondary submit button; the wheel itself is the explicit Admin action. Reset uses a normal destructive confirmation dialog. Close remains the stronger terminal action and requires acknowledgement plus exact typed confirmation.
+
 ---
 
 ## 10. DynamoDB single-table design

@@ -2,10 +2,10 @@
 
 Status: APPROVED
 Owner: Principal Software Engineer  
-Version: 1.8
+Version: 1.9
 Last Updated: 2026-09-08
-Change: Approved epoch-based Mega Draw reset policy
-Reason: Record confirmed immediate isolation and separate cleanup of prior Mega Draw epochs
+Change: Pending Mega Draw reset preservation, reverse order, click-to-draw, and terminal close review
+Reason: Approved Mega Draw reset preservation, reverse order, click-to-draw, and terminal close changes
 
 These are the confirmed business rules for the Dutta Brothers Festive Lucky Draw.
 
@@ -308,10 +308,13 @@ The Mega Draw is an Admin-scope-only year-end operation. Its configuration, pref
 - The Mega Draw can run only after the backend determines that the current `Asia/Kolkata` year's campaign has ended.
 - It awards 1 to 10 separately configured, uniquely named Mega prizes. Before the first successful selection, Admin may add, remove, rename, or reorder them; afterwards the ordered configuration is immutable. Main lucky-draw prize configuration, weighting, stock, and `Given` counts do not apply.
 - Each eligible successful, active main-draw claim in the execution year is a candidate identity defined by its normalized bill number and normalized phone number. The same phone number with different bill numbers may win more than one Mega prize.
-- The first successful `draw next` action locks immutable campaign, candidate, and ordered-prize snapshots, then selects prize 1. Each later `draw next` action atomically selects exactly one distinct candidate identity for the next configured prize using a cryptographically secure random source without replacement. Partial results are valid, persist across refresh, and must complete in configured order.
-- The Admin wheel is presentation-only: its spokes show only remaining backend-provided prizes and it never selects or determines a winner.
-- No Mega Draw audit trace, reset event, historical void/redraw history, or Mega Draw-specific retention requirement exists. No separate Mega Draw winner export exists.
-- A post-start configuration change requires reset. Reset requires Admin scope, acknowledgement, and exact typed confirmation `RESET MEGA DRAW <year>`. It atomically advances that execution year's current Mega Draw epoch to a new empty editable configuration. All Mega Draw reads and operations use only the new current epoch; records from prior epochs become inaccessible immediately and are deleted separately by cleanup. Reset must not alter main lucky-draw claims, prizes, campaign, claim archives, aggregate records, or ordinary claims CSV.
+- The first successful wheel-initiated `draw next` action locks immutable campaign, candidate, and ordered-prize snapshots, then selects the last configured prize. Each later action atomically selects one distinct candidate identity for the next prize in reverse configured order using a cryptographically secure random source without replacement. Partial results are valid and persist across refresh.
+- `Prepare draw` opens a customer-page-themed festive modal with a flashing colorful rainbow-spoked wheel and surrounding glowing bulbs. Admin must explicitly click the wheel to initiate each draw, with no RUN checkbox, typed phrase, or secondary submit button. The backend selects and persists only after that click; any rotation begins after the authoritative result, is capped at seven full turns, and is presentation-only.
+- Saving valid configuration shows explicit success notification. Winners are viewable in chronological selection order.
+- After the final reveal, the modal hides the wheel and shows all winner labels in a responsive layout.
+- Reset requires Admin scope and a normal destructive confirmation dialog. It clears only active winner/lifecycle/preflight/idempotency state, preserves the editable ordered Mega prizes, and makes previously selected candidates eligible for the new lifecycle. Reset must not alter main lucky-draw claims, prizes, campaign, claim archives, aggregate records, or ordinary claims CSV.
+- A completed draw may be terminally closed with acknowledgement and exact typed confirmation `CLOSE MEGA DRAW <year>`. `CLOSED` results remain viewable, but no draw, configuration change, preflight, or reset is allowed for that execution year.
+- No Mega Draw audit, reset event, close event, history, or Mega-specific retention requirement exists. No separate Mega Draw winner export exists.
 
 ## BR-013 — Prize Given Count and Claims Drill-Down
 

@@ -190,15 +190,11 @@ const isMegaConfigurationRequest = (value: unknown): value is { prizes: string[]
   Array.isArray((value as { prizes?: unknown }).prizes) &&
   (value as { prizes: unknown[] }).prizes.every((prize) => typeof prize === 'string');
 
-const isMegaDrawNextRequest = (
-  value: unknown,
-): value is { preflightReference?: string; acknowledgement: boolean; confirmation: string } =>
+const isMegaDrawNextRequest = (value: unknown): value is { preflightReference?: string } =>
   !!value &&
   typeof value === 'object' &&
   ((value as { preflightReference?: unknown }).preflightReference === undefined ||
-    typeof (value as { preflightReference?: unknown }).preflightReference === 'string') &&
-  typeof (value as { acknowledgement?: unknown }).acknowledgement === 'boolean' &&
-  typeof (value as { confirmation?: unknown }).confirmation === 'string';
+    typeof (value as { preflightReference?: unknown }).preflightReference === 'string');
 
 const isMegaResetRequest = (
   value: unknown,
@@ -216,6 +212,7 @@ const megaErrorResponse = (
       ? 400
       : error.code === 'MEGA_DRAW_IN_PROGRESS' ||
           error.code === 'MEGA_DRAW_ALREADY_COMPLETED' ||
+          error.code === 'MEGA_DRAW_CLOSED' ||
           error.code === 'CAMPAIGN_NOT_ENDED' ||
           error.code === 'INSUFFICIENT_ELIGIBLE_PARTICIPANTS'
         ? 409
@@ -533,6 +530,12 @@ export const handler = async (event: {
         if (!parsed.ok || !isMegaResetRequest(parsed.value))
           return responseJson(400, validationErrorResponse().body);
         return responseJson(200, { status: 'SUCCESS', ...(await megaDraw.reset(parsed.value)) });
+      }
+      if (method === 'POST' && path === '/api/admin/mega-draw/close') {
+        const parsed = safeParseJson(event.body);
+        if (!parsed.ok || !isMegaResetRequest(parsed.value))
+          return responseJson(400, validationErrorResponse().body);
+        return responseJson(200, { status: 'SUCCESS', ...(await megaDraw.close(parsed.value)) });
       }
     }
 

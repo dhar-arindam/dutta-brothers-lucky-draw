@@ -59,7 +59,7 @@ describe('MegaDrawService', () => {
     });
 
     expect(result.lifecycle.status).toBe('IN_PROGRESS');
-    expect(result.selectedRow.prize.position).toBe(1);
+    expect(result.selectedRow.prize.position).toBe(2);
     expect(retry).toEqual(result);
   });
 
@@ -95,7 +95,7 @@ describe('MegaDrawService', () => {
     }
   });
 
-  it('resets to an isolated empty editable epoch without changing main-draw source data', () => {
+  it('preserves editable configuration and restores selected candidates after reset', () => {
     const activeClaims = [
       claim('DB26-1', 'BILL-1', '9876543210'),
       claim('DB26-2', 'BILL-2', '9123456789'),
@@ -123,16 +123,56 @@ describe('MegaDrawService', () => {
       executionYear: 2026,
     });
 
-    expect(service.get()).toEqual({ configuration: [] });
+    expect(service.get()).toEqual({
+      configuration: [
+        { position: 1, name: 'First' },
+        { position: 2, name: 'Second' },
+      ],
+    });
     expect(activeClaims).toHaveLength(4);
-    expect(() =>
-      service.drawNext({
-        idempotencyKey: 'run',
-        operatorSubject: 'admin',
-        acknowledgement: true,
-        confirmation: 'DRAW NEXT MEGA PRIZE 2026',
-      }),
-    ).toThrow(MegaDrawError);
+    const redrawPreflight = service.preflight();
+    const redraw = service.drawNext({
+      preflightReference: redrawPreflight.reference,
+      idempotencyKey: 'redraw',
+      operatorSubject: 'admin',
+      acknowledgement: true,
+      confirmation: 'DRAW NEXT MEGA PRIZE 2026',
+    });
+    expect(redraw.selectedRow.candidate.identity).toBe(
+      original.selectedRows[0]?.candidate.identity,
+    );
     expect(original.selectedRows).toHaveLength(1);
+  });
+
+  it('closes a completed lifecycle and retains results while blocking mutations', () => {
+    const service = new MegaDrawService(
+      {
+        getCampaign: () => campaign,
+        listActiveClaims: () => [claim('DB26-1', 'BILL-1', '9876543210')],
+      },
+      () => now,
+      () => 0,
+    );
+    service.configure(['Only prize']);
+    const preflight = service.preflight();
+    service.drawNext({
+      preflightReference: preflight.reference,
+      idempotencyKey: 'draw',
+      operatorSubject: 'admin',
+      acknowledgement: true,
+      confirmation: 'DRAW NEXT MEGA PRIZE 2026',
+    });
+
+    expect(
+      service.close({ acknowledgement: true, confirmation: 'CLOSE MEGA DRAW 2026' }).lifecycle,
+    ).toMatchObject({
+      status: 'CLOSED',
+      selectedRows: [{ prize: { position: 1, name: 'Only prize' } }],
+    });
+    expect(() => service.preflight()).toThrow(/closed/i);
+    expect(() => service.configure(['Replacement prize'])).toThrow(/closed/i);
+    expect(() =>
+      service.reset({ acknowledgement: true, confirmation: 'RESET MEGA DRAW 2026' }),
+    ).toThrow(/closed/i);
   });
 });

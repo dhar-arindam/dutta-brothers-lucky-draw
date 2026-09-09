@@ -145,12 +145,12 @@ it('persists one distinct ordinal per draw-next, recovers retries, and completes
 
   expect(retry).toEqual(first);
   expect([first, second, third].map((result) => result.selectedRow.prize.position)).toEqual([
-    1, 2, 3,
+    3, 2, 1,
   ]);
   expect(new Set(third.lifecycle.selectedRows.map((row) => row.candidate.identity)).size).toBe(3);
   expect(third.lifecycle).toMatchObject({
     status: 'COMPLETED',
-    nextPrizeOrdinal: 4,
+    nextPrizeOrdinal: 0,
     remainingPrizes: [],
   });
   expect(client.transactionCount).toBe(3);
@@ -169,10 +169,10 @@ it('rejects a stale concurrent ordinal transaction without persisting a second w
     code: 'MEGA_DRAW_IN_PROGRESS',
   });
   expect((await serviceFor(client).get()).lifecycle?.selectedRows).toHaveLength(2);
-  expect(first.selectedRow.prize.position).toBe(1);
+  expect(first.selectedRow.prize.position).toBe(3);
 });
 
-it('advances to an empty current epoch without retaining winner history or audit records', async () => {
+it('retains editable configuration without retaining winner history or audit records after reset', async () => {
   const client = new MemoryDocClient();
   const service = serviceFor(client);
   await service.configure(['First']);
@@ -181,7 +181,32 @@ it('advances to an empty current epoch without retaining winner history or audit
   await service.reset({ acknowledgement: true, confirmation: 'RESET MEGA DRAW 2026' });
   const read = await serviceFor(client).get();
 
-  expect(read).toEqual({ configuration: [] });
+  expect(read).toEqual({ configuration: [{ position: 1, name: 'First' }] });
   expect([...client.items.values()].filter((item) => item.entityType === 'MEGA_AUDIT')).toEqual([]);
   expect(original.lifecycle.selectedRows).toHaveLength(1);
+});
+
+it('closes only a completed lifecycle and blocks further mutations while retaining results', async () => {
+  const client = new MemoryDocClient();
+  const service = serviceFor(client);
+  await service.configure(['Only prize']);
+  const preflight = await service.preflight();
+  await service.drawNext(request('draw', preflight.reference));
+
+  const closed = await service.close({
+    acknowledgement: true,
+    confirmation: 'CLOSE MEGA DRAW 2026',
+  });
+
+  expect(closed.lifecycle).toMatchObject({
+    status: 'CLOSED',
+    selectedRows: [{ prize: { position: 1 } }],
+  });
+  await expect(service.preflight()).rejects.toMatchObject({ code: 'MEGA_DRAW_CLOSED' });
+  await expect(service.configure(['Replacement prize'])).rejects.toMatchObject({
+    code: 'MEGA_DRAW_CLOSED',
+  });
+  await expect(
+    service.reset({ acknowledgement: true, confirmation: 'RESET MEGA DRAW 2026' }),
+  ).rejects.toMatchObject({ code: 'MEGA_DRAW_CLOSED' });
 });

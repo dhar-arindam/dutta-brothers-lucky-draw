@@ -2,10 +2,10 @@
 
 Status: APPROVED
 Owner: Principal Software Engineer  
-Version: 1.8
+Version: 1.9
 Last Updated: 2026-09-08
-Change: Approved epoch-based Mega Draw reset policy
-Reason: Record confirmed immediate isolation and separate cleanup of prior Mega Draw epochs
+Change: Pending Mega Draw reset preservation, reverse order, click-to-draw, and terminal close review
+Reason: Approved Mega Draw reset preservation, reverse order, click-to-draw, and terminal close changes
 
 ## Route and Access
 
@@ -260,13 +260,14 @@ Bill number is visible to the shop owner because it is required for operational 
 ### Mega Draw
 
 - Mega Draw navigation appears only for a logged-in Admin user.
-- Before the first successful selection, the administrator configures 1 to 10 ordered, uniquely named Mega prizes and may add, remove, rename, or reorder them, then requests a backend preflight.
-- The preflight presents the current `Asia/Kolkata` execution year, campaign-ended status, eligible-candidate count, configured prizes, and an expiry-bound reference. The first successful `draw next` locks immutable campaign, candidate, and prize snapshots.
-- Each `draw next` action requires acknowledgement and typed confirmation `DRAW NEXT MEGA PRIZE <year>`; it selects exactly one winner for the next configured prize. A stale preflight requires refresh and reconfirmation only before the first selection.
+- Before the first successful selection, the administrator configures 1 to 10 ordered, uniquely named Mega prizes and may add, remove, rename, or reorder them. A successful save provides explicit success notification, then the administrator requests a backend preflight.
+- `Prepare draw` opens a customer-page-themed festive modal with a flashing colorful rainbow-spoked wheel and surrounding glowing bulbs. The preflight presents the current `Asia/Kolkata` execution year, campaign-ended status, eligible-candidate count, configured prizes, and an expiry-bound reference. Desktop Admins may expand this modal to fullscreen; mobile screens use the normal responsive modal. The first successful wheel-initiated `draw next` locks immutable campaign, candidate, and prize snapshots.
+- Each `draw next` action is initiated directly by explicit wheel click with no acknowledgement checkbox, typed confirmation, or separate submit button; it selects exactly one winner for the next prize in reverse configured order. A stale preflight requires refresh only before the first selection.
 - The UI prevents repeat submission for an in-flight next-prize action, recovers a lost response through that action's idempotency key, shows persisted partial rows after refresh, and does not use customer reveal behavior.
-- A presentation-only wheel may animate only after the backend returns the selected row. Its spokes reflect the remaining backend-provided configured prizes and never influence selection.
-- Completed results show every ordered prize and masked winner details, completion time in `Asia/Kolkata`, draw reference, and archived-source status where applicable.
-- After the first selection, any configuration change requires reset. Reset requires acknowledgement and typed confirmation `RESET MEGA DRAW <year>`, atomically advances that year's current Mega Draw epoch to an empty editable setup, and immediately makes all prior Mega Draw-only records inaccessible. Prior-epoch records are deleted separately and no reset event, audit history, or historical results are retained. Reset does not alter main lucky-draw claims, prizes, campaign, claim archives, aggregates, or ordinary claims CSV.
+- Wheel rotation may begin only after the backend returns the selected row. It rotates no more than seven full turns, its split prize-name spokes reflect backend-provided configured prizes, and it never influences selection. The just-drawn prize remains visible until the winner label is shown.
+- After the final reveal, the modal hides the wheel and shows a responsive grid of all winner labels. Page results show all winners in chronological selection order, masked winner details, completion time in `Asia/Kolkata`, draw reference, and archived-source status where applicable.
+- After the first selection, any configuration change requires reset. Reset uses a normal destructive confirmation dialog, clears only active winner/lifecycle/preflight/idempotency state, preserves editable ordered prizes, and makes prior winners eligible again. No reset event, audit history, or historical results are retained. Reset does not alter main lucky-draw claims, prizes, campaign, claim archives, aggregates, or ordinary claims CSV.
+- After all winners are selected, Admin may terminally close the draw using acknowledgement and exact typed confirmation `CLOSE MEGA DRAW <year>`. Closed results remain viewable, but no draw, configuration change, preflight, or reset is allowed for that execution year.
 
 ### Admin Theme Behaviour
 

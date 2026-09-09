@@ -1,11 +1,11 @@
 # Target Architecture
 
-Status: APPROVED  
+Status: APPROVED
 Owner: Principal Software Engineer  
-Version: 1.9
+Version: 2.0
 Last Updated: 2026-09-08
-Change: Approved epoch-based Mega Draw reset policy
-Reason: Record confirmed immediate isolation and separate cleanup of prior Mega Draw epochs
+Change: Pending Mega Draw reset preservation, reverse order, click-to-draw, and terminal close review
+Reason: Approved Mega Draw reset preservation, reverse order, click-to-draw, and terminal close changes
 
 ## Technology
 
@@ -57,9 +57,9 @@ DynamoDB
 - Claims preserve the historical prize name snapshot.
 - Dashboard totals and prize distribution use lightweight DynamoDB aggregate records or counters updated with successful claim creation.
 - Before campaign end, claim deletion and clear-all operations remove active records; after campaign end, they archive active records. Both operations update or reset active claim-derived aggregates and release normalized bills.
-- Mega Draw selection, candidate eligibility, first-selection preflight validation, per-prize idempotency, ordered execution state, and reset are backend-authoritative.
-- The first successful next-prize action locks campaign, candidate, and ordered-prize snapshots. DynamoDB atomically persists exactly one distinct winner for each next configured ordinal and allows resumable partial lifecycle reads. An Admin-authorized reset atomically advances only the execution year's current Mega Draw epoch to a fresh empty editable state. All Mega Draw reads and operations are current-epoch scoped, making prior-epoch records inaccessible immediately; separate cleanup later deletes those Mega Draw-only records without affecting the current epoch. Reset creates no audit or reset event and does not modify main lucky-draw claims, prizes, campaign, claim archives, aggregates, or ordinary claims CSV data.
-- Browser wheel spokes are derived only from backend-provided remaining prizes. The browser never supplies selection input or determines a Mega Draw winner.
+- Mega Draw selection, candidate eligibility, first-selection preflight validation, per-prize idempotency, reverse-ordered execution state, reset, and close are backend-authoritative.
+- The first successful wheel-initiated next-prize action locks campaign, candidate, and ordered-prize snapshots. DynamoDB atomically persists exactly one distinct winner for each next reverse configured ordinal and allows resumable partial lifecycle reads. An Admin-authorized reset clears active winners, lifecycle, preflight, locked snapshots, and idempotency/execution state while retaining editable ordered prize configuration and restoring prior winners' eligibility. A confirmed completed draw becomes terminal `CLOSED`; results remain readable but no lifecycle mutation is permitted. Reset and close create no Mega audit/history and do not modify main lucky-draw claims, prizes, campaign, claim archives, aggregates, or ordinary claims CSV data.
+- Browser wheel spokes are derived only from backend-provided prizes. Explicit Admin wheel click initiates a backend action directly, but the browser never supplies selection input or determines a Mega Draw winner; presentation rotation starts only after the authoritative result and is capped at seven full turns. After the final reveal, the modal hides the wheel and presents a responsive grid of all winners.
 - Transaction cancellation distinguishes duplicate-bill conflicts from transient DynamoDB contention. Only transient contention is retried with bounded backoff.
 - No prize inventory or stock management exists.
 - Prize activation/deactivation is a required V1 capability and affects future draws only.

@@ -53,14 +53,13 @@ Required GitHub repository variables (available to reusable CI workflow calls):
 
 - staging environment:
   - `AWS_ROLE_ARN_STAGING`
-  - `STAGING_FRONTEND_ORIGIN`
 - production environment:
   - `AWS_ROLE_ARN_PRODUCTION`
-  - `PRODUCTION_FRONTEND_ORIGIN`
 
 Admin Cognito configuration:
 
-- Deployment resolves `AdminCognitoDomain` and `AdminUserPoolClientId` from the deployed CloudFormation stack outputs and rebuilds the frontend asset with those values before the final asset deployment.
+- Deployment resolves `CloudFrontDistributionDomainName`, `AdminCognitoDomain`, and `AdminUserPoolClientId` from the deployed CloudFormation stack outputs and rebuilds the frontend asset with those values before the final asset deployment.
+- The frontend origin is always derived as `https://<CloudFrontDistributionDomainName>`; no GitHub frontend-origin variable is required.
 - `VITE_COGNITO_DOMAIN` and `VITE_COGNITO_CLIENT_ID` are derived build-time values and do not need to be manually maintained as GitHub variables.
 - These values are identifiers, not secrets. The Cognito app client has no client secret.
 - Provision exactly two local Cognito users after stack creation. Do not enable MFA or configure Google federation in V1.

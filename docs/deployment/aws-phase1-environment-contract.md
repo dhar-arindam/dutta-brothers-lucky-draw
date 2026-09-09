@@ -63,13 +63,13 @@ The CDK application requires `stage` and stage-specific context values.
 
 ### staging
 
-- Frontend origin must be the staging CloudFront/custom domain.
+- Frontend origin is derived from the staging CloudFront distribution output.
 - Production-like routing and CORS must be validated here first.
 - Medium throttle defaults.
 
 ### prod
 
-- Frontend origin must be production CloudFront/custom domain.
+- Frontend origin is derived from the production CloudFront distribution output.
 - Localhost origins are explicitly blocked.
 - Highest throttle defaults.
 - Persistent resources use retain policies.

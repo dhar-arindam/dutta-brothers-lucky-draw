@@ -57,7 +57,7 @@ export class DurableMegaDrawService {
     const year = campaignYearInKolkata(this.now());
     const current = await this.currentEpoch(year);
     const [configuration, state] = await Promise.all([
-      this.readValue<MegaPrize[]>(year, scoped(current, 'CONFIG')),
+      this.readValue<MegaPrize[]>(year, 'CONFIG'),
       this.readValue<MegaDrawLifecycle>(year, scoped(current, 'STATE')),
     ]);
     return { configuration: configuration ?? [], ...(state ? { lifecycle: state } : {}) };
@@ -87,6 +87,8 @@ export class DurableMegaDrawService {
     const year = campaignYearInKolkata(this.now());
     const current = await this.currentEpoch(year);
     const state = await this.readValue<MegaDrawLifecycle>(year, scoped(current, 'STATE'));
+    if (state?.status === 'CLOSED')
+      throw new MegaDrawError('MEGA_DRAW_CLOSED', 'Mega Draw is closed.');
     if (state)
       throw new MegaDrawError(
         'MEGA_DRAW_CONFIGURATION_LOCKED',
@@ -98,7 +100,7 @@ export class DurableMegaDrawService {
         TableName: this.tableName,
         Item: {
           pk: key(year),
-          sk: scoped(current, 'CONFIG'),
+          sk: 'CONFIG',
           entityType: 'MEGA_CONFIG',
           value: prizes,
           updatedAt: this.now().toISOString(),
@@ -109,8 +111,12 @@ export class DurableMegaDrawService {
   }
 
   public async preflight(): Promise<MegaPreflight> {
+    const year = campaignYearInKolkata(this.now());
+    const current = await this.currentEpoch(year);
+    const state = await this.readValue<MegaDrawLifecycle>(year, scoped(current, 'STATE'));
+    if (state?.status === 'CLOSED')
+      throw new MegaDrawError('MEGA_DRAW_CLOSED', 'Mega Draw is closed.');
     const context = await this.currentContext();
-    const current = await this.currentEpoch(context.year);
     const reference = `MD-${context.year}-${randomUUID()}`;
     const expiresAt = new Date(this.now().getTime() + PREFLIGHT_SECONDS * 1000).toISOString();
     const stored: StoredPreflight = {
@@ -142,8 +148,8 @@ export class DurableMegaDrawService {
     preflightReference?: string;
     idempotencyKey: string;
     operatorSubject: string;
-    acknowledgement: boolean;
-    confirmation: string;
+    acknowledgement?: boolean;
+    confirmation?: string;
     correlationId?: string;
   }): Promise<{
     lifecycle: import('./mega-draw.js').MegaDrawLifecycle;
@@ -158,14 +164,14 @@ export class DurableMegaDrawService {
     const requestFingerprint = fingerprint({
       operation: 'DRAW_NEXT',
       preflightReference: input.preflightReference,
-      acknowledgement: input.acknowledgement,
-      confirmation: input.confirmation,
+      acknowledgement: input.acknowledgement ?? true,
+      confirmation: input.confirmation ?? `DRAW NEXT MEGA PRIZE ${year}`,
     });
     const prior = await this.readValue<Execution>(year, storageKey);
     if (prior) return recoverDrawNext(prior, requestFingerprint);
-    if (!input.acknowledgement || input.confirmation !== `DRAW NEXT MEGA PRIZE ${year}`)
-      throw new MegaDrawError('VALIDATION_ERROR', 'Draw-next confirmation is required.');
     const current = await this.readValue<MegaDrawLifecycle>(year, scoped(currentEpoch, 'STATE'));
+    if (current?.status === 'CLOSED')
+      throw new MegaDrawError('MEGA_DRAW_CLOSED', 'Mega Draw is closed.');
     if (current?.status === 'COMPLETED')
       throw new MegaDrawError('MEGA_DRAW_ALREADY_COMPLETED', 'Mega Draw has already completed.');
     const lifecycle =
@@ -247,6 +253,9 @@ export class DurableMegaDrawService {
     if (!input.acknowledgement || input.confirmation !== `RESET MEGA DRAW ${year}`)
       throw new MegaDrawError('VALIDATION_ERROR', 'Mega Draw reset confirmation is required.');
     const current = await this.currentEpoch(year);
+    const state = await this.readValue<MegaDrawLifecycle>(year, scoped(current, 'STATE'));
+    if (state?.status === 'CLOSED')
+      throw new MegaDrawError('MEGA_DRAW_CLOSED', 'Mega Draw is closed.');
     const next: CurrentEpoch = { epoch: randomUUID() };
     try {
       await this.client.send(
@@ -278,6 +287,62 @@ export class DurableMegaDrawService {
     return { executionYear: year };
   }
 
+  public async close(input: {
+    acknowledgement: boolean;
+    confirmation: string;
+  }): Promise<{ lifecycle: MegaDrawLifecycle }> {
+    const year = campaignYearInKolkata(this.now());
+    if (!input.acknowledgement || input.confirmation !== `CLOSE MEGA DRAW ${year}`)
+      throw new MegaDrawError('VALIDATION_ERROR', 'Mega Draw close confirmation is required.');
+    const current = await this.currentEpoch(year);
+    const lifecycle = await this.readValue<MegaDrawLifecycle>(year, scoped(current, 'STATE'));
+    if (!lifecycle || lifecycle.status !== 'COMPLETED')
+      throw new MegaDrawError(
+        'MEGA_DRAW_NOT_CONFIGURED',
+        'Mega Draw must be completed before closing.',
+      );
+    const closed = { ...lifecycle, status: 'CLOSED' as const };
+    try {
+      await this.client.send(
+        new TransactWriteCommand({
+          TransactItems: [
+            {
+              ConditionCheck: {
+                TableName: this.tableName,
+                Key: { pk: key(year), sk: 'CURRENT' },
+                ConditionExpression: 'attribute_not_exists(pk) OR #value.#epoch = :epoch',
+                ExpressionAttributeNames: { '#value': 'value', '#epoch': 'epoch' },
+                ExpressionAttributeValues: { ':epoch': current },
+              },
+            },
+            {
+              Update: {
+                TableName: this.tableName,
+                Key: { pk: key(year), sk: scoped(current, 'STATE') },
+                ConditionExpression: '#value.#reference = :reference AND #value.#status = :status',
+                UpdateExpression: 'SET #value = :value, updatedAt = :updatedAt',
+                ExpressionAttributeNames: {
+                  '#value': 'value',
+                  '#reference': 'reference',
+                  '#status': 'status',
+                },
+                ExpressionAttributeValues: {
+                  ':reference': lifecycle.reference,
+                  ':status': 'COMPLETED',
+                  ':value': closed,
+                  ':updatedAt': this.now().toISOString(),
+                },
+              },
+            },
+          ],
+        }),
+      );
+    } catch {
+      throw new MegaDrawError('MEGA_DRAW_IN_PROGRESS', 'Mega Draw state changed while closing.');
+    }
+    return { lifecycle: closed };
+  }
+
   private async startFromPreflight(
     reference: string | undefined,
     year: number,
@@ -302,8 +367,8 @@ export class DurableMegaDrawService {
       prizes: preflight.prizes,
       candidates: preflight.candidates,
       selectedRows: [],
-      nextPrizeOrdinal: 1,
-      remainingPrizes: preflight.prizes,
+      nextPrizeOrdinal: preflight.prizes.length,
+      remainingPrizes: [...preflight.prizes].reverse(),
     };
   }
 
@@ -314,10 +379,9 @@ export class DurableMegaDrawService {
     candidates: MegaCandidate[];
   }> {
     const year = campaignYearInKolkata(this.now());
-    const current = await this.currentEpoch(year);
     const [campaign, prizes, claims] = await Promise.all([
       this.drawStore.getCampaign(),
-      this.readValue<MegaPrize[]>(year, scoped(current, 'CONFIG')),
+      this.readValue<MegaPrize[]>(year, 'CONFIG'),
       this.drawStore.listActiveClaims(),
     ]);
     if (!campaign || Number(campaign.fromDate.slice(0, 4)) !== year)
@@ -385,7 +449,8 @@ export class DurableMegaDrawService {
     );
     const items = (response as { Items?: MegaItem[] }).Items ?? [];
     const stale = items.filter(
-      (item) => item.sk !== 'CURRENT' && !item.sk.startsWith(`EPOCH#${current}#`),
+      (item) =>
+        item.sk !== 'CURRENT' && item.sk !== 'CONFIG' && !item.sk.startsWith(`EPOCH#${current}#`),
     );
     if (stale.length > 0)
       await this.client.send(
@@ -468,8 +533,8 @@ const advance = (
   now: () => Date,
 ): MegaDrawLifecycle => {
   const selectedRows = [...lifecycle.selectedRows, selectedRow];
-  const nextPrizeOrdinal = lifecycle.nextPrizeOrdinal + 1;
-  const remainingPrizes = (lifecycle.prizes ?? []).slice(nextPrizeOrdinal - 1);
+  const nextPrizeOrdinal = lifecycle.nextPrizeOrdinal - 1;
+  const remainingPrizes = (lifecycle.prizes ?? []).slice(0, nextPrizeOrdinal).reverse();
   const completed = remainingPrizes.length === 0;
   return {
     ...lifecycle,

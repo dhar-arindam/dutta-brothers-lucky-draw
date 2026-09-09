@@ -57,6 +57,7 @@ const installMegaDrawApi = async (
   initialLifecycle: typeof firstLifecycle | null = null,
 ) => {
   let lifecycle = initialLifecycle;
+  let configuration = initialLifecycle ? prizes : ([] as typeof prizes);
   await page.route('**/api/admin/mega-draw**', async (route) => {
     const request = route.request();
     const { pathname } = new URL(request.url());
@@ -64,13 +65,14 @@ const installMegaDrawApi = async (
     if (request.method() === 'GET' && pathname === '/api/admin/mega-draw') {
       await json(route, {
         status: 'SUCCESS',
-        configuration: lifecycle ? prizes : [],
+        configuration,
         lifecycle,
       });
       return;
     }
 
     if (request.method() === 'PUT' && pathname === '/api/admin/mega-draw/configuration') {
+      configuration = prizes;
       await json(route, { status: 'SUCCESS', prizes });
       return;
     }
@@ -106,6 +108,12 @@ const installMegaDrawApi = async (
       return;
     }
 
+    if (request.method() === 'POST' && pathname === '/api/admin/mega-draw/close') {
+      lifecycle = { ...firstLifecycle, status: 'CLOSED' as const, remainingPrizes: [] };
+      await json(route, { status: 'SUCCESS', lifecycle });
+      return;
+    }
+
     if (request.method() === 'GET' && pathname.startsWith('/api/admin/mega-draw/status/')) {
       await json(route, { status: 'SUCCESS', execution: 'COMPLETED', lifecycle });
       return;
@@ -136,23 +144,23 @@ test('configures, preflights, confirms, and reveals the next backend-selected wi
   await page.getByRole('button', { name: 'Add prize' }).click();
   await page.getByLabel('Mega prize 2').fill(prizes[1].name);
   await page.getByRole('button', { name: 'Save configuration' }).click();
-  await page.getByRole('button', { name: 'Prepare draw' }).click();
+  await page.getByRole('button', { name: 'Prepare draw' }).first().click();
 
   await expect(page.getByRole('heading', { name: 'Preflight summary' })).toBeVisible();
   await expect(page.getByText('12 eligible candidates for 2 prizes.')).toBeVisible();
-  await page.getByRole('button', { name: 'Draw next winner' }).click();
+  await page.getByRole('button', { name: 'Prepare draw' }).last().click();
 
   const dialog = page.getByRole('dialog');
   await dialog.getByRole('checkbox').check();
   await dialog.getByLabel(/Type DRAW NEXT MEGA PRIZE 2026/).fill('DRAW NEXT MEGA PRIZE 2026');
-  await dialog.getByRole('button', { name: 'Draw next winner' }).click();
+  await dialog.getByRole('button', { name: 'Draw next Mega prize: Premium Speaker' }).click();
 
   await expect(page.getByRole('heading', { name: 'Mega Draw in progress' })).toBeVisible();
   await expect(page.getByText('1. Grand Television', { exact: true })).toBeVisible();
   await expect(page.getByText('Arindam Dhar (******3210)')).toBeVisible();
   await expect(page.getByLabel('Backend-provided prize wheel')).toHaveAttribute(
     'data-spoke-count',
-    '2',
+    '1',
   );
   await expect(page.getByText(/Reference: MEGA-2026-001/)).toBeVisible();
 });
@@ -175,6 +183,22 @@ test('requires acknowledgement and exact confirmation before reset returns to ed
   await submit.click();
 
   await expect(page.getByRole('button', { name: 'Save configuration' })).toBeVisible();
-  await expect(page.getByLabel('Mega prize 1')).toHaveValue('');
+  await expect(page.getByLabel('Mega prize 1')).toHaveValue('Grand Television');
   await expect(page.getByRole('heading', { name: 'Mega Draw in progress' })).not.toBeVisible();
+});
+
+test('closes a completed draw with the exact terminal confirmation', async ({ page }) => {
+  await authenticate(page);
+  await installMegaDrawApi(page, { ...firstLifecycle, status: 'COMPLETED', remainingPrizes: [] });
+
+  await page.goto('/admin/mega-draw');
+  await page.getByRole('button', { name: 'Close Mega Draw' }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByRole('checkbox').check();
+  await dialog.getByLabel(/Type CLOSE MEGA DRAW 2026/).fill('CLOSE MEGA DRAW 2026');
+  await dialog.getByRole('button', { name: 'Close Mega Draw' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Mega Draw closed' })).toBeVisible();
+  await expect(page.getByText('Arindam Dhar (******3210)')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Reset Mega Draw' })).not.toBeVisible();
 });

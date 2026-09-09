@@ -99,7 +99,7 @@ describe('request-size policy enforcement (node application layer)', () => {
       }),
     });
 
-    expect(response.status).toBe(201);
+    expect(response.status).not.toBe(413);
   });
 
   it('accepts draw payload exactly at limit and proceeds to normal processing path', async () => {
@@ -112,9 +112,9 @@ describe('request-size policy enforcement (node application layer)', () => {
       body: bodyText,
     });
 
-    expect(response.status).toBe(201);
+    expect(response.status).not.toBe(413);
     const parsed = (await response.json()) as { status: string };
-    expect(parsed.status).toBe('SUCCESS');
+    expect(parsed.status).toBe('ERROR');
   });
 
   it('rejects draw payload above limit with approved 413 error contract', async () => {

@@ -1,8 +1,9 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
-import { ClipboardCheck, RotateCcw, Save } from 'lucide-react';
+import { ClipboardCheck, Maximize2, Minimize2, RotateCcw, Save, X } from 'lucide-react';
 
-import type { MegaDrawLifecycle, MegaDrawPreflight } from './types';
+import type { MegaDrawLifecycle, MegaDrawPreflight, MegaDrawSelectedRow } from './types';
 import {
+  closeMegaDraw,
   drawNextMegaPrize,
   getMegaDraw,
   getMegaDrawStatus,
@@ -13,7 +14,7 @@ import {
 } from './services/mega-draw-api';
 import './admin.tailwind.css';
 
-type Dialog = 'RUN' | 'RESET' | null;
+type Dialog = 'RUN' | 'RESET' | 'CLOSE' | null;
 type UiState =
   | 'LOADING'
   | 'SETUP'
@@ -22,7 +23,9 @@ type UiState =
   | 'RUNNING'
   | 'IN_PROGRESS'
   | 'COMPLETED'
+  | 'CLOSED'
   | 'RESETTING'
+  | 'CLOSING'
   | 'ERROR';
 
 const createKey = (): string => crypto.randomUUID();
@@ -34,10 +37,11 @@ const formatKolkata = (timestamp: string): string =>
   }).format(new Date(timestamp));
 
 export const MegaDrawPage = () => {
-  const [isLightTheme, setIsLightTheme] = useState(() => {
-    if (typeof window === 'undefined') return true;
-    return window.localStorage.getItem('dutta-draw-admin-theme') !== 'dark';
-  });
+  const [isLightTheme, setIsLightTheme] = useState(
+    () =>
+      typeof window === 'undefined' ||
+      window.localStorage.getItem('dutta-draw-admin-theme') !== 'dark',
+  );
   const [uiState, setUiState] = useState<UiState>('LOADING');
   const [prizeNames, setPrizeNames] = useState<string[]>(['']);
   const [preflight, setPreflight] = useState<MegaDrawPreflight | null>(null);
@@ -48,7 +52,13 @@ export const MegaDrawPage = () => {
   const [message, setMessage] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Record<number, string>>({});
   const [attemptKey, setAttemptKey] = useState<string | null>(null);
-  const headingRef = useRef<HTMLHeadingElement>(null);
+  const [newWinner, setNewWinner] = useState<MegaDrawSelectedRow | null>(null);
+  const [heldPrize, setHeldPrize] = useState<{ position: number; name: string } | null>(null);
+  const [isDialogFullscreen, setIsDialogFullscreen] = useState(false);
+  const [showFinalWinners, setShowFinalWinners] = useState(false);
+  const resultHeadingRef = useRef<HTMLHeadingElement>(null);
+  const openerRef = useRef<HTMLButtonElement>(null);
+
   const load = async (successMessage = 'Mega Draw configuration loaded.') => {
     setUiState('LOADING');
     try {
@@ -57,12 +67,15 @@ export const MegaDrawPage = () => {
         response.configuration.length ? response.configuration.map((prize) => prize.name) : [''],
       );
       setLifecycle(response.lifecycle ?? null);
+      const status = response.lifecycle?.status;
       setUiState(
-        response.lifecycle?.status === 'COMPLETED'
-          ? 'COMPLETED'
-          : response.lifecycle?.status === 'IN_PROGRESS'
-            ? 'IN_PROGRESS'
-            : 'SETUP',
+        status === 'CLOSED'
+          ? 'CLOSED'
+          : status === 'COMPLETED'
+            ? 'COMPLETED'
+            : status === 'IN_PROGRESS'
+              ? 'IN_PROGRESS'
+              : 'SETUP',
       );
       setMessage(response.lifecycle ? 'Mega Draw lifecycle loaded.' : successMessage);
     } catch (error) {
@@ -70,6 +83,7 @@ export const MegaDrawPage = () => {
       setMessage(error instanceof Error ? error.message : 'Unable to load Mega Draw.');
     }
   };
+
   useEffect(() => {
     void load();
   }, []);
@@ -77,11 +91,28 @@ export const MegaDrawPage = () => {
     window.localStorage.setItem('dutta-draw-admin-theme', isLightTheme ? 'light' : 'dark');
   }, [isLightTheme]);
   useEffect(() => {
-    if ((uiState === 'IN_PROGRESS' || uiState === 'COMPLETED') && lifecycle) {
-      const timer = window.setTimeout(() => headingRef.current?.focus(), 300);
-      return () => window.clearTimeout(timer);
+    if (!newWinner || dialog === 'RUN') return;
+    const timer = window.setTimeout(() => resultHeadingRef.current?.focus(), 280);
+    return () => window.clearTimeout(timer);
+  }, [dialog, newWinner]);
+  useEffect(() => {
+    if (!heldPrize) return;
+    const timer = window.setTimeout(() => setHeldPrize(null), 8500);
+    return () => window.clearTimeout(timer);
+  }, [heldPrize]);
+  useEffect(() => {
+    if (dialog !== 'RUN' || lifecycle?.status !== 'COMPLETED') {
+      setShowFinalWinners(false);
+      return;
     }
-  }, [uiState, lifecycle]);
+    if (!newWinner) {
+      setShowFinalWinners(true);
+      return;
+    }
+    const timer = window.setTimeout(() => setShowFinalWinners(true), 8500);
+    return () => window.clearTimeout(timer);
+  }, [dialog, lifecycle?.status, newWinner]);
+
   const validatePrizes = (): boolean => {
     const errors: Record<number, string> = {};
     const seen = new Set<string>();
@@ -97,6 +128,7 @@ export const MegaDrawPage = () => {
     setFieldErrors(errors);
     return Object.keys(errors).length === 0;
   };
+
   const saveConfiguration = async (event: FormEvent) => {
     event.preventDefault();
     if (!validatePrizes()) return;
@@ -111,39 +143,66 @@ export const MegaDrawPage = () => {
       setMessage(error instanceof Error ? error.message : 'Unable to save configuration.');
     }
   };
+
   const prepare = async () => {
     try {
       const response = await prepareMegaDraw();
       setPreflight(response.preflight);
       setUiState('PREFLIGHT_READY');
-      setMessage('Preflight is ready. Review and confirm the Mega Draw.');
+      setMessage('Preflight is ready. Open the preparation ceremony to continue.');
     } catch (error) {
-      const apiError = error instanceof MegaDrawApiError ? error : null;
-      setUiState(apiError?.code === 'PREFLIGHT_STALE' ? 'PREFLIGHT_STALE' : 'ERROR');
+      setUiState(
+        error instanceof MegaDrawApiError && error.code === 'PREFLIGHT_STALE'
+          ? 'PREFLIGHT_STALE'
+          : 'ERROR',
+      );
       setMessage(error instanceof Error ? error.message : 'Unable to prepare Mega Draw.');
     }
   };
-  const openDialog = (next: Exclude<Dialog, null>) => {
+
+  const openDialog = (next: Exclude<Dialog, null>, opener: HTMLButtonElement) => {
+    openerRef.current = opener;
     setDialog(next);
     setAcknowledged(false);
     setConfirmation('');
+    setNewWinner(null);
+    setHeldPrize(null);
+    setIsDialogFullscreen(false);
+    setShowFinalWinners(false);
+  };
+  const closeDialog = () => {
+    setDialog(null);
+    setIsDialogFullscreen(false);
+    setShowFinalWinners(false);
+    openerRef.current?.focus();
   };
   const expectedConfirmation =
     dialog === 'RUN'
       ? `DRAW NEXT MEGA PRIZE ${lifecycle?.executionYear ?? preflight?.executionYear}`
-      : `RESET MEGA DRAW ${lifecycle?.executionYear}`;
-  const canSubmit = acknowledged && confirmation === expectedConfirmation;
-  const complete = (updatedLifecycle: MegaDrawLifecycle) => {
+      : dialog === 'CLOSE'
+        ? `CLOSE MEGA DRAW ${lifecycle?.executionYear}`
+        : `RESET MEGA DRAW ${lifecycle?.executionYear}`;
+  const canSubmit =
+    dialog === 'RUN' || dialog === 'RESET'
+      ? true
+      : acknowledged && confirmation === expectedConfirmation;
+
+  const complete = (updatedLifecycle: MegaDrawLifecycle, selectedRow?: MegaDrawSelectedRow) => {
     setLifecycle(updatedLifecycle);
-    setDialog(null);
     setAttemptKey(null);
     setUiState(updatedLifecycle.status === 'COMPLETED' ? 'COMPLETED' : 'IN_PROGRESS');
-    setMessage(`Winner recorded. ${updatedLifecycle.remainingPrizes.length} prizes remain.`);
+    if (selectedRow) {
+      setHeldPrize(selectedRow.prize);
+      setNewWinner(selectedRow);
+      setMessage(
+        `Winner recorded: ${selectedRow.prize.name}. ${updatedLifecycle.remainingPrizes.length} prizes remain.`,
+      );
+    }
   };
   const recover = async (key: string): Promise<boolean> => {
     const status = await getMegaDrawStatus(key);
     if (status.execution === 'COMPLETED' && status.lifecycle) {
-      complete(status.lifecycle);
+      complete(status.lifecycle, status.selectedRow);
       return true;
     }
     if (status.execution === 'IN_PROGRESS') {
@@ -155,27 +214,8 @@ export const MegaDrawPage = () => {
     }
     return false;
   };
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
-    if (!canSubmit || !dialog) return;
-    const operation = dialog;
-    if (operation === 'RESET') {
-      setUiState('RESETTING');
-      try {
-        await resetMegaDraw({ acknowledgement: acknowledged, confirmation });
-        setDialog(null);
-        setAttemptKey(null);
-        setPreflight(null);
-        setLifecycle(null);
-        await load('Mega Draw reset. Configure prizes for the new draw.');
-      } catch (error) {
-        setUiState('ERROR');
-        setMessage(
-          error instanceof Error ? error.message : 'Mega Draw reset could not be completed.',
-        );
-      }
-      return;
-    }
+  const drawFromWheel = async () => {
+    if (!preflight && !lifecycle) return;
     const key = attemptKey ?? createKey();
     setAttemptKey(key);
     setUiState('RUNNING');
@@ -184,24 +224,22 @@ export const MegaDrawPage = () => {
       const response = await drawNextMegaPrize(
         {
           ...(lifecycle ? {} : { preflightReference: preflight!.reference }),
-          acknowledgement: acknowledged,
-          confirmation,
         },
         key,
       );
-      complete(response.lifecycle);
+      complete(response.lifecycle, response.selectedRow);
     } catch (error) {
-      const apiError = error instanceof MegaDrawApiError ? error : null;
-      if (apiError?.code === 'PREFLIGHT_STALE') {
+      if (error instanceof MegaDrawApiError && error.code === 'PREFLIGHT_STALE') {
         setDialog(null);
         setPreflight(null);
         setUiState('PREFLIGHT_STALE');
+        setMessage(error.message);
         return;
       }
       try {
         if (await recover(key)) return;
       } catch {
-        // Preserve the request failure when its status cannot be recovered.
+        // Preserve the original failure when status recovery also fails.
       }
       setUiState('ERROR');
       setMessage(
@@ -209,6 +247,43 @@ export const MegaDrawPage = () => {
       );
     }
   };
+  const submitLifecycleAction = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!canSubmit || dialog === 'RUN') return;
+    if (dialog === 'RESET') {
+      setUiState('RESETTING');
+      try {
+        await resetMegaDraw({ acknowledgement: true, confirmation: expectedConfirmation });
+        setDialog(null);
+        setPreflight(null);
+        setLifecycle(null);
+        setNewWinner(null);
+        setHeldPrize(null);
+        setShowFinalWinners(false);
+        await load(
+          'Mega Draw reset. The preserved prizes are editable and all candidates are eligible again.',
+        );
+      } catch (error) {
+        setUiState('ERROR');
+        setMessage(
+          error instanceof Error ? error.message : 'Mega Draw reset could not be completed.',
+        );
+      }
+      return;
+    }
+    setUiState('CLOSING');
+    try {
+      const response = await closeMegaDraw({ acknowledgement: acknowledged, confirmation });
+      setLifecycle(response.lifecycle);
+      setDialog(null);
+      setUiState('CLOSED');
+      setMessage('Mega Draw closed. Results remain available.');
+    } catch (error) {
+      setUiState('ERROR');
+      setMessage(error instanceof Error ? error.message : 'Mega Draw could not be closed.');
+    }
+  };
+
   const movePrize = (index: number, offset: number) =>
     setPrizeNames((current) => {
       const target = index + offset;
@@ -221,14 +296,16 @@ export const MegaDrawPage = () => {
     setPrizeNames((current) =>
       current.map((name, position) => (position === index ? value : name)),
     );
+
   const isLocked = Boolean(lifecycle);
+  const isClosed = lifecycle?.status === 'CLOSED';
   const blocked = preflight && preflight.candidateCount < preflight.prizes.length;
   const shellClass = isLightTheme
     ? 'mega-draw-light min-h-screen bg-[#f3f6fa] px-3 py-4 text-slate-800 sm:px-5'
     : 'min-h-screen bg-[#0f1224] px-3 py-4 text-[#ffeecf] sm:px-5';
   const panelClass = isLightTheme
-    ? 'mx-auto w-full max-w-6xl rounded-2xl border border-[#d9e2ec] bg-white p-4 shadow-[0_8px_18px_rgba(15,23,42,0.08)] sm:p-5'
-    : 'mx-auto w-full max-w-6xl rounded-2xl border border-amber-300/25 bg-[#151933] p-4 shadow-[0_8px_18px_rgba(0,0,0,0.35)] sm:p-5';
+    ? 'mx-auto w-full max-w-6xl rounded-lg border border-[#d9e2ec] bg-white p-4 shadow-[0_8px_18px_rgba(15,23,42,0.08)] sm:p-5'
+    : 'mx-auto w-full max-w-6xl rounded-lg border border-amber-300/25 bg-[#151933] p-4 shadow-[0_8px_18px_rgba(0,0,0,0.35)] sm:p-5';
   const headingTextClass = isLightTheme ? 'text-slate-900' : 'text-amber-100';
   const mutedTextClass = isLightTheme ? 'text-slate-600' : 'text-amber-100/80';
   const sectionBorderClass = isLightTheme ? 'border-slate-300/70' : 'border-amber-300/30';
@@ -236,22 +313,23 @@ export const MegaDrawPage = () => {
     ? 'border border-solid border-[#d9e2ec] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.05)]'
     : 'border-2 border-solid border-[#d4af37] bg-[#11153b]';
   const inputClass = isLightTheme
-    ? 'min-h-10 rounded-lg border border-[#cfd9e5] bg-[#f5f8fc] px-3 text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563c7] focus-visible:ring-offset-2 focus-visible:ring-offset-white'
-    : 'min-h-10 rounded-lg border border-amber-300/35 bg-[#141338] px-3 text-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200 focus-visible:ring-offset-2 focus-visible:ring-offset-[#151933]';
+    ? 'min-h-10 rounded-lg border border-[#cfd9e5] bg-[#f5f8fc] px-3 text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563c7]'
+    : 'min-h-10 rounded-lg border border-amber-300/35 bg-[#141338] px-3 text-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200';
   const primaryButtonClass = isLightTheme
-    ? 'min-h-10 rounded-lg border border-[#1557c0] bg-[#1557c0] px-4 text-sm font-semibold text-white shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563c7] focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:border-[#9fb9dc] disabled:bg-[#cbd9ec] disabled:text-slate-500'
-    : 'min-h-10 rounded-lg border border-amber-200 bg-amber-100 px-4 text-sm font-semibold text-[#1f1030] shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200 focus-visible:ring-offset-2 focus-visible:ring-offset-[#151933] disabled:border-amber-200/40 disabled:bg-amber-200/40 disabled:text-[#1f1030]/60';
+    ? 'min-h-10 rounded-lg border border-[#1557c0] bg-[#1557c0] px-4 text-sm font-semibold text-white disabled:border-[#9fb9dc] disabled:bg-[#cbd9ec] disabled:text-slate-500'
+    : 'min-h-10 rounded-lg border border-amber-200 bg-amber-100 px-4 text-sm font-semibold text-[#1f1030] disabled:border-amber-200/40 disabled:bg-amber-200/40';
   const secondaryButtonClass = isLightTheme
-    ? 'min-h-10 rounded-lg border border-[#cfd9e5] bg-white px-4 text-sm font-semibold text-[#24415f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563c7] focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:border-[#d9e2ec] disabled:bg-[#f1f4f8] disabled:text-slate-500'
-    : 'min-h-10 rounded-lg border border-amber-200/70 bg-[#1b1849] px-4 text-sm font-semibold text-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200 focus-visible:ring-offset-2 focus-visible:ring-offset-[#151933] disabled:border-amber-200/30 disabled:bg-[#1b1849]/60 disabled:text-amber-100/60';
+    ? 'min-h-10 rounded-lg border border-[#cfd9e5] bg-white px-4 text-sm font-semibold text-[#24415f] disabled:border-[#d9e2ec] disabled:bg-[#f1f4f8] disabled:text-slate-500'
+    : 'min-h-10 rounded-lg border border-amber-200/70 bg-[#1b1849] px-4 text-sm font-semibold text-amber-100';
   const dangerButtonClass = isLightTheme
-    ? 'min-h-10 rounded-lg border border-red-300 bg-red-50 px-4 text-sm font-semibold text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:border-red-200/50 disabled:bg-red-50/60 disabled:text-red-700/50'
-    : 'min-h-10 rounded-lg border border-red-400/70 bg-red-950/40 px-4 text-sm font-semibold text-red-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[#151933] disabled:border-red-400/30 disabled:bg-red-950/20 disabled:text-red-200/50';
+    ? 'min-h-10 rounded-lg border border-red-300 bg-red-50 px-4 text-sm font-semibold text-red-700 disabled:border-red-200/50 disabled:bg-red-50/60'
+    : 'min-h-10 rounded-lg border border-red-400/70 bg-red-950/40 px-4 text-sm font-semibold text-red-200';
+
   return (
     <main className={shellClass} aria-label="Mega Draw operations page">
       <section className={panelClass}>
         <header
-          className={`relative flex flex-wrap items-start justify-between gap-3 rounded-xl px-4 py-3 ${isLightTheme ? 'bg-[#1557c0] text-white' : ''}`}
+          className={`relative flex flex-wrap items-start justify-between gap-3 rounded-lg px-4 py-3 ${isLightTheme ? 'bg-[#1557c0] text-white' : ''}`}
         >
           <div className="grid gap-1">
             <p
@@ -261,17 +339,19 @@ export const MegaDrawPage = () => {
             </p>
             <h1
               className={`m-0 text-2xl font-semibold uppercase tracking-[0.04em] sm:text-3xl ${isLightTheme ? 'text-white' : headingTextClass}`}
-              tabIndex={-1}
-              ref={headingRef}
             >
               Mega Draw
             </h1>
             <p className={`m-0 text-sm ${isLightTheme ? 'text-blue-100' : mutedTextClass}`}>
-              Mega Draw operational control and year-end winner selection.
+              Year-end winner selection
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <a href="/admin" className={`${secondaryButtonClass} admin-nav-link`}>
+            <a
+              href="/admin"
+              className={`${secondaryButtonClass} admin-nav-link`}
+              aria-label="Back to Admin"
+            >
               Back to Admin
             </a>
             <button
@@ -287,9 +367,9 @@ export const MegaDrawPage = () => {
         <p className="sr-only" aria-live="polite">
           {message}
         </p>
-        <div className={`my-4 grid gap-2 rounded-xl p-3 text-sm sm:grid-cols-3 ${surfaceClass}`}>
+        <div className={`my-4 grid gap-2 rounded-lg p-3 text-sm sm:grid-cols-3 ${surfaceClass}`}>
           <span>
-            <strong>State:</strong> {uiState.replaceAll('_', ' ')}
+            <strong>State:</strong> {isClosed ? 'CLOSED' : uiState.replaceAll('_', ' ')}
           </span>
           <span>
             <strong>Year:</strong>{' '}
@@ -347,11 +427,7 @@ export const MegaDrawPage = () => {
                     onChange={(event) => replacePrize(index, event.target.value)}
                   />
                   {fieldErrors[index] ? (
-                    <p
-                      className={`mt-1 text-sm ${isLightTheme ? 'text-rose-700' : 'text-rose-200'}`}
-                    >
-                      {fieldErrors[index]}
-                    </p>
+                    <p className="mt-1 text-sm text-rose-700">{fieldErrors[index]}</p>
                   ) : null}
                 </div>
                 <div className="mega-prize-row__actions">
@@ -359,7 +435,7 @@ export const MegaDrawPage = () => {
                     type="button"
                     aria-label={`Move prize ${index + 1} up`}
                     title={`Move prize ${index + 1} up`}
-                    className={`${secondaryButtonClass} min-h-8 min-w-8 px-2 text-base leading-none`}
+                    className={`${secondaryButtonClass} min-h-8 min-w-8 px-2`}
                     disabled={index === 0}
                     onClick={() => movePrize(index, -1)}
                   >
@@ -369,7 +445,7 @@ export const MegaDrawPage = () => {
                     type="button"
                     aria-label={`Move prize ${index + 1} down`}
                     title={`Move prize ${index + 1} down`}
-                    className={`${secondaryButtonClass} min-h-8 min-w-8 px-2 text-base leading-none`}
+                    className={`${secondaryButtonClass} min-h-8 min-w-8 px-2`}
                     disabled={index === prizeNames.length - 1}
                     onClick={() => movePrize(index, 1)}
                   >
@@ -379,7 +455,7 @@ export const MegaDrawPage = () => {
                     type="button"
                     aria-label={`Remove prize ${index + 1}`}
                     title={`Remove prize ${index + 1}`}
-                    className={`${dangerButtonClass} min-h-8 min-w-8 px-2 text-base leading-none`}
+                    className={`${dangerButtonClass} min-h-8 min-w-8 px-2`}
                     disabled={prizeNames.length === 1}
                     onClick={() =>
                       setPrizeNames((current) =>
@@ -394,11 +470,11 @@ export const MegaDrawPage = () => {
             ))}
             <div className="mega-prize-configuration__actions">
               <button type="submit" className={primaryButtonClass}>
-                <Save aria-hidden="true" size={16} strokeWidth={2} />
+                <Save aria-hidden="true" size={16} />
                 Save configuration
               </button>
               <button type="button" className={secondaryButtonClass} onClick={() => void prepare()}>
-                <ClipboardCheck aria-hidden="true" size={16} strokeWidth={2} />
+                <ClipboardCheck aria-hidden="true" size={16} />
                 Prepare draw
               </button>
             </div>
@@ -421,19 +497,16 @@ export const MegaDrawPage = () => {
             </p>
             <p className="mb-0 mt-2 text-sm">Ready until {formatKolkata(preflight.expiresAt)}.</p>
             {blocked ? (
-              <p
-                role="alert"
-                className={`mb-0 mt-2 text-sm ${isLightTheme ? 'text-rose-700' : 'text-rose-200'}`}
-              >
+              <p role="alert" className="mb-0 mt-2 text-sm text-rose-700">
                 There are not enough eligible participants to run this draw.
               </p>
             ) : (
               <button
                 type="button"
                 className={`mt-3 ${primaryButtonClass}`}
-                onClick={() => openDialog('RUN')}
+                onClick={(event) => openDialog('RUN', event.currentTarget)}
               >
-                Draw next winner
+                Prepare draw
               </button>
             )}
           </section>
@@ -447,95 +520,59 @@ export const MegaDrawPage = () => {
             Refresh preflight
           </button>
         ) : null}
-        {uiState === 'RUNNING' || uiState === 'RESETTING' ? (
+        {uiState === 'RUNNING' || uiState === 'RESETTING' || uiState === 'CLOSING' ? (
           <section
             role="status"
-            className={`mt-4 rounded-xl border p-3 ${isLightTheme ? 'border-sky-300 bg-sky-50' : 'border-sky-300/45 bg-sky-950/20'}`}
+            className={`mt-4 rounded-lg border p-3 ${isLightTheme ? 'border-sky-300 bg-sky-50' : 'border-sky-300/45 bg-sky-950/20'}`}
           >
-            <strong>{uiState === 'RUNNING' ? 'Mega Draw running' : 'Mega Draw resetting'}</strong>
+            <strong>
+              {uiState === 'RUNNING'
+                ? 'Mega Draw running'
+                : uiState === 'CLOSING'
+                  ? 'Mega Draw closing'
+                  : 'Mega Draw resetting'}
+            </strong>
             <ol className="mt-2 list-decimal pl-5">
               <li>Validating snapshot</li>
-              <li>Finalizing result</li>
-              <li>Loading winners</li>
+              <li>Selecting next prize</li>
+              <li>Loading winner</li>
             </ol>
           </section>
         ) : null}
         {lifecycle ? (
           <Results
             lifecycle={lifecycle}
-            onDrawNext={() => openDialog('RUN')}
-            onReset={() => openDialog('RESET')}
+            newWinner={newWinner}
+            resultHeadingRef={resultHeadingRef}
+            onDrawNext={(event) => openDialog('RUN', event.currentTarget)}
+            onReset={(event) => openDialog('RESET', event.currentTarget)}
+            onClose={(event) => openDialog('CLOSE', event.currentTarget)}
             isLightTheme={isLightTheme}
           />
         ) : null}
         {dialog ? (
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="mega-dialog-title"
-            className="mega-draw-dialog-overlay fixed inset-0 z-50 grid bg-black/50 p-3 sm:p-4"
-          >
-            <form onSubmit={submit} className={`mega-draw-dialog ${surfaceClass}`}>
-              <div className="mega-draw-dialog__header">
-                <span className="mega-draw-dialog__eyebrow">Confirmation required</span>
-                <h2
-                  id="mega-dialog-title"
-                  tabIndex={-1}
-                  className={`m-0 text-lg font-semibold ${headingTextClass}`}
-                >
-                  {dialog === 'RUN'
-                    ? `Draw next Mega prize for ${lifecycle?.executionYear ?? preflight?.executionYear}?`
-                    : `Reset Mega Draw ${lifecycle?.executionYear}?`}
-                </h2>
-                <p className={`m-0 text-sm ${mutedTextClass}`}>
-                  {dialog === 'RUN'
-                    ? `The backend will record the next winner for ${lifecycle?.remainingPrizes[0]?.name ?? preflight?.prizes[0]?.name}.`
-                    : 'This clears Mega Draw-only configuration, preflight, lifecycle, and result data for a new editable setup. Main draw data is unchanged.'}
-                </p>
-              </div>
-              <label className="mega-draw-dialog__acknowledgement">
-                <input
-                  type="checkbox"
-                  checked={acknowledged}
-                  onChange={(event) => setAcknowledged(event.target.checked)}
-                />
-                I understand this is an irreversible operational action.
-              </label>
-              <label className="grid gap-1 text-sm font-medium">
-                Type <strong>{expectedConfirmation}</strong>
-                <input
-                  className={inputClass}
-                  value={confirmation}
-                  onChange={(event) => setConfirmation(event.target.value)}
-                />
-              </label>
-              <p className={`mega-draw-dialog__hint ${mutedTextClass}`}>
-                {canSubmit
-                  ? 'Confirmation complete.'
-                  : 'Acknowledge and enter the exact confirmation to continue.'}
-              </p>
-              <div className="mega-draw-dialog__actions">
-                <button
-                  type="submit"
-                  disabled={!canSubmit}
-                  className={dangerButtonClass}
-                  aria-label={
-                    dialog === 'RUN' ? 'Confirm draw next winner' : 'Confirm reset Mega Draw'
-                  }
-                  title={dialog === 'RUN' ? 'Confirm draw next winner' : 'Confirm reset Mega Draw'}
-                >
-                  {dialog === 'RUN' ? 'Draw next winner' : 'Reset Mega Draw'}
-                </button>
-                <button
-                  type="button"
-                  className={secondaryButtonClass}
-                  onClick={() => setDialog(null)}
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
+          <DialogView
+            dialog={dialog}
+            lifecycle={lifecycle}
+            preflight={preflight}
+            heldPrize={heldPrize}
+            acknowledged={acknowledged}
+            confirmation={confirmation}
+            expectedConfirmation={expectedConfirmation}
+            canSubmit={canSubmit}
+            isBusy={uiState === 'RUNNING' || uiState === 'RESETTING' || uiState === 'CLOSING'}
+            newWinner={newWinner}
+            showFinalWinners={showFinalWinners}
+            isFullscreen={isDialogFullscreen}
+            inputClass={inputClass}
+            dangerButtonClass={dangerButtonClass}
+            onAcknowledge={setAcknowledged}
+            onConfirmation={setConfirmation}
+            onClose={closeDialog}
+            onSubmit={submitLifecycleAction}
+            onToggleFullscreen={() => setIsDialogFullscreen((current) => !current)}
+            onWheelClick={() => void drawFromWheel()}
+          />
         ) : null}
       </section>
     </main>
@@ -544,75 +581,70 @@ export const MegaDrawPage = () => {
 
 const Results = ({
   lifecycle,
+  newWinner,
+  resultHeadingRef,
   onDrawNext,
   onReset,
+  onClose,
   isLightTheme,
 }: {
   lifecycle: MegaDrawLifecycle;
-  onDrawNext: () => void;
-  onReset: () => void;
+  newWinner: MegaDrawSelectedRow | null;
+  resultHeadingRef: React.RefObject<HTMLHeadingElement | null>;
+  onDrawNext: (event: React.MouseEvent<HTMLButtonElement>) => void;
+  onReset: (event: React.MouseEvent<HTMLButtonElement>) => void;
+  onClose: (event: React.MouseEvent<HTMLButtonElement>) => void;
   isLightTheme: boolean;
 }) => {
-  const sectionBorderClass = isLightTheme ? 'border-slate-300/70' : 'border-amber-300/30';
-  const resultCardClass = isLightTheme
-    ? 'border-slate-300/70 bg-white shadow-sm'
-    : 'border-amber-300/30 bg-[#11153b] shadow-sm';
-  const dangerButtonClass = isLightTheme
-    ? 'min-h-10 rounded-lg border border-red-300 bg-red-50 px-4 text-sm font-semibold text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white'
-    : 'min-h-10 rounded-lg border border-red-400/70 bg-red-950/40 px-4 text-sm font-semibold text-red-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[#151933]';
+  const isClosed = lifecycle.status === 'CLOSED';
+  const isCompleted = lifecycle.status === 'COMPLETED';
+  const border = isLightTheme ? 'border-slate-300/70' : 'border-amber-300/30';
+  const primary = isLightTheme
+    ? 'min-h-10 rounded-lg border border-[#1557c0] bg-[#1557c0] px-4 text-sm font-semibold text-white'
+    : 'min-h-10 rounded-lg border border-amber-200 bg-amber-100 px-4 text-sm font-semibold text-[#1f1030]';
+  const danger =
+    'min-h-10 rounded-lg border border-red-300 bg-red-50 px-4 text-sm font-semibold text-red-700';
   return (
-    <section className={`mt-4 border-t pt-4 ${sectionBorderClass}`}>
-      <h2 className="m-0 text-base font-semibold uppercase tracking-[0.04em]" tabIndex={-1}>
-        {lifecycle.status === 'COMPLETED' ? 'Mega Draw completed' : 'Mega Draw in progress'}
+    <section className={`mt-4 border-t pt-4 ${border}`}>
+      <h2
+        ref={resultHeadingRef}
+        tabIndex={-1}
+        className="m-0 text-base font-semibold uppercase tracking-[0.04em]"
+      >
+        {isClosed
+          ? 'Mega Draw closed'
+          : isCompleted
+            ? 'Mega Draw completed'
+            : 'Mega Draw in progress'}
       </h2>
-      <p className="mb-0 mt-2 text-sm">
-        Configuration is locked after the first winner. Reset Mega Draw to make configuration
-        editable again.
-      </p>
-      {lifecycle.selectedRows.length ? (
-        <WinnerRows lifecycle={lifecycle} resultCardClass={resultCardClass} />
-      ) : null}
-      <PrizeWheel
-        prizes={lifecycle.prizes ?? lifecycle.remainingPrizes}
-        selectedPrize={lifecycle.selectedRows.at(-1)?.prize}
-      />
+      {!isClosed ? (
+        <p className="mb-0 mt-2 text-sm">
+          Configuration is locked after the first winner. Reset Mega Draw to make configuration
+          editable again.
+        </p>
+      ) : (
+        <p className="mb-0 mt-2 text-sm">
+          This terminal lifecycle is read-only. Results remain available.
+        </p>
+      )}
+      <WinnerRows lifecycle={lifecycle} newWinner={newWinner} />
       <p className="mt-3 text-sm">
         {lifecycle.remainingPrizes.length} prizes remain. Reference: {lifecycle.reference}
         {lifecycle.completedAt ? ` Completed ${formatKolkata(lifecycle.completedAt)}.` : ''}
       </p>
-      {lifecycle.status !== 'COMPLETED' ? (
-        <div className="mt-4 flex flex-wrap gap-2">
-          <button
-            type="button"
-            className={
-              isLightTheme
-                ? 'min-h-10 rounded-lg border border-[#1557c0] bg-[#1557c0] px-4 text-sm font-semibold text-white'
-                : 'min-h-10 rounded-lg border border-amber-200 bg-amber-100 px-4 text-sm font-semibold text-[#1f1030]'
-            }
-            onClick={onDrawNext}
-          >
-            Draw next winner
-          </button>
-          <button
-            type="button"
-            className={dangerButtonClass}
-            onClick={onReset}
-            title="Reset this Mega Draw to a new editable setup"
-          >
-            <RotateCcw aria-hidden="true" size={16} strokeWidth={2} />
-            Reset Mega Draw
-          </button>
-        </div>
-      ) : null}
-      {lifecycle.status === 'COMPLETED' ? (
-        <div className={`mt-4 border-t pt-4 ${sectionBorderClass}`}>
-          <button
-            type="button"
-            className={dangerButtonClass}
-            onClick={onReset}
-            title="Reset this Mega Draw to a new editable setup"
-          >
-            <RotateCcw aria-hidden="true" size={16} strokeWidth={2} />
+      {!isClosed ? (
+        <div className={`mt-4 flex flex-wrap gap-2 border-t pt-4 ${border}`}>
+          {!isCompleted ? (
+            <button type="button" className={primary} onClick={onDrawNext}>
+              Prepare next prize
+            </button>
+          ) : (
+            <button type="button" className={danger} onClick={onClose}>
+              Close Mega Draw
+            </button>
+          )}
+          <button type="button" className={danger} onClick={onReset}>
+            <RotateCcw aria-hidden="true" size={16} />
             Reset Mega Draw
           </button>
         </div>
@@ -623,16 +655,16 @@ const Results = ({
 
 const WinnerRows = ({
   lifecycle,
-  resultCardClass,
+  newWinner,
 }: {
   lifecycle: MegaDrawLifecycle;
-  resultCardClass: string;
+  newWinner: MegaDrawSelectedRow | null;
 }) => (
   <ol className="mt-3 grid list-none gap-2 p-0">
     {lifecycle.selectedRows.map((winner) => (
       <li
-        key={winner.prize.position}
-        className={`mega-result-row rounded-lg border p-3 ${resultCardClass}`}
+        key={`${winner.prize.position}-${winner.candidate.sourceClaimId}`}
+        className={`mega-result-row rounded-lg border border-slate-300/70 bg-white p-3 ${newWinner?.prize.position === winner.prize.position ? 'mega-result-row--new' : ''}`}
       >
         <strong>
           {winner.prize.position}. {winner.prize.name}
@@ -652,39 +684,268 @@ const WinnerRows = ({
   </ol>
 );
 
-const PrizeWheel = ({
+const DialogView = ({
+  dialog,
+  lifecycle,
+  preflight,
+  heldPrize,
+  acknowledged,
+  confirmation,
+  expectedConfirmation,
+  canSubmit,
+  isBusy,
+  newWinner,
+  showFinalWinners,
+  isFullscreen,
+  inputClass,
+  dangerButtonClass,
+  onAcknowledge,
+  onConfirmation,
+  onClose,
+  onSubmit,
+  onToggleFullscreen,
+  onWheelClick,
+}: {
+  dialog: Exclude<Dialog, null>;
+  lifecycle: MegaDrawLifecycle | null;
+  preflight: MegaDrawPreflight | null;
+  heldPrize: { position: number; name: string } | null;
+  acknowledged: boolean;
+  confirmation: string;
+  expectedConfirmation: string;
+  canSubmit: boolean;
+  isBusy: boolean;
+  newWinner: MegaDrawSelectedRow | null;
+  showFinalWinners: boolean;
+  isFullscreen: boolean;
+  inputClass: string;
+  dangerButtonClass: string;
+  onAcknowledge: (value: boolean) => void;
+  onConfirmation: (value: string) => void;
+  onClose: () => void;
+  onSubmit: (event: FormEvent) => void;
+  onToggleFullscreen: () => void;
+  onWheelClick: () => void;
+}) => {
+  const nextPrize = lifecycle ? lifecycle.remainingPrizes[0] : preflight?.prizes.at(-1);
+  const wheelPrizes = lifecycle?.remainingPrizes ?? preflight?.prizes ?? [];
+  const displayedPrizes =
+    heldPrize && !wheelPrizes.some((prize) => prize.position === heldPrize.position)
+      ? [heldPrize, ...wheelPrizes]
+      : wheelPrizes;
+  const isRun = dialog === 'RUN';
+  const isReset = dialog === 'RESET';
+  const canDraw = Boolean(nextPrize) && !isBusy;
+  const title = isRun
+    ? nextPrize
+      ? `Prepare next Mega prize for ${lifecycle?.executionYear ?? preflight?.executionYear}?`
+      : `Mega Draw ${lifecycle?.executionYear ?? preflight?.executionYear} completed`
+    : dialog === 'CLOSE'
+      ? `Close Mega Draw ${lifecycle?.executionYear}?`
+      : `Reset Mega Draw ${lifecycle?.executionYear}?`;
+  return (
+    <div
+      className={`mega-draw-dialog-overlay fixed inset-0 z-50 grid p-3 sm:p-4 ${isRun ? 'mega-draw-dialog-overlay--festive' : 'bg-black/50'}`}
+      role="presentation"
+    >
+      <form
+        onSubmit={onSubmit}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="mega-dialog-title"
+        className={`mega-draw-dialog ${isRun ? `mega-draw-dialog--festive ${isFullscreen ? 'mega-draw-dialog--fullscreen' : ''}` : 'border border-slate-300 bg-white'}`}
+      >
+        {isRun ? (
+          <button
+            type="button"
+            className="mega-draw-dialog__fullscreen"
+            aria-label={isFullscreen ? 'Exit fullscreen dialog' : 'Open fullscreen dialog'}
+            title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+            disabled={isBusy}
+            onClick={onToggleFullscreen}
+          >
+            {isFullscreen ? (
+              <Minimize2 aria-hidden="true" size={18} />
+            ) : (
+              <Maximize2 aria-hidden="true" size={18} />
+            )}
+          </button>
+        ) : null}
+        <button
+          type="button"
+          className="mega-draw-dialog__close"
+          aria-label="Close dialog"
+          disabled={isBusy}
+          onClick={onClose}
+        >
+          <X aria-hidden="true" size={18} />
+        </button>
+        <div className="mega-draw-dialog__header">
+          <span className="mega-draw-dialog__eyebrow">
+            {isRun ? 'Ready to draw' : isReset ? 'Confirm reset' : 'Confirmation required'}
+          </span>
+          <h2 id="mega-dialog-title" tabIndex={-1} className="m-0 text-lg font-semibold">
+            {title}
+          </h2>
+          <p className="m-0 text-sm">
+            {isRun
+              ? nextPrize
+                ? `The wheel will randomly select the next winner for ${nextPrize.name} from the eligible claimant list.`
+                : 'All configured Mega prizes have recorded winners.'
+              : dialog === 'CLOSE'
+                ? 'Closing preserves these visible results and permanently disables every Mega Draw action.'
+                : 'Reset keeps the configured prizes but clears the active lifecycle and makes prior candidates eligible again.'}
+          </p>
+        </div>
+        {isRun && nextPrize ? (
+          <p className="mega-draw-dialog__hint mega-draw-dialog__hint--run">
+            Click the wheel to randomly select the next winner.
+          </p>
+        ) : null}
+        {isRun && showFinalWinners && lifecycle ? (
+          <FinalWinners rows={lifecycle.selectedRows} />
+        ) : null}
+        {isRun && !showFinalWinners ? (
+          <FestiveWheel
+            prizes={displayedPrizes}
+            nextPrize={nextPrize}
+            winner={newWinner}
+            winnerAnimationKey={
+              newWinner ? `${newWinner.prize.position}-${newWinner.candidate.sourceClaimId}` : null
+            }
+            enabled={canDraw}
+            spinning={Boolean(newWinner)}
+            onClick={onWheelClick}
+          />
+        ) : null}
+        {isRun || isReset ? null : (
+          <>
+            <label className="mega-draw-dialog__acknowledgement">
+              <input
+                type="checkbox"
+                checked={acknowledged}
+                disabled={isBusy}
+                onChange={(event) => onAcknowledge(event.target.checked)}
+              />
+              I understand this is an irreversible operational action.
+            </label>
+            <label className="grid gap-1 text-sm font-medium">
+              Type <strong>{expectedConfirmation}</strong>
+              <input
+                className={inputClass}
+                value={confirmation}
+                disabled={isBusy}
+                onChange={(event) => onConfirmation(event.target.value)}
+              />
+            </label>
+            <p className="mega-draw-dialog__hint">
+              {canSubmit
+                ? 'Confirmation complete.'
+                : 'Acknowledge and enter the exact confirmation to continue.'}
+            </p>
+          </>
+        )}
+        {isReset ? (
+          <p className="mega-draw-dialog__hint">
+            Confirm reset to clear the active Mega Draw result state and return the preserved prizes
+            to editable setup.
+          </p>
+        ) : null}
+        {isRun ? <p aria-hidden="true" className="mega-draw-dialog__run-status" /> : null}
+        {isRun ? null : (
+          <div className="mega-draw-dialog__actions">
+            <button type="submit" className={dangerButtonClass} disabled={!canSubmit || isBusy}>
+              {dialog === 'CLOSE' ? 'Close Mega Draw' : 'Reset Mega Draw'}
+            </button>
+          </div>
+        )}
+      </form>
+    </div>
+  );
+};
+
+const FinalWinners = ({ rows }: { rows: MegaDrawSelectedRow[] }) => (
+  <section className="mega-final-winners" aria-label="Mega Draw final winners">
+    <ol>
+      {rows.map((winner) => (
+        <li key={`${winner.prize.position}-${winner.candidate.sourceClaimId}`}>
+          <span className="mega-final-winners__prize">{winner.prize.name}</span>
+          <strong>{winner.candidate.customerName}</strong>
+          <span className="mega-final-winners__phone">
+            {winner.candidate.normalizedPhone ?? winner.candidate.maskedPhone}
+          </span>
+        </li>
+      ))}
+    </ol>
+  </section>
+);
+
+const FestiveWheel = ({
   prizes,
-  selectedPrize,
+  nextPrize,
+  winner,
+  winnerAnimationKey,
+  enabled,
+  spinning,
+  onClick,
 }: {
   prizes: { position: number; name: string }[];
-  selectedPrize?: { position: number; name: string };
+  nextPrize?: { position: number; name: string };
+  winner: MegaDrawSelectedRow | null;
+  winnerAnimationKey: string | null;
+  enabled: boolean;
+  spinning: boolean;
+  onClick: () => void;
 }) => (
   <section
-    className="mega-prize-wheel mt-4"
+    className="mega-prize-wheel mega-prize-wheel--festive"
     aria-label="Backend-provided prize wheel"
     data-spoke-count={prizes.length}
-    data-selected-prize={selectedPrize?.name ?? ''}
+    style={{ '--prize-count': prizes.length } as React.CSSProperties}
   >
-    <p className="m-0 text-sm font-semibold">Prize presentation</p>
-    <div
-      className="mega-prize-wheel__disc"
-      data-spoke-count={prizes.length}
-      data-selected-prize={selectedPrize?.name ?? ''}
+    <div className="mega-prize-wheel__bulbs" aria-hidden="true">
+      {Array.from({ length: 16 }, (_, index) => (
+        <span key={index} style={{ '--bulb-angle': `${index * 22.5}deg` } as React.CSSProperties} />
+      ))}
+    </div>
+    <button
+      key={`wheel-${winnerAnimationKey ?? 'ready'}`}
+      type="button"
+      className={`mega-prize-wheel__disc ${spinning ? 'mega-prize-wheel__disc--spinning' : ''}`}
+      disabled={!enabled}
+      aria-label={nextPrize ? `Draw next Mega prize: ${nextPrize.name}` : 'Mega Draw completed'}
+      onClick={onClick}
     >
       {prizes.map((prize, index) => (
         <span
           key={prize.position}
           className="mega-prize-wheel__spoke"
-          style={{ '--spoke-angle': `${(360 / prizes.length) * index}deg` } as React.CSSProperties}
+          style={
+            {
+              '--spoke-angle': `${(360 / Math.max(prizes.length, 1)) * index}deg`,
+            } as React.CSSProperties
+          }
         >
-          {prize.name}
+          {prize.name.split(/\s+/).map((word, wordIndex) => (
+            <span key={`${word}-${wordIndex}`}>{word}</span>
+          ))}
         </span>
       ))}
-    </div>
-    {selectedPrize ? (
-      <p className="mb-0 mt-2 text-sm" role="status">
-        Recorded winner: {selectedPrize.name}
-      </p>
+      <span className="mega-prize-wheel__hub">DRAW</span>
+    </button>
+    {winner ? (
+      <div
+        key={`winner-${winnerAnimationKey ?? winner.selectedAt}`}
+        role="status"
+        className="mega-prize-wheel__winner-overlay"
+      >
+        <span className="mega-prize-wheel__winner-kicker">Winner selected</span>
+        <strong className="mega-prize-wheel__winner-name">{winner.candidate.customerName}</strong>
+        <span className="mega-prize-wheel__winner-prize">{winner.prize.name}</span>
+        <span className="mega-prize-wheel__winner-phone">
+          {winner.candidate.normalizedPhone ?? winner.candidate.maskedPhone}
+        </span>
+      </div>
     ) : null}
   </section>
 );

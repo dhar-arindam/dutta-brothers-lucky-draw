@@ -2,8 +2,8 @@
 
 Status: APPROVED  
 Last Updated: 2026-09-08
-Change: Approved epoch-based Mega Draw reset policy
-Reason: Record confirmed immediate isolation and separate cleanup of prior Mega Draw epochs
+Change: Pending Mega Draw reset preservation, reverse order, click-to-draw, and terminal close review
+Reason: Approved Mega Draw reset preservation, reverse order, click-to-draw, and terminal close changes
 
 Specifications are the source of truth for product behaviour.
 
@@ -11,7 +11,7 @@ Active customer reveal: Festive Gift Box Reveal.
 
 Active Admin V1 model: `/admin` operational page with public read-only access and Cognito-managed local users for edits and exports, using OAuth2 Authorization Code + PKCE and no MFA. Mega Draw is an Admin-scope-only exception: its route, configuration, execution, and results require login.
 
-The resettable Mega Draw lifecycle is approved. A confirmed reset atomically advances the execution year's current Mega Draw epoch to an empty editable setup, immediately makes prior Mega Draw-only records inaccessible, and uses separate cleanup to delete those prior-epoch records. Reset creates no audit or reset event and never affects main draw claims, prizes, campaign, archives, aggregates, or CSV.
+The Mega Draw changes are approved. Reset clears only active Mega Draw winner/lifecycle/preflight/idempotency state after a normal destructive confirmation while preserving editable ordered prize configuration and restoring selected candidates' eligibility. Draws proceed in reverse configured order after explicit wheel click with no RUN checkbox or typed phrase; the themed wheel rotation follows the authoritative result and is capped at seven full turns. After the final reveal, the modal replaces the wheel with all winner labels. Completed draws may be terminally closed with exact phrase `CLOSE MEGA DRAW <year>`; no Mega history or audit is retained, and main draw behaviour remains unchanged.
 
 Admin V1 supports explicitly confirmed deletion of individual claims and clearing all claims. Before campaign end these operations remove records; after campaign end they archive records while updating active claim-derived aggregates consistently.
 

@@ -20,7 +20,7 @@ const original: MegaDrawLifecycle = {
   prizes: [{ position: 1, name: 'First' }],
   candidates: [],
   selectedRows: [],
-  nextPrizeOrdinal: 2,
+  nextPrizeOrdinal: 0,
   remainingPrizes: [],
 };
 const current: MegaDrawLifecycle = { ...original, reference: 'MD-2026-current' };
@@ -30,8 +30,7 @@ class FakeDocClient {
     if (command instanceof GetCommand) {
       const sk = command.input.Key?.sk;
       if (sk === 'CURRENT') return { Item: { value: { epoch: 'current' } } };
-      if (sk === 'EPOCH#current#CONFIG')
-        return { Item: { value: [{ position: 1, name: 'First' }] } };
+      if (sk === 'CONFIG') return { Item: { value: [{ position: 1, name: 'First' }] } };
       if (sk === 'EPOCH#current#STATE') return { Item: { value: current } };
       if (sk === 'EPOCH#current#IDEMP#admin-1#lost-response')
         return { Item: { value: { operation: 'DRAW_NEXT', lifecycle: current } } };

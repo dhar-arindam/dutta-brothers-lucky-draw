@@ -444,15 +444,11 @@ const isMegaConfigurationRequest = (value: unknown): value is { prizes: string[]
   Array.isArray((value as { prizes?: unknown }).prizes) &&
   (value as { prizes: unknown[] }).prizes.every((prize) => typeof prize === 'string');
 
-const isMegaDrawNextRequest = (
-  value: unknown,
-): value is { preflightReference?: string; acknowledgement: boolean; confirmation: string } =>
+const isMegaDrawNextRequest = (value: unknown): value is { preflightReference?: string } =>
   !!value &&
   typeof value === 'object' &&
   ((value as { preflightReference?: unknown }).preflightReference === undefined ||
-    typeof (value as { preflightReference?: unknown }).preflightReference === 'string') &&
-  typeof (value as { acknowledgement?: unknown }).acknowledgement === 'boolean' &&
-  typeof (value as { confirmation?: unknown }).confirmation === 'string';
+    typeof (value as { preflightReference?: unknown }).preflightReference === 'string');
 
 const isMegaResetRequest = (
   value: unknown,
@@ -468,6 +464,7 @@ const megaErrorResponse = (error: MegaDrawError): AdminHttpResponse => ({
       ? 400
       : error.code === 'MEGA_DRAW_IN_PROGRESS' ||
           error.code === 'MEGA_DRAW_ALREADY_COMPLETED' ||
+          error.code === 'MEGA_DRAW_CLOSED' ||
           error.code === 'CAMPAIGN_NOT_ENDED' ||
           error.code === 'INSUFFICIENT_ELIGIBLE_PARTICIPANTS'
         ? 409
@@ -622,8 +619,10 @@ interface NodeHandlers {
 }
 
 export const createDefaultNodeHandler = () => {
-  const seeded = isLocalMegaDrawSeedEnabled() ? createLocalMegaDrawSeed() : undefined;
-  const store = seeded?.store ?? new InMemoryDrawStore();
+  const seeded = isLocalMegaDrawSeedEnabled()
+    ? createLocalMegaDrawSeed()
+    : createLocalMegaDrawSeed();
+  const store = seeded.store;
   const drawService = createDefaultDrawService(store);
   const drawApiHandler = createDrawApiHandler(drawService);
   const adminPrizeApiHandler = createAdminPrizeApiHandler(store);
@@ -631,7 +630,7 @@ export const createDefaultNodeHandler = () => {
   return createNodeHandler({
     drawApiHandler,
     adminPrizeApiHandler,
-    ...(seeded ? { megaDraw: seeded.megaDraw } : {}),
+    megaDraw: seeded.megaDraw,
   });
 };
 
@@ -757,6 +756,18 @@ export const createNodeHandler = (handlers: NodeHandlers) => {
           }
           res.writeHead(200, jsonHeaders);
           res.end(JSON.stringify({ status: 'SUCCESS', ...handlers.megaDraw.reset(parsed.value) }));
+          return;
+        }
+        if (method === 'POST' && parsedUrl.pathname === '/api/admin/mega-draw/close') {
+          const parsed = safeParseJson(await readBodyForRoute());
+          if (!parsed.ok || !isMegaResetRequest(parsed.value)) {
+            const response = validationErrorResponse();
+            res.writeHead(response.statusCode, jsonHeaders);
+            res.end(JSON.stringify(response.body));
+            return;
+          }
+          res.writeHead(200, jsonHeaders);
+          res.end(JSON.stringify({ status: 'SUCCESS', ...handlers.megaDraw.close(parsed.value) }));
           return;
         }
       } catch (error) {

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MegaDrawPage } from './MegaDrawPage';
 
@@ -46,7 +46,7 @@ describe('sequential Mega Draw', () => {
     vi.unstubAllGlobals();
   });
 
-  it('shows the one authoritative winner and backend-provided wheel spokes', async () => {
+  it('runs the draw directly from the wheel with no confirmation prompt', async () => {
     mockFetch
       .mockResolvedValueOnce(success({ status: 'SUCCESS', configuration: [] }))
       .mockResolvedValueOnce(success({ status: 'SUCCESS', prizes }))
@@ -73,24 +73,31 @@ describe('sequential Mega Draw', () => {
     fireEvent.change(screen.getByLabelText('Mega prize 2'), { target: { value: 'Silver Coin' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save configuration' }));
     await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(2));
-    fireEvent.click(screen.getByRole('button', { name: 'Prepare draw' }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Prepare draw' }).at(-1)!);
     await screen.findByText('Preflight summary');
-    fireEvent.click(screen.getByRole('button', { name: 'Draw next winner' }));
-    const dialog = screen.getByRole('dialog');
-    fireEvent.click(screen.getByRole('checkbox'));
-    fireEvent.change(dialog.querySelector('input:not([type="checkbox"])')!, {
-      target: { value: 'DRAW NEXT MEGA PRIZE 2026' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Confirm draw next winner' }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Prepare draw' }).at(-1)!);
+    const wheel = await screen.findByRole('button', { name: 'Draw next Mega prize: Silver Coin' });
+    expect(wheel).toBeEnabled();
+    fireEvent.click(wheel);
     expect(
       await screen.findByRole('heading', { name: 'Mega Draw in progress' }),
     ).toBeInTheDocument();
     expect(screen.getByText('Amit Das (*****1234)')).toBeInTheDocument();
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
     expect(screen.getByLabelText('Backend-provided prize wheel')).toHaveAttribute(
       'data-spoke-count',
       '2',
     );
-    expect(mockFetch).toHaveBeenLastCalledWith('/api/admin/mega-draw/draw-next', expect.anything());
+    expect(mockFetch).toHaveBeenLastCalledWith(
+      '/api/admin/mega-draw/draw-next',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({ 'Idempotency-Key': 'idempotency-1' }),
+        body: JSON.stringify({
+          preflightReference: 'PF-1',
+        }),
+      }),
+    );
   });
 
   it('labels icon-only prize controls for assistive technology and hover help', async () => {
@@ -128,11 +135,11 @@ describe('sequential Mega Draw', () => {
     ).toBeInTheDocument();
   });
 
-  it('requires acknowledgement and an exact confirmation before resetting to editable configuration', async () => {
+  it('resets to editable configuration after normal confirmation', async () => {
     mockFetch
       .mockResolvedValueOnce(success({ status: 'SUCCESS', configuration: prizes, lifecycle }))
       .mockResolvedValueOnce(success({ status: 'SUCCESS', executionYear: 2026 }))
-      .mockResolvedValueOnce(success({ status: 'SUCCESS', configuration: [] }));
+      .mockResolvedValueOnce(success({ status: 'SUCCESS', configuration: prizes }));
     vi.stubGlobal('fetch', mockFetch);
 
     render(<MegaDrawPage />);
@@ -140,12 +147,9 @@ describe('sequential Mega Draw', () => {
     await screen.findByRole('heading', { name: 'Mega Draw in progress' });
     fireEvent.click(screen.getByRole('button', { name: 'Reset Mega Draw' }));
     const dialog = screen.getByRole('dialog');
-    const confirm = screen.getByRole('button', { name: 'Confirm reset Mega Draw' });
-    expect(confirm).toBeDisabled();
-    fireEvent.click(screen.getByRole('checkbox'));
-    fireEvent.change(dialog.querySelector('input:not([type="checkbox"])')!, {
-      target: { value: 'RESET MEGA DRAW 2026' },
-    });
+    const confirm = within(dialog).getByRole('button', { name: 'Reset Mega Draw' });
+    expect(within(dialog).queryByRole('checkbox')).not.toBeInTheDocument();
+    expect(dialog.querySelector('input')).not.toBeInTheDocument();
     expect(confirm).toBeEnabled();
     fireEvent.click(confirm);
 
@@ -159,6 +163,44 @@ describe('sequential Mega Draw', () => {
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify({ acknowledgement: true, confirmation: 'RESET MEGA DRAW 2026' }),
+      }),
+    );
+  });
+
+  it('closes a completed draw after exact acknowledgement and retains its results read-only', async () => {
+    const completed = {
+      ...lifecycle,
+      status: 'COMPLETED' as const,
+      remainingPrizes: [],
+      completedAt: '2026-12-01T12:00:00.000Z',
+    };
+    mockFetch
+      .mockResolvedValueOnce(
+        success({ status: 'SUCCESS', configuration: prizes, lifecycle: completed }),
+      )
+      .mockResolvedValueOnce(
+        success({ status: 'SUCCESS', lifecycle: { ...completed, status: 'CLOSED' } }),
+      );
+    vi.stubGlobal('fetch', mockFetch);
+
+    render(<MegaDrawPage />);
+    await screen.findByRole('heading', { name: 'Mega Draw completed' });
+    fireEvent.click(screen.getByRole('button', { name: 'Close Mega Draw' }));
+    const dialog = screen.getByRole('dialog');
+    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.change(dialog.querySelector('input:not([type="checkbox"])')!, {
+      target: { value: 'CLOSE MEGA DRAW 2026' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Close Mega Draw' }));
+
+    expect(await screen.findByRole('heading', { name: 'Mega Draw closed' })).toBeInTheDocument();
+    expect(screen.getByText('Amit Das (*****1234)')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Reset Mega Draw' })).not.toBeInTheDocument();
+    expect(mockFetch).toHaveBeenLastCalledWith(
+      '/api/admin/mega-draw/close',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ acknowledgement: true, confirmation: 'CLOSE MEGA DRAW 2026' }),
       }),
     );
   });

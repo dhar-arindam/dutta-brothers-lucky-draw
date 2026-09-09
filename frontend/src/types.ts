@@ -154,6 +154,7 @@ export interface MegaCandidate {
   sourceClaimId: string;
   sourceClaimTimestamp: string;
   customerName: string;
+  normalizedPhone?: string;
   maskedPhone: string;
   billNumber: string;
 }
@@ -169,7 +170,7 @@ export interface MegaDrawSelectedRow {
 export interface MegaDrawLifecycle {
   reference: string;
   executionYear: number;
-  status: 'SETUP' | 'IN_PROGRESS' | 'COMPLETED';
+  status: 'SETUP' | 'IN_PROGRESS' | 'COMPLETED' | 'CLOSED';
   campaign?: MegaCampaignSnapshot;
   prizes?: MegaPrize[];
   selectedRows: MegaDrawSelectedRow[];
@@ -220,6 +221,11 @@ export interface MegaDrawStatusResponse {
 export interface MegaDrawResetResponse {
   status: 'SUCCESS';
   executionYear: number;
+}
+
+export interface MegaDrawCloseResponse {
+  status: 'SUCCESS';
+  lifecycle: MegaDrawLifecycle;
 }
 
 export interface MegaDrawErrorResponse {

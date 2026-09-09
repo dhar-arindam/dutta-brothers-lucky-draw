@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  closeMegaDraw,
   drawNextMegaPrize,
   getMegaDraw,
   getMegaDrawStatus,
@@ -85,8 +86,6 @@ describe('mega draw api client', () => {
     await drawNextMegaPrize(
       {
         preflightReference: 'MD-2026-0',
-        acknowledgement: true,
-        confirmation: 'DRAW NEXT MEGA PRIZE 2026',
       },
       'attempt-1',
     );
@@ -152,6 +151,30 @@ describe('mega draw api client', () => {
     );
   });
 
+  it('uses the protected terminal close contract', async () => {
+    sessionStorage.setItem(
+      'dutta-draw-admin-auth',
+      JSON.stringify({ accessToken: 'token', expiresAt: Date.now() + 60_000 }),
+    );
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ status: 'SUCCESS', lifecycle: { ...lifecycle, status: 'CLOSED' } }),
+    });
+    vi.stubGlobal('fetch', mockFetch);
+
+    await closeMegaDraw({ acknowledgement: true, confirmation: 'CLOSE MEGA DRAW 2026' });
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      '/api/admin/mega-draw/close',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ acknowledgement: true, confirmation: 'CLOSE MEGA DRAW 2026' }),
+        headers: expect.objectContaining({ authorization: 'Bearer token' }),
+      }),
+    );
+  });
+
   it('looks up an attempt status and removes internal contact fields', async () => {
     sessionStorage.setItem(
       'dutta-draw-admin-auth',
@@ -180,6 +203,7 @@ describe('mega draw api client', () => {
       sourceClaimId: 'DB26-1',
       sourceClaimTimestamp: '2026-10-01T00:00:00.000Z',
       customerName: 'Amit Das',
+      normalizedPhone: '9999912345',
       maskedPhone: '*****1234',
       billNumber: 'BILL-1',
     });

@@ -23,7 +23,7 @@ export interface MegaDrawSelectedRow {
 export interface MegaDrawLifecycle {
   reference: string;
   executionYear: number;
-  status: 'SETUP' | 'IN_PROGRESS' | 'COMPLETED';
+  status: 'SETUP' | 'IN_PROGRESS' | 'COMPLETED' | 'CLOSED';
   selectedRows: MegaDrawSelectedRow[];
   nextPrizeOrdinal: number;
   remainingPrizes: MegaPrize[];
@@ -47,4 +47,9 @@ export interface MegaDrawStatusResponse {
 export interface MegaDrawResetResponse {
   status: 'SUCCESS';
   executionYear: number;
+}
+
+export interface MegaDrawCloseResponse {
+  status: 'SUCCESS';
+  lifecycle: MegaDrawLifecycle;
 }

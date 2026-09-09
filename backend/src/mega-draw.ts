@@ -13,6 +13,7 @@ export type MegaDrawErrorCode =
   | 'PREFLIGHT_STALE'
   | 'MEGA_DRAW_IN_PROGRESS'
   | 'MEGA_DRAW_ALREADY_COMPLETED'
+  | 'MEGA_DRAW_CLOSED'
   | 'VALIDATION_ERROR';
 export class MegaDrawError extends Error {
   public constructor(
@@ -54,7 +55,7 @@ export interface MegaSelectedRow {
 export interface MegaDrawLifecycle {
   reference: string;
   executionYear: number;
-  status: 'SETUP' | 'IN_PROGRESS' | 'COMPLETED';
+  status: 'SETUP' | 'IN_PROGRESS' | 'COMPLETED' | 'CLOSED';
   campaign?: MegaCampaignSnapshot;
   prizes?: MegaPrize[];
   candidates?: MegaCandidate[];
@@ -113,7 +114,7 @@ export class MegaDrawService {
     const epoch = this.currentEpoch(executionYear);
     const lifecycle = this.lifecycles.get(this.epochKey(executionYear, epoch));
     return {
-      configuration: [...(this.configurations.get(this.epochKey(executionYear, epoch)) ?? [])],
+      configuration: [...(this.configurations.get(this.configurationKey(executionYear)) ?? [])],
       ...(lifecycle ? { lifecycle } : {}),
     };
   }
@@ -135,16 +136,22 @@ export class MegaDrawService {
     const year = campaignYearInKolkata(this.now());
     const epoch = this.currentEpoch(year);
     const lifecycle = this.lifecycles.get(this.epochKey(year, epoch));
+    if (lifecycle?.status === 'CLOSED')
+      throw new MegaDrawError('MEGA_DRAW_CLOSED', 'Mega Draw is closed.');
     if (lifecycle && lifecycle.status !== 'SETUP')
       throw new MegaDrawError(
         'MEGA_DRAW_CONFIGURATION_LOCKED',
         'Mega Draw configuration is locked after the first selection.',
       );
     const prizes = validatePrizes(prizeNames);
-    this.configurations.set(this.epochKey(year, epoch), prizes);
+    this.configurations.set(this.configurationKey(year), prizes);
     return [...prizes];
   }
   public preflight(): MegaPreflight {
+    const year = campaignYearInKolkata(this.now());
+    const lifecycle = this.lifecycles.get(this.epochKey(year, this.currentEpoch(year)));
+    if (lifecycle?.status === 'CLOSED')
+      throw new MegaDrawError('MEGA_DRAW_CLOSED', 'Mega Draw is closed.');
     const context = this.currentContext();
     const preflight: StoredPreflight = {
       reference: this.nextReference(context.year),
@@ -166,20 +173,21 @@ export class MegaDrawService {
     preflightReference?: string;
     idempotencyKey: string;
     operatorSubject: string;
-    acknowledgement: boolean;
-    confirmation: string;
+    acknowledgement?: boolean;
+    confirmation?: string;
   }): { lifecycle: MegaDrawLifecycle; selectedRow: MegaSelectedRow } {
     const year = campaignYearInKolkata(this.now());
     const epoch = this.currentEpoch(year);
     const existing = this.lifecycles.get(this.epochKey(year, epoch));
+    if (existing?.status === 'CLOSED')
+      throw new MegaDrawError('MEGA_DRAW_CLOSED', 'Mega Draw is closed.');
     if (existing?.status === 'COMPLETED')
       throw new MegaDrawError('MEGA_DRAW_ALREADY_COMPLETED', 'Mega Draw has already completed.');
-    const ordinal = existing?.nextPrizeOrdinal ?? 1;
     const requestFingerprint = fingerprint({
       operation: 'DRAW_NEXT',
       preflightReference: input.preflightReference,
-      acknowledgement: input.acknowledgement,
-      confirmation: input.confirmation,
+      acknowledgement: input.acknowledgement ?? true,
+      confirmation: input.confirmation ?? `DRAW NEXT MEGA PRIZE ${year}`,
     });
     const executionKey = this.executionKey(
       year,
@@ -198,9 +206,8 @@ export class MegaDrawService {
         throw new MegaDrawError('MEGA_DRAW_IN_PROGRESS', 'Mega Draw execution is in progress.');
       return { lifecycle: prior.lifecycle, selectedRow: prior.selectedRow };
     }
-    if (!input.acknowledgement || input.confirmation !== `DRAW NEXT MEGA PRIZE ${year}`)
-      throw new MegaDrawError('VALIDATION_ERROR', 'Draw-next confirmation is required.');
     const lifecycle = existing ?? this.startFromPreflight(input.preflightReference, year);
+    const ordinal = lifecycle.nextPrizeOrdinal;
     const prize = lifecycle.prizes?.[ordinal - 1];
     const candidates = lifecycle.candidates;
     if (!prize || !candidates)
@@ -217,12 +224,13 @@ export class MegaDrawService {
       sourceClaimStatus: 'ACTIVE',
     };
     const selectedRows = [...lifecycle.selectedRows, selectedRow];
-    const remainingPrizes = (lifecycle.prizes ?? []).slice(ordinal);
+    const nextPrizeOrdinal = ordinal - 1;
+    const remainingPrizes = (lifecycle.prizes ?? []).slice(0, nextPrizeOrdinal).reverse();
     const completed = remainingPrizes.length === 0;
     const updated: MegaDrawLifecycle = {
       ...lifecycle,
       selectedRows,
-      nextPrizeOrdinal: ordinal + 1,
+      nextPrizeOrdinal,
       remainingPrizes,
       status: completed ? 'COMPLETED' : 'IN_PROGRESS',
       ...(completed ? { completedAt: this.now().toISOString() } : {}),
@@ -242,8 +250,27 @@ export class MegaDrawService {
     const year = campaignYearInKolkata(this.now());
     if (!input.acknowledgement || input.confirmation !== `RESET MEGA DRAW ${year}`)
       throw new MegaDrawError('VALIDATION_ERROR', 'Mega Draw reset confirmation is required.');
+    if (this.lifecycles.get(this.epochKey(year, this.currentEpoch(year)))?.status === 'CLOSED')
+      throw new MegaDrawError('MEGA_DRAW_CLOSED', 'Mega Draw is closed.');
     this.epochs.set(year, this.currentEpoch(year) + 1);
     return { executionYear: year };
+  }
+  public close(input: { acknowledgement: boolean; confirmation: string }): {
+    lifecycle: MegaDrawLifecycle;
+  } {
+    const year = campaignYearInKolkata(this.now());
+    if (!input.acknowledgement || input.confirmation !== `CLOSE MEGA DRAW ${year}`)
+      throw new MegaDrawError('VALIDATION_ERROR', 'Mega Draw close confirmation is required.');
+    const key = this.epochKey(year, this.currentEpoch(year));
+    const lifecycle = this.lifecycles.get(key);
+    if (!lifecycle || lifecycle.status !== 'COMPLETED')
+      throw new MegaDrawError(
+        'MEGA_DRAW_NOT_CONFIGURED',
+        'Mega Draw must be completed before closing.',
+      );
+    const closed = { ...lifecycle, status: 'CLOSED' as const };
+    this.lifecycles.set(key, closed);
+    return { lifecycle: closed };
   }
   private startFromPreflight(reference: string | undefined, year: number): MegaDrawLifecycle {
     const preflight = reference
@@ -265,8 +292,8 @@ export class MegaDrawService {
       prizes: [...preflight.prizes],
       candidates: [...preflight.candidates],
       selectedRows: [],
-      nextPrizeOrdinal: 1,
-      remainingPrizes: [...preflight.prizes],
+      nextPrizeOrdinal: preflight.prizes.length,
+      remainingPrizes: [...preflight.prizes].reverse(),
     };
   }
   private currentContext(): {
@@ -277,8 +304,7 @@ export class MegaDrawService {
   } {
     const year = campaignYearInKolkata(this.now());
     const campaign = this.source.getCampaign();
-    const configuration =
-      this.configurations.get(this.epochKey(year, this.currentEpoch(year))) ?? [];
+    const configuration = this.configurations.get(this.configurationKey(year)) ?? [];
     if (!campaign || Number(campaign.fromDate.slice(0, 4)) !== year)
       throw new MegaDrawError(
         'CAMPAIGN_NOT_FOUND',
@@ -329,6 +355,9 @@ export class MegaDrawService {
   }
   private epochKey(year: number, epoch: number): string {
     return `${year}:${epoch}`;
+  }
+  private configurationKey(year: number): string {
+    return `${year}:configuration`;
   }
   private preflightKey(year: number, epoch: number, reference: string): string {
     return `${this.epochKey(year, epoch)}:${reference}`;

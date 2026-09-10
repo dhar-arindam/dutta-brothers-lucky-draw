@@ -100,7 +100,7 @@ describe('admin operations page', () => {
     await waitForAutoLoad();
 
     expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Save campaign dates' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Add Prize' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Export Data' })).toBeDisabled();
     expect(screen.getAllByText('Amit Das').length).toBeGreaterThan(0);
@@ -137,6 +137,31 @@ describe('admin operations page', () => {
     render(<AdminPrizePage />);
     await waitForAutoLoad();
     expect(screen.getByRole('button', { name: 'Switch to Light' })).toBeInTheDocument();
+  });
+
+  it('labels destructive claim controls and date clear actions distinctly', async () => {
+    enqueueDashboardSuccess();
+    vi.stubGlobal('fetch', mockFetch);
+
+    render(<AdminPrizePage />);
+    await waitForAutoLoad();
+
+    expect(screen.getByRole('button', { name: 'Clear campaign start date' })).toHaveAttribute(
+      'title',
+      'Clear campaign start date',
+    );
+    expect(screen.getByRole('button', { name: 'Clear campaign end date' })).toHaveAttribute(
+      'title',
+      'Clear campaign end date',
+    );
+    expect(
+      screen.getByRole('button', {
+        name: 'Open delete confirmation for claim CLM-20260816-000001',
+      }),
+    ).toHaveAttribute('title', 'Delete claim CLM-20260816-000001');
+    expect(
+      screen.getByRole('button', { name: 'Open clear all claims confirmation' }),
+    ).toHaveAttribute('title', 'Permanently delete all claims');
   });
 
   it('loads admin data automatically without authentication step', async () => {
@@ -253,9 +278,13 @@ describe('admin operations page', () => {
     await waitForAutoLoad();
 
     fireEvent.click(
-      screen.getAllByRole('button', { name: 'Delete claim CLM-20260816-000001' })[0] as HTMLElement,
+      screen.getByRole('button', {
+        name: 'Open delete confirmation for claim CLM-20260816-000001',
+      }),
     );
-    fireEvent.click(await screen.findByRole('button', { name: 'Delete Claim' }));
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Permanently delete claim CLM-20260816-000001' }),
+    );
 
     const status = await screen.findByRole('status');
     expect(status).toHaveTextContent('Claim CLM-20260816-000001 deleted.');
@@ -271,7 +300,9 @@ describe('admin operations page', () => {
 
     const callCountBefore = mockFetch.mock.calls.length;
     fireEvent.click(
-      screen.getAllByRole('button', { name: 'Delete claim CLM-20260816-000001' })[0] as HTMLElement,
+      screen.getByRole('button', {
+        name: 'Open delete confirmation for claim CLM-20260816-000001',
+      }),
     );
     fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }));
 
@@ -326,11 +357,11 @@ describe('admin operations page', () => {
     render(<AdminPrizePage />);
     await waitForAutoLoad();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Clear All Claims' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open clear all claims confirmation' }));
     fireEvent.change(await screen.findByLabelText('Type CLEAR ALL CLAIMS to confirm'), {
       target: { value: 'CLEAR ALL CLAIMS' },
     });
-    fireEvent.click(screen.getAllByRole('button', { name: 'Clear All Claims' })[1] as HTMLElement);
+    fireEvent.click(screen.getByRole('button', { name: 'Permanently clear all claims' }));
 
     const status = await screen.findByRole('status');
     expect(status).toHaveTextContent('Cleared 1 claim(s).');
@@ -345,12 +376,12 @@ describe('admin operations page', () => {
     await waitForAutoLoad();
 
     const callCountBefore = mockFetch.mock.calls.length;
-    fireEvent.click(screen.getByRole('button', { name: 'Clear All Claims' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open clear all claims confirmation' }));
     fireEvent.change(await screen.findByLabelText('Type CLEAR ALL CLAIMS to confirm'), {
       target: { value: 'nope' },
     });
 
-    expect(screen.getAllByRole('button', { name: 'Clear All Claims' })[1]).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Permanently clear all claims' })).toBeDisabled();
     expect(mockFetch.mock.calls.length).toBe(callCountBefore);
     expect(screen.getAllByText('Amit Das').length).toBeGreaterThan(0);
   });
@@ -394,7 +425,7 @@ describe('admin operations page', () => {
     fireEvent.change(screen.getByLabelText('Weight', { selector: 'input#weight-prize-001' }), {
       target: { value: '7' },
     });
-    fireEvent.click(screen.getAllByRole('button', { name: 'Save Weight' })[0]);
+    fireEvent.click(screen.getByRole('button', { name: 'Save weight for Electric Kettle' }));
 
     const status = await screen.findByRole('status');
     expect(status).toHaveTextContent(
@@ -597,13 +628,13 @@ describe('admin operations page', () => {
 
     fireEvent.change(screen.getByLabelText('From Date'), { target: { value: '' } });
     fireEvent.change(screen.getByLabelText('To Date'), { target: { value: '' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save campaign dates' }));
     expect(await screen.findByText('From Date is required.')).toBeInTheDocument();
     expect(await screen.findByText('To Date is required.')).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('From Date'), { target: { value: '2026-11-01' } });
     fireEvent.change(screen.getByLabelText('To Date'), { target: { value: '2026-10-01' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save campaign dates' }));
     expect(await screen.findByText('To Date must be on or after From Date.')).toBeInTheDocument();
   });
 
@@ -1168,7 +1199,7 @@ describe('admin operations page', () => {
     fireEvent.change(screen.getByLabelText('Weight', { selector: 'input#weight-prize-001' }), {
       target: { value: '0' },
     });
-    fireEvent.click(screen.getAllByRole('button', { name: 'Save Weight' })[0]);
+    fireEvent.click(screen.getByRole('button', { name: 'Save weight for Electric Kettle' }));
 
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('Weight must be a positive number.');
@@ -1195,7 +1226,7 @@ describe('admin operations page', () => {
 
     fireEvent.change(screen.getByLabelText('From Date'), { target: { value: '2026-09-01' } });
     fireEvent.change(screen.getByLabelText('To Date'), { target: { value: '2026-12-01' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save campaign dates' }));
 
     const status = await screen.findByRole('status');
     expect(status).toHaveTextContent('Campaign period updated successfully.');

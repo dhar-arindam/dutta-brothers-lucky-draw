@@ -259,7 +259,7 @@ Use least-privilege IAM.
 
 Lambda must receive only the minimum AWS permissions required for its responsibilities, scoped by function and resource.
 
-Admin V1 does not use admin token authentication. The admin Lambda/API component must not depend on token-validation secrets for access control in V1. DynamoDB permissions must remain least-privilege and resource-scoped.
+Admin V1 keeps ordinary read-only Admin data public. Admin mutation and export APIs require Cognito local-user authentication and the Admin scope. Mega Draw is fully protected: its route, configuration, preflight, execution, results, and audit APIs require Cognito authentication and the Admin scope. Use API Gateway's native JWT authorizer and do not introduce token-validation secrets into application code. DynamoDB permissions must remain least-privilege and resource-scoped.
 
 Do not use broad permissions such as:
 

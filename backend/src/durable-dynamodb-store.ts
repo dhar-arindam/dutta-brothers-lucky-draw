@@ -85,6 +85,7 @@ interface ClaimEntity {
   };
   gsi1pk: 'CLAIM';
   gsi1sk: string;
+  archivedAt?: string;
 }
 
 interface BillEntity {
@@ -755,14 +756,40 @@ export class DynamoDbDrawStore {
     return toClaimFromEntity(entity);
   }
 
+  public async listActiveClaims(): Promise<Claim[]> {
+    let exclusiveStartKey: Record<string, unknown> | undefined;
+    const claims: Claim[] = [];
+
+    do {
+      const page = await this.docClient.send(
+        new QueryCommand({
+          TableName: this.tableName,
+          IndexName: 'gsi1',
+          KeyConditionExpression: 'gsi1pk = :gsi1pk',
+          ExpressionAttributeValues: { ':gsi1pk': 'CLAIM' },
+          ExclusiveStartKey: exclusiveStartKey,
+        }),
+      );
+      claims.push(...((page as { Items?: ClaimEntity[] }).Items ?? []).map(toClaimFromEntity));
+      exclusiveStartKey = (page as { LastEvaluatedKey?: Record<string, unknown> }).LastEvaluatedKey;
+    } while (exclusiveStartKey);
+
+    return claims;
+  }
+
   public async deleteClaim(claimId: string): Promise<{ type: 'SUCCESS' } | { type: 'NOT_FOUND' }> {
-    const claim = await this.getClaimById(claimId);
-    if (!claim) {
+    const existing = await this.docClient.send(
+      new GetCommand({ TableName: this.tableName, Key: { pk: 'CLAIM', sk: claimId } }),
+    );
+    const entity = (existing as { Item?: ClaimEntity }).Item;
+    if (!entity || entity.archivedAt) {
       return { type: 'NOT_FOUND' };
     }
+    const claim = toClaimFromEntity(entity);
 
     const dateKey = campaignDateInKolkata(new Date(claim.claimTimestamp));
     const timestamp = this.nowProvider().toISOString();
+    const archive = (await this.getCampaign()).status === 'ENDED';
 
     await this.docClient.send(
       new TransactWriteCommand({
@@ -774,11 +801,19 @@ export class DynamoDbDrawStore {
             },
           },
           {
-            Delete: {
-              TableName: this.tableName,
-              Key: { pk: 'CLAIM', sk: claim.claimId },
-              ConditionExpression: 'attribute_exists(pk)',
-            },
+            [archive ? 'Update' : 'Delete']: archive
+              ? {
+                  TableName: this.tableName,
+                  Key: { pk: 'CLAIM', sk: claim.claimId },
+                  ConditionExpression: 'attribute_exists(pk) AND attribute_not_exists(archivedAt)',
+                  UpdateExpression: 'SET archivedAt = :archivedAt REMOVE gsi1pk, gsi1sk',
+                  ExpressionAttributeValues: { ':archivedAt': timestamp },
+                }
+              : {
+                  TableName: this.tableName,
+                  Key: { pk: 'CLAIM', sk: claim.claimId },
+                  ConditionExpression: 'attribute_exists(pk)',
+                },
           },
           {
             Update: {
@@ -836,6 +871,14 @@ export class DynamoDbDrawStore {
   // again, matching the intent of a reset. The reverse order would strand BILL guards that
   // permanently block legitimate customers with no matching claim to explain why.
   public async clearAllClaims(): Promise<number> {
+    if ((await this.getCampaign()).status === 'ENDED') {
+      const claims = await this.listActiveClaims();
+      for (const claim of claims) {
+        await this.deleteClaim(claim.claimId);
+      }
+      return claims.length;
+    }
+
     await this.deleteAllByPartition('BILL');
     const deletedClaims = await this.deleteAllByPartition('CLAIM');
     await this.deleteAllByPartition('AGG');

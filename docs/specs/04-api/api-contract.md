@@ -1,11 +1,11 @@
 # API Contract
 
-Status: APPROVED  
+Status: APPROVED
 Owner: Principal Software Engineer  
-Version: 1.5
-Last Updated: 2026-08-21
-Change: Admin claim deletion and transactional retry alignment
-Reason: Align API contract with implemented claim lifecycle and concurrency behaviour
+Version: 2.0
+Last Updated: 2026-09-08
+Change: Pending Mega Draw reset preservation, reverse order, click-to-draw, and terminal close review
+Reason: Approved Mega Draw reset preservation, reverse order, click-to-draw, and terminal close changes
 
 This document defines the initial API contract conceptually. It is not an implementation specification.
 
@@ -13,7 +13,7 @@ The Principal Software Engineer must review and approve this contract before API
 
 ## Admin Authentication
 
-Admin mutation and export endpoints require a Cognito User Pool access token in the `Authorization: Bearer <token>` header. Admin read endpoints remain available without login. The User Pool contains locally managed users only; Google federation and MFA are not enabled in V1. API Gateway validates the token using a native JWT authorizer before invoking the backend.
+Admin mutation and export endpoints require a Cognito User Pool access token in the `Authorization: Bearer <token>` header. Admin read endpoints remain available without login, except Mega Draw configuration, preflight, and result endpoints, which require Admin scope. The User Pool contains locally managed users only; Google federation and MFA are not enabled in V1. API Gateway validates the token using a native JWT authorizer before invoking the backend.
 
 Unauthenticated or invalid-token requests return `401 Unauthorized`. Authenticated users without the required Admin scope return `403 Forbidden`. The customer `POST /api/draw` endpoint remains public.
 
@@ -287,7 +287,7 @@ Results are newest first. Page tokens are opaque and must not expose internal da
 
 ### `DELETE /api/admin/claims/{claimId}`
 
-Deletes a single claim and decrements its associated aggregates (total successful spins, today's successful spins if applicable, and the claim's prize `Given` count). Releases the claim's bill number so it can be used for a future draw.
+Before campaign end, deletes a single claim and decrements its associated aggregates (total successful spins, today's successful spins if applicable, and the claim's prize `Given` count). After campaign end, archives the claim instead. Both outcomes release the bill number for future participation and apply the same aggregate decrements. Archived claims are excluded from normal results and CSV export.
 
 `200 OK` response:
 
@@ -303,7 +303,7 @@ The operation requires explicit confirmation in the admin UI and does not alter 
 
 ### `DELETE /api/admin/claims`
 
-Deletes all claims and resets all claim-derived aggregates (total successful spins, per-date counts, per-prize `Given` counts) to zero. Prize configuration (name, weight, active status) and campaign dates are unaffected.
+Before campaign end, deletes all claims and resets all claim-derived aggregates (total successful spins, per-date counts, per-prize `Given` counts) to zero. After campaign end, archives all active claims and applies the same aggregate and bill-release effects. Prize configuration (name, weight, active status), campaign dates, and Mega Draw records are unaffected.
 
 `200 OK` response:
 
@@ -353,7 +353,7 @@ The error carries a `year` field error, for example:
 }
 ```
 
-Active claims filters such as `search`, `prizeId`, `from`, and `to` affect dashboard viewing only and must not limit CSV export content. Within the selected year the export includes every successful claim.
+Active claims filters such as `search`, `prizeId`, `from`, and `to` affect dashboard viewing only and must not limit CSV export content. Within the selected year the export includes every active successful claim. Archived claims are excluded.
 
 For deterministic formula-injection protection, prefix any exported cell beginning with `=`, `+`, `-`, or `@` with a single apostrophe. Apply normal CSV quoting after this transformation for commas, quotes, and line breaks. Quoting alone is not sufficient protection.
 
@@ -485,6 +485,21 @@ Campaign validation requirements:
 
 The backend validates campaign dates and interprets campaign boundaries in `Asia/Kolkata`.
 
+### Mega Draw APIs
+
+All Mega Draw endpoints require a Cognito access token with the Admin scope and must not return data to unauthenticated callers.
+
+- `GET /api/admin/mega-draw` returns `{ status: "SUCCESS", configuration, lifecycle?, history }` for the execution year's active lifecycle and closed-cycle history. `history` contains closed cycles with cycle number, reference, close timestamp, and preserved winner rows; history is ordered newest-first and contains no mutable active-cycle state.
+- `GET /api/admin/mega-draw/status/{idempotencyKey}` is an Admin-scoped, caller-subject-scoped recovery lookup for `DRAW_NEXT`. It returns `{ status: "SUCCESS", execution, operation?, lifecycle?, selectedRow? }`, where `execution` is `NOT_FOUND`, `IN_PROGRESS`, or `COMPLETED` and `operation` is `DRAW_NEXT` when known. The idempotency key is URL-encoded. Clients must use this endpoint after a lost next-prize response before issuing any retry.
+- `PUT /api/admin/mega-draw/configuration` saves 1 to 10 ordered, uniquely named Mega prize slots only before the first successful selection. It permits add, remove, rename, and reorder; after snapshot lock or terminal close it returns `409 MEGA_DRAW_CONFIGURATION_LOCKED` and makes no change. A successful response supports an explicit Admin success notification.
+- `POST /api/admin/mega-draw/preflight` returns an expiry-bound preflight reference, campaign snapshot, eligible-candidate count, and ordered prize snapshot. It rejects campaigns that have not ended or do not exist for the execution year. It is required only to start a lifecycle.
+- `POST /api/admin/mega-draw/draw-next` requires an `Idempotency-Key` and explicit wheel-click initiation. The first selection requires the current preflight reference. It atomically locks snapshots when needed and persists exactly one winner for the next reverse-order prize ordinal, or returns the existing action outcome/lifecycle. It returns backend-derived `remainingPrizes` solely for presentation; wheel rotation occurs only after this authoritative response.
+- `POST /api/admin/mega-draw/reset` requires an Admin-scoped request from the reset confirmation flow. It clears only the active lifecycle's winners, preflight, locked snapshots, and idempotency/execution records, while retaining the editable ordered prize configuration. It restores previously selected candidates to eligibility for the new lifecycle, creates no Mega history, and must not alter main lucky-draw claims, prizes, campaign, claim archives, aggregate records, or ordinary claims CSV data or scope.
+- `POST /api/admin/mega-draw/close` is available only for a completed lifecycle and requires acknowledgement and exact typed confirmation `CLOSE MEGA DRAW <year>`. It makes the execution year terminally `CLOSED`; results remain readable, but draw, configuration update, preflight, and reset operations are rejected.
+- `POST /api/admin/mega-draw/reopen` is available only when the active lifecycle is `CLOSED`. It creates the next sequential cycle in `SETUP`, preserves the closed cycle in `history`, retains the ordered configuration as editable, and excludes all identities selected in prior closed cycles for the execution year. It rejects `SETUP`, `IN_PROGRESS`, and `COMPLETED` with `MEGA_DRAW_REOPEN_NOT_ALLOWED`.
+
+Mega Draw errors use the standard error shape and include `MEGA_DRAW_NOT_CONFIGURED`, `CAMPAIGN_NOT_FOUND`, `CAMPAIGN_NOT_ENDED`, `INSUFFICIENT_ELIGIBLE_PARTICIPANTS`, `PREFLIGHT_STALE`, `MEGA_DRAW_IN_PROGRESS`, `MEGA_DRAW_ALREADY_COMPLETED`, `MEGA_DRAW_CLOSED`, and `MEGA_DRAW_CONFIGURATION_LOCKED` where applicable. Wheel-spoke data is presentation-only and is never accepted as selection input.
+
 Admin validation errors return `400` with `VALIDATION_ERROR`; invalid prize or campaign updates do not partially apply. Unexpected failures return `500` with `INTERNAL_ERROR`.
 
 ## API Rules
@@ -496,7 +511,7 @@ Admin validation errors return `400` with `VALIDATION_ERROR`; invalid prize or c
 - The backend generates the claim ID.
 - The backend enforces the approved request-body size policy for in-scope mutation endpoints.
 - Admin responses must mask phone numbers and avoid unnecessary internal data.
-- Admin APIs must not permit claim modification or deletion.
+- Admin APIs permit only the explicitly specified claim deletion or archive operations; claim contents otherwise remain immutable.
 - CORS must allow only approved frontend origins.
 - All API timestamps use ISO 8601 UTC; admin display converts them to `Asia/Kolkata`.
 - CSV exports must contain only approved fields and must protect against spreadsheet formula injection.

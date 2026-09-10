@@ -37,7 +37,7 @@ describe('Cognito admin authentication', () => {
   it('starts a PKCE login with the configured Managed Login client', async () => {
     vi.stubEnv('VITE_COGNITO_DOMAIN', config.domain);
     vi.stubEnv('VITE_COGNITO_CLIENT_ID', config.clientId);
-    setUrl('http://localhost:5173/admin');
+    setUrl('https://app.example.com/admin');
     const assign = vi.fn();
     Object.defineProperty(window.location, 'assign', { configurable: true, value: assign });
 
@@ -61,7 +61,7 @@ describe('Cognito admin authentication', () => {
   it('returns no callback result when the URL has no authorization code', async () => {
     vi.stubEnv('VITE_COGNITO_DOMAIN', config.domain);
     vi.stubEnv('VITE_COGNITO_CLIENT_ID', config.clientId);
-    setUrl('http://localhost:5173/admin');
+    setUrl('https://app.example.com/admin');
 
     await expect(completeCognitoLogin()).resolves.toBe(false);
   });
@@ -69,7 +69,7 @@ describe('Cognito admin authentication', () => {
   it('exchanges a valid callback code and stores the access token', async () => {
     vi.stubEnv('VITE_COGNITO_DOMAIN', config.domain);
     vi.stubEnv('VITE_COGNITO_CLIENT_ID', config.clientId);
-    setUrl('http://localhost:5173/admin?code=auth-code&state=oauth-state');
+    setUrl('https://app.example.com/admin?code=auth-code&state=oauth-state');
     sessionStorage.setItem('dutta-draw-admin-oauth-state', 'oauth-state');
     sessionStorage.setItem('dutta-draw-admin-pkce-verifier', 'verifier');
     vi.stubGlobal(
@@ -89,12 +89,12 @@ describe('Cognito admin authentication', () => {
   it('rejects an invalid callback state and a failed token exchange', async () => {
     vi.stubEnv('VITE_COGNITO_DOMAIN', config.domain);
     vi.stubEnv('VITE_COGNITO_CLIENT_ID', config.clientId);
-    setUrl('http://localhost:5173/admin?code=auth-code&state=wrong-state');
+    setUrl('https://app.example.com/admin?code=auth-code&state=wrong-state');
     sessionStorage.setItem('dutta-draw-admin-oauth-state', 'expected-state');
     sessionStorage.setItem('dutta-draw-admin-pkce-verifier', 'verifier');
     await expect(completeCognitoLogin()).rejects.toThrow('Invalid Cognito login state');
 
-    setUrl('http://localhost:5173/admin?code=auth-code&state=oauth-state');
+    setUrl('https://app.example.com/admin?code=auth-code&state=oauth-state');
     sessionStorage.setItem('dutta-draw-admin-oauth-state', 'oauth-state');
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }));
     await expect(completeCognitoLogin()).rejects.toThrow('could not be completed');
@@ -112,7 +112,7 @@ describe('Cognito admin authentication', () => {
   it('clears an expired session and logs out through Managed Login', () => {
     vi.stubEnv('VITE_COGNITO_DOMAIN', config.domain);
     vi.stubEnv('VITE_COGNITO_CLIENT_ID', config.clientId);
-    setUrl('http://localhost:5173/admin');
+    setUrl('https://app.example.com/admin');
     sessionStorage.setItem(
       'dutta-draw-admin-auth',
       JSON.stringify({ accessToken: 'access-token', expiresAt: Date.now() + 60_000 }),
@@ -134,5 +134,15 @@ describe('Cognito admin authentication', () => {
       JSON.stringify({ accessToken: 'expired', expiresAt: Date.now() - 1 }),
     );
     expect(getAdminAccessToken()).toBeNull();
+  });
+
+  it('automatically creates a local Admin session in development mode', async () => {
+    vi.stubEnv('VITE_COGNITO_DOMAIN', config.domain);
+    vi.stubEnv('VITE_COGNITO_CLIENT_ID', config.clientId);
+    setUrl('http://localhost:5173/admin');
+
+    await expect(completeCognitoLogin()).resolves.toBe(true);
+    expect(getAdminAccessToken()).toBe('local-admin-session');
+    expect(hasAdminSession()).toBe(true);
   });
 });

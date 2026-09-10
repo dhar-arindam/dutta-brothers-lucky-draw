@@ -15,7 +15,8 @@
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present && vitest run tests",
+    "test": "npm run test --workspaces --if-present && vitest run tests --exclude \"tests/e2e/**\"",
+    "test:e2e": "playwright test",
     "test:coverage": "npm run test:coverage --workspace backend && npm run test:coverage --workspace frontend && npm run test:coverage --workspace infrastructure",
     "quality:gate": "npm run lint && npm run typecheck && npm run build && npm run test:coverage",
     "test:watch": "vitest",
@@ -39,6 +40,7 @@
     "perf:dry-run": "node tests/performance/run.mjs all --dry-run"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "husky": "^9.1.7",
     "lint-staged": "^17.4.1",
     "prettier": "^3.6.2",

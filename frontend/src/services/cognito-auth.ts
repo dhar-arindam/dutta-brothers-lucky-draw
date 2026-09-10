@@ -1,6 +1,7 @@
 const STORAGE_KEY = 'dutta-draw-admin-auth';
 const VERIFIER_KEY = 'dutta-draw-admin-pkce-verifier';
 const STATE_KEY = 'dutta-draw-admin-oauth-state';
+const LOCAL_ACCESS_TOKEN = 'local-admin-session';
 
 interface CognitoConfig {
   domain: string;
@@ -13,6 +14,14 @@ interface StoredSession {
   accessToken: string;
   expiresAt: number;
 }
+
+const isLocalDevelopment = (): boolean => {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  return window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+};
 
 const getConfig = (): CognitoConfig | null => {
   const domain = import.meta.env.VITE_COGNITO_DOMAIN;
@@ -102,6 +111,17 @@ export const startCognitoLogin = async (): Promise<void> => {
 };
 
 export const completeCognitoLogin = async (): Promise<boolean> => {
+  if (isLocalDevelopment()) {
+    sessionStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        accessToken: LOCAL_ACCESS_TOKEN,
+        expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+      }),
+    );
+    return true;
+  }
+
   const config = getConfig();
   if (!config || typeof window === 'undefined') {
     return false;

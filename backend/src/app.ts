@@ -1,6 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 
 import type {
+  AdminErrorCode,
   AdminCsvResponse,
   AdminErrorResponse,
   AdminHttpResponse,
@@ -24,6 +25,8 @@ import {
   toRequestTooLargeBody,
   utf8ByteLength,
 } from './request-size-policy.js';
+import { isLocalMegaDrawSeedEnabled, createLocalMegaDrawSeed } from './local-mega-draw-seed.js';
+import { MegaDrawError, MegaDrawService } from './mega-draw.js';
 
 const jsonHeaders = {
   'content-type': 'application/json; charset=utf-8',
@@ -435,6 +438,41 @@ const isUpdatePrizeRequest = (value: unknown): value is UpdatePrizeInput => {
   return true;
 };
 
+const isMegaConfigurationRequest = (value: unknown): value is { prizes: string[] } =>
+  !!value &&
+  typeof value === 'object' &&
+  Array.isArray((value as { prizes?: unknown }).prizes) &&
+  (value as { prizes: unknown[] }).prizes.every((prize) => typeof prize === 'string');
+
+const isMegaDrawNextRequest = (value: unknown): value is { preflightReference?: string } =>
+  !!value &&
+  typeof value === 'object' &&
+  ((value as { preflightReference?: unknown }).preflightReference === undefined ||
+    typeof (value as { preflightReference?: unknown }).preflightReference === 'string');
+
+const isMegaResetRequest = (
+  value: unknown,
+): value is { acknowledgement: boolean; confirmation: string } =>
+  !!value &&
+  typeof value === 'object' &&
+  typeof (value as { acknowledgement?: unknown }).acknowledgement === 'boolean' &&
+  typeof (value as { confirmation?: unknown }).confirmation === 'string';
+
+const megaErrorResponse = (error: MegaDrawError): AdminHttpResponse => ({
+  statusCode:
+    error.code === 'VALIDATION_ERROR'
+      ? 400
+      : error.code === 'MEGA_DRAW_IN_PROGRESS' ||
+          error.code === 'MEGA_DRAW_ALREADY_COMPLETED' ||
+          error.code === 'MEGA_DRAW_CLOSED' ||
+          error.code === 'MEGA_DRAW_REOPEN_NOT_ALLOWED' ||
+          error.code === 'CAMPAIGN_NOT_ENDED' ||
+          error.code === 'INSUFFICIENT_ELIGIBLE_PARTICIPANTS'
+        ? 409
+        : 400,
+  body: { status: 'ERROR', code: error.code as AdminErrorCode, message: error.message },
+});
+
 const isCampaignUpdateRequest = (value: unknown): value is CampaignUpdateInput => {
   if (!value || typeof value !== 'object') {
     return false;
@@ -578,17 +616,22 @@ const toCsvCell = (raw: string): string => {
 interface NodeHandlers {
   drawApiHandler: DrawApiHandler;
   adminPrizeApiHandler: AdminPrizeApiHandler;
+  megaDraw?: MegaDrawService;
 }
 
 export const createDefaultNodeHandler = () => {
-  const store = new InMemoryDrawStore();
+  const store = isLocalMegaDrawSeedEnabled()
+    ? createLocalMegaDrawSeed().store
+    : new InMemoryDrawStore();
   const drawService = createDefaultDrawService(store);
   const drawApiHandler = createDrawApiHandler(drawService);
   const adminPrizeApiHandler = createAdminPrizeApiHandler(store);
+  const megaDraw = new MegaDrawService(store);
 
   return createNodeHandler({
     drawApiHandler,
     adminPrizeApiHandler,
+    megaDraw,
   });
 };
 
@@ -627,6 +670,127 @@ export const createNodeHandler = (handlers: NodeHandlers) => {
         throw error;
       }
     };
+
+    if (handlers.megaDraw && parsedUrl.pathname.startsWith('/api/admin/mega-draw')) {
+      try {
+        if (method === 'GET' && parsedUrl.pathname === '/api/admin/mega-draw') {
+          res.writeHead(200, jsonHeaders);
+          res.end(JSON.stringify({ status: 'SUCCESS', ...handlers.megaDraw.get() }));
+          return;
+        }
+        if (method === 'GET' && parsedUrl.pathname.startsWith('/api/admin/mega-draw/status/')) {
+          const idempotencyKey = decodeURIComponent(
+            parsedUrl.pathname.slice('/api/admin/mega-draw/status/'.length),
+          );
+          if (!idempotencyKey) {
+            const response = validationErrorResponse('Idempotency-Key is required.');
+            res.writeHead(response.statusCode, jsonHeaders);
+            res.end(JSON.stringify(response.body));
+            return;
+          }
+          res.writeHead(200, jsonHeaders);
+          res.end(
+            JSON.stringify({
+              status: 'SUCCESS',
+              ...handlers.megaDraw.status(idempotencyKey, 'local-admin'),
+            }),
+          );
+          return;
+        }
+        if (method === 'PUT' && parsedUrl.pathname === '/api/admin/mega-draw/configuration') {
+          const parsed = safeParseJson(await readBodyForRoute());
+          if (!parsed.ok || !isMegaConfigurationRequest(parsed.value)) {
+            const response = validationErrorResponse();
+            res.writeHead(response.statusCode, jsonHeaders);
+            res.end(JSON.stringify(response.body));
+            return;
+          }
+          const prizes = handlers.megaDraw.configure(parsed.value.prizes);
+          res.writeHead(200, jsonHeaders);
+          res.end(
+            JSON.stringify({
+              status: 'SUCCESS',
+              prizes,
+            }),
+          );
+          return;
+        }
+        if (method === 'POST' && parsedUrl.pathname === '/api/admin/mega-draw/preflight') {
+          const preflight = handlers.megaDraw.preflight();
+          res.writeHead(200, jsonHeaders);
+          res.end(JSON.stringify({ status: 'SUCCESS', preflight }));
+          return;
+        }
+        if (method === 'POST' && parsedUrl.pathname === '/api/admin/mega-draw/draw-next') {
+          const idempotencyKey = readIdempotencyKeyHeader(req);
+          if (!idempotencyKey) {
+            const response = validationErrorResponse('Idempotency-Key is required.');
+            res.writeHead(response.statusCode, jsonHeaders);
+            res.end(JSON.stringify(response.body));
+            return;
+          }
+          const parsed = safeParseJson(await readBodyForRoute());
+          if (!parsed.ok || !isMegaDrawNextRequest(parsed.value)) {
+            const response = validationErrorResponse();
+            res.writeHead(response.statusCode, jsonHeaders);
+            res.end(JSON.stringify(response.body));
+            return;
+          }
+          const result = handlers.megaDraw.drawNext({
+            ...parsed.value,
+            idempotencyKey,
+            operatorSubject: 'local-admin',
+          });
+          res.writeHead(200, jsonHeaders);
+          res.end(
+            JSON.stringify({
+              status: 'SUCCESS',
+              ...result,
+            }),
+          );
+          return;
+        }
+        if (method === 'POST' && parsedUrl.pathname === '/api/admin/mega-draw/reset') {
+          const parsed = safeParseJson(await readBodyForRoute());
+          if (!parsed.ok || !isMegaResetRequest(parsed.value)) {
+            const response = validationErrorResponse();
+            res.writeHead(response.statusCode, jsonHeaders);
+            res.end(JSON.stringify(response.body));
+            return;
+          }
+          const result = handlers.megaDraw.reset(parsed.value);
+          res.writeHead(200, jsonHeaders);
+          res.end(JSON.stringify({ status: 'SUCCESS', ...result }));
+          return;
+        }
+        if (method === 'POST' && parsedUrl.pathname === '/api/admin/mega-draw/close') {
+          const parsed = safeParseJson(await readBodyForRoute());
+          if (!parsed.ok || !isMegaResetRequest(parsed.value)) {
+            const response = validationErrorResponse();
+            res.writeHead(response.statusCode, jsonHeaders);
+            res.end(JSON.stringify(response.body));
+            return;
+          }
+          const result = handlers.megaDraw.close(parsed.value);
+          res.writeHead(200, jsonHeaders);
+          res.end(JSON.stringify({ status: 'SUCCESS', ...result }));
+          return;
+        }
+        if (method === 'POST' && parsedUrl.pathname === '/api/admin/mega-draw/reopen') {
+          res.statusCode = 200;
+          res.end(JSON.stringify({ status: 'SUCCESS', ...handlers.megaDraw.reopen() }));
+          return;
+        }
+      } catch (error) {
+        if (error instanceof MegaDrawError) {
+          const response = megaErrorResponse(error);
+          res.writeHead(response.statusCode, jsonHeaders);
+          res.end(JSON.stringify(response.body));
+          return;
+        }
+        throw error;
+      }
+    }
 
     if (method === 'POST' && parsedUrl.pathname === '/api/draw') {
       let bodyText = '';

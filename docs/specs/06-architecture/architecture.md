@@ -1,11 +1,11 @@
 # Target Architecture
 
-Status: APPROVED  
+Status: APPROVED
 Owner: Principal Software Engineer  
-Version: 1.5
-Last Updated: 2026-08-21
-Change: Claim lifecycle, contention handling, and deployment provenance
-Reason: Align target architecture with implemented runtime and delivery controls
+Version: 2.0
+Last Updated: 2026-09-08
+Change: Pending Mega Draw reset preservation, reverse order, click-to-draw, and terminal close review
+Reason: Approved Mega Draw reset preservation, reverse order, click-to-draw, and terminal close changes
 
 ## Technology
 
@@ -56,7 +56,10 @@ DynamoDB
 - DynamoDB must enforce bill uniqueness atomically.
 - Claims preserve the historical prize name snapshot.
 - Dashboard totals and prize distribution use lightweight DynamoDB aggregate records or counters updated with successful claim creation.
-- Claim deletion and clear-all operations update or reset claim-derived aggregates and release deleted normalized bills.
+- Before campaign end, claim deletion and clear-all operations remove active records; after campaign end, they archive active records. Both operations update or reset active claim-derived aggregates and release normalized bills.
+- Mega Draw selection, candidate eligibility, first-selection preflight validation, per-prize idempotency, reverse-ordered execution state, reset, and close are backend-authoritative.
+- The first successful wheel-initiated next-prize action locks campaign, candidate, and ordered-prize snapshots. DynamoDB atomically persists exactly one distinct winner for each next reverse configured ordinal and allows resumable partial lifecycle reads. An Admin-authorized reset clears active winners, lifecycle, preflight, locked snapshots, and idempotency/execution state while retaining editable ordered prize configuration and restoring prior winners' eligibility. A confirmed completed draw becomes terminal `CLOSED`; results remain readable but no lifecycle mutation is permitted. Reset and close create no Mega audit/history and do not modify main lucky-draw claims, prizes, campaign, claim archives, aggregates, or ordinary claims CSV data.
+- Browser wheel spokes are derived only from backend-provided prizes. Explicit Admin wheel click initiates a backend action directly, but the browser never supplies selection input or determines a Mega Draw winner; presentation rotation starts only after the authoritative result and is capped at seven full turns. After the final reveal, the modal hides the wheel and presents a responsive grid of all winners.
 - Transaction cancellation distinguishes duplicate-bill conflicts from transient DynamoDB contention. Only transient contention is retried with bounded backoff.
 - No prize inventory or stock management exists.
 - Prize activation/deactivation is a required V1 capability and affects future draws only.
@@ -74,7 +77,7 @@ DynamoDB
 - IAM permissions follow least privilege.
 - All taggable AWS resources created by CDK must include tags `project=lucky-draw` and `organization=dutta-brothers`.
 - Customer PII is masked in admin responses and exports.
-- Admin mutation/export routes use an Amazon Cognito User Pool with local AWS-managed users, OAuth2 Authorization Code + PKCE, and no MFA in V1; Admin read routes remain public read-only endpoints.
+- Admin mutation/export routes use an Amazon Cognito User Pool with local AWS-managed users, OAuth2 Authorization Code + PKCE, and no MFA in V1; ordinary Admin read routes remain public read-only endpoints, while all Mega Draw routes and data require Admin scope.
 - Google and other external identity providers are not configured.
 - API Gateway uses a native JWT authorizer for `/api/admin/*`; `/api/draw` remains public.
 - Campaign dates use `Asia/Kolkata`; APIs use ISO 8601 UTC timestamps where time values are returned and the backend is authoritative for campaign-period enforcement.

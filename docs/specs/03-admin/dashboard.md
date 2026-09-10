@@ -1,11 +1,11 @@
 # Admin V1 Operations Page
 
-Status: APPROVED  
+Status: APPROVED
 Owner: Principal Software Engineer  
-Version: 1.4
-Last Updated: 2026-08-21
-Change: Claim deletion and responsive action layout
-Reason: Align Admin V1 with destructive operations and responsive controls
+Version: 1.9
+Last Updated: 2026-09-08
+Change: Pending Mega Draw reset preservation, reverse order, click-to-draw, and terminal close review
+Reason: Approved Mega Draw reset preservation, reverse order, click-to-draw, and terminal close changes
 
 ## Route and Access
 
@@ -29,6 +29,12 @@ Admin UX access requirements:
 - There is no separate dashboard landing step.
 
 - Customer endpoints remain separate from admin endpoints by route.
+
+Mega Draw is a protected Admin-only exception to public read-only operational data:
+
+- The logged-in `/admin` page provides the only navigation entry to `/admin/mega-draw`.
+- An unauthenticated direct request to `/admin/mega-draw` redirects to `/admin` without loading Mega Draw data.
+- Mega Draw configuration, preflight, and results require an Admin-scoped Cognito session.
 
 The Admin page is intended for a single shop owner and should remain simple.
 
@@ -75,6 +81,8 @@ Admin V1 page structure:
 Admin
 |
 |- Campaign Configuration
+|
+|- Mega Draw (authenticated only)
 |
 |- Prize Summary
 |
@@ -163,10 +171,11 @@ At large desktop widths, the Claims action controls should remain on one row whe
 
 - The admin can delete an individual claim from the Claims Report.
 - The admin can clear all claims in one action ("Clear All Claims").
-- Both actions are destructive and irreversible and must require an explicit confirmation step before executing.
+- Before campaign end, both actions are destructive and irreversible. After campaign end, they archive records rather than physically removing them. Both require an explicit confirmation step before executing.
 - Clearing all claims requires a stronger confirmation than deleting a single claim (for example, typing a confirmation phrase), reflecting its larger blast radius.
-- Deleting a claim must decrement the associated prize `Given` count and the summary aggregates (total successful spins, today's successful spins) so dashboard figures remain consistent with the remaining claims.
-- Deleting a claim releases its bill number so the same bill can be used for a future draw.
+- Deleting or archiving a claim must decrement the associated prize `Given` count and the summary aggregates (total successful spins, today's successful spins) so dashboard figures remain consistent with active claims.
+- Deleting or archiving a claim releases its bill number so the same bill can be used for a future draw.
+- Archived claims are hidden from claims reporting and CSV export by default and remain available only for authorized audit and reconciliation use.
 - Deleting claims does not change prize configuration (name, weight, active status) or campaign dates.
 
 ### Prize-Based Claims Filter Behaviour
@@ -246,7 +255,19 @@ CSV export scope:
 
 Exporting one year at a time keeps each export small enough to download reliably and makes the period covered by a file unambiguous for prize fulfilment and reconciliation. Asking for the year in a modal at the point of export makes the period an explicit, deliberate choice rather than a filter the operator may not notice.
 
-Bill number is visible to the shop owner because it is required for operational verification. Do not export unnecessary personal information or internal database identifiers. CSV values beginning with `=`, `+`, `-`, or `@` must be prefixed with a single apostrophe before normal CSV quoting.
+Bill number is visible to the shop owner because it is required for operational verification. Do not export unnecessary personal information or internal database identifiers. Archived claims are not included in CSV export. CSV values beginning with `=`, `+`, `-`, or `@` must be prefixed with a single apostrophe before normal CSV quoting.
+
+### Mega Draw
+
+- Mega Draw navigation appears only for a logged-in Admin user.
+- Before the first successful selection, the administrator configures 1 to 10 ordered, uniquely named Mega prizes and may add, remove, rename, or reorder them. A successful save provides explicit success notification, then the administrator requests a backend preflight.
+- `Prepare draw` opens a customer-page-themed festive modal with a flashing colorful rainbow-spoked wheel and surrounding glowing bulbs. The preflight presents the current `Asia/Kolkata` execution year, campaign-ended status, eligible-candidate count, configured prizes, and an expiry-bound reference. Desktop Admins may expand this modal to fullscreen; mobile screens use the normal responsive modal. The first successful wheel-initiated `draw next` locks immutable campaign, candidate, and prize snapshots.
+- Each `draw next` action is initiated directly by explicit wheel click with no acknowledgement checkbox, typed confirmation, or separate submit button; it selects exactly one winner for the next prize in reverse configured order. A stale preflight requires refresh only before the first selection.
+- The UI prevents repeat submission for an in-flight next-prize action, recovers a lost response through that action's idempotency key, shows persisted partial rows after refresh, and does not use customer reveal behavior.
+- Wheel rotation may begin only after the backend returns the selected row. It rotates no more than seven full turns, its split prize-name spokes reflect backend-provided configured prizes, and it never influences selection. The just-drawn prize remains visible until the winner label is shown.
+- After the final reveal, the modal hides the wheel and shows a responsive grid of all winner labels. Page results show all winners in chronological selection order, masked winner details, completion time in `Asia/Kolkata`, draw reference, and archived-source status where applicable.
+- After the first selection, any configuration change requires reset. Reset uses a normal destructive confirmation dialog, clears only active winner/lifecycle/preflight/idempotency state, preserves editable ordered prizes, and makes prior winners eligible again. No reset event, audit history, or historical results are retained. Reset does not alter main lucky-draw claims, prizes, campaign, claim archives, aggregates, or ordinary claims CSV.
+- After all winners are selected, Admin may terminally close the draw using acknowledgement and exact typed confirmation `CLOSE MEGA DRAW <year>`. Closed results remain viewable, but no draw, configuration change, preflight, or reset is allowed for that execution year.
 
 ### Admin Theme Behaviour
 

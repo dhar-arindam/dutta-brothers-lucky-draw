@@ -1,13 +1,13 @@
 # Acceptance Criteria
 
-Status: APPROVED  
+Status: APPROVED
 Backend impact: None  
 API impact: None  
 Owner: Principal Software Engineer  
-Version: 1.8
-Last Updated: 2026-08-21
-Change: Claim deletion, contention retry, and deployment provenance
-Reason: Align acceptance criteria with implemented runtime and delivery behaviour
+Version: 2.3
+Last Updated: 2026-09-08
+Change: Pending Mega Draw reset preservation, reverse order, click-to-draw, and terminal close review
+Reason: Approved Mega Draw reset preservation, reverse order, click-to-draw, and terminal close changes
 
 These criteria define the Definition of Done for the initial product scope.
 
@@ -184,6 +184,39 @@ These criteria define the Definition of Done for the initial product scope.
 - [ ] Initial admin load failure shows a single actionable error state with retry.
 - [ ] Initial admin load does not render partial operational data when required initial datasets fail.
 - [ ] In-flight operations display explicit loading state text for campaign, claims, CSV, and prize actions.
+
+### Mega Draw
+
+- [ ] Mega Draw is reachable only from the logged-in Admin page; an unauthenticated direct visit to `/admin/mega-draw` redirects to `/admin` without exposing Mega Draw data.
+- [ ] All Mega Draw configuration, preflight, execution, results, reset, close, and Reopen/New Cycle APIs require Admin scope; ordinary approved Admin read APIs remain public.
+- [ ] Before its first successful selection, the Mega Draw supports adding, removing, renaming, and reordering 1 to 10 ordered, non-blank, uniquely named prizes; it does not reuse main-draw weights, active state, stock, or `Given` counts.
+- [ ] Execution is allowed only after the backend determines the current `Asia/Kolkata` campaign has ended.
+- [ ] Eligibility contains only active successful claims from the execution year; archived claims are excluded.
+- [ ] Candidate identity is the normalized bill number plus normalized phone number. Different bills with the same phone are separate candidates and may each win.
+- [ ] Saving valid Mega prize configuration gives explicit success notification.
+- [ ] `Prepare draw` opens a customer-page-themed festive modal showing a flashing colorful rainbow-spoked wheel and surrounding glowing bulbs, with a desktop-only fullscreen option.
+- [ ] The first successful wheel-initiated `draw next` validates the expiry-bound preflight reference, locks immutable candidate/campaign/prize snapshots, and selects only the last configured prize. A changed population, configuration, campaign state, or expired reference returns `PREFLIGHT_STALE` without a winner.
+- [ ] Each wheel-initiated `draw next` action atomically selects one distinct candidate identity in reverse configured order using cryptographically secure random selection without replacement; partial results survive refresh and later reverse-order prizes cannot be drawn out of order.
+- [ ] Fewer candidates than configured prizes before the first selection returns `INSUFFICIENT_ELIGIBLE_PARTICIPANTS` and records no snapshot or winner.
+- [ ] After first selection, prize configuration and order are locked; updates return the documented locked outcome and require reset to restore editable setup.
+- [ ] Concurrent next-prize requests result in exactly one result row for an ordinal. Same-key retry recovers the existing row/status; a different-key concurrent request receives the documented in-progress or current lifecycle outcome.
+- [ ] After a lost next-prize response, an Admin-scoped, operator-scoped idempotency-status lookup returns `NOT_FOUND`, `IN_PROGRESS`, or the recorded action/lifecycle outcome before any retry is attempted.
+- [ ] The wheel initiates the backend request directly after explicit Admin click, with no RUN checkbox, typed phrase, or secondary submit button. Selection/persistence occurs only after that click, while wheel rotation begins only after the authoritative selected row is returned and never selects or determines a winner.
+- [ ] Wheel rotation is presentation-only, capped at seven full turns, keeps the just-drawn prize label visible until the winner label appears, and uses split prize labels for consistent spoke readability.
+- [ ] After the last reveal, the modal hides the wheel and shows a responsive grid of all winner labels.
+- [ ] Reset requires Admin scope and uses a normal destructive confirmation dialog without checkbox or typed phrase.
+- [ ] Mega Draw has no separate winner export; the existing claims CSV remains the only export and excludes archived claims.
+- [ ] After campaign end, claim delete and clear-all archive active claims, decrement active aggregates, release normalized bills, and exclude archived records from normal claims views and CSV export.
+- [ ] An in-progress or completed Mega Draw remains historically unchanged when a referenced source claim is archived and marks the applicable selected row `SOURCE_CLAIM_ARCHIVED` without automatic replacement.
+- [ ] Reset clears only active winner, lifecycle, preflight, locked-snapshot, and idempotency/execution state; it preserves editable ordered Mega prizes and makes all previously selected candidates eligible for the new lifecycle.
+- [ ] Results display all winners in chronological selection order.
+- [ ] Completed Mega Draw close requires acknowledgement and exact typed confirmation `CLOSE MEGA DRAW <year>`; `CLOSED` results remain viewable, while new draw, configuration update, preflight, and reset are prohibited for that execution year.
+- [ ] Reopen/New Cycle is enabled only when the current cycle is `CLOSED`; it creates the next sequential cycle while preserving the closed cycle and its winners.
+- [ ] A reopened cycle excludes every candidate identity selected in all earlier closed cycles for that execution year.
+- [ ] Closed cycles are shown in collapsed history panels with headers containing the cycle number and close time; expanding a panel shows its preserved winners in chronological order.
+- [ ] Reset does not alter main lucky-draw claims, prizes, campaign, claim archives, aggregate records, or ordinary claims CSV content or scope.
+- [ ] Reset creates no history, while closed-cycle results and close timestamps remain retained and viewable across later Reopen/New Cycle operations.
+- [ ] Mega Draw configuration, confirmation, results, and failure states are keyboard-operable, visibly focused, screen-reader announced, and usable at 360px, 375px, 390px, and 430px widths.
 
 ## 8. Security
 

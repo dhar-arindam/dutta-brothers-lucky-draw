@@ -164,6 +164,30 @@ describe('foundation stack aws configuration', () => {
     });
 
     template.hasResourceProperties('AWS::ApiGatewayV2::Route', {
+      RouteKey: 'GET /api/admin/mega-draw',
+      AuthorizationType: 'JWT',
+      AuthorizationScopes: ['dutta-admin/admin'],
+    });
+
+    template.hasResourceProperties('AWS::ApiGatewayV2::Route', {
+      RouteKey: 'GET /api/admin/mega-draw/status/{idempotencyKey}',
+      AuthorizationType: 'JWT',
+      AuthorizationScopes: ['dutta-admin/admin'],
+    });
+
+    template.hasResourceProperties('AWS::ApiGatewayV2::Route', {
+      RouteKey: 'PUT /api/admin/mega-draw/configuration',
+      AuthorizationType: 'JWT',
+      AuthorizationScopes: ['dutta-admin/admin'],
+    });
+
+    template.hasResourceProperties('AWS::ApiGatewayV2::Route', {
+      RouteKey: 'POST /api/admin/mega-draw/{operation}',
+      AuthorizationType: 'JWT',
+      AuthorizationScopes: ['dutta-admin/admin'],
+    });
+
+    template.hasResourceProperties('AWS::ApiGatewayV2::Route', {
       RouteKey: 'GET /api/{proxy+}',
       AuthorizationType: 'NONE',
     });

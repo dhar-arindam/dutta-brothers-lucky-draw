@@ -22,8 +22,6 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ github.ref == 'refs/heads/main' }}
     environment: staging
-    env:
-      STAGING_FRONTEND_ORIGIN: ${{ vars.STAGING_FRONTEND_ORIGIN }}
     steps:
       - name: Download validated source artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -80,13 +78,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [ -n "${STAGING_FRONTEND_ORIGIN:-}" ]; then
-            echo "origin=${STAGING_FRONTEND_ORIGIN}" >> "$GITHUB_OUTPUT"
-            echo "bootstrap=false" >> "$GITHUB_OUTPUT"
-            exit 0
+          CLOUDFRONT_DOMAIN="$(aws cloudformation describe-stacks --stack-name "${STAGING_STACK_NAME}" --query "Stacks[0].Outputs[?OutputKey=='CloudFrontDistributionDomainName'].OutputValue" --output text 2>/dev/null || true)"
+          if [ -z "$CLOUDFRONT_DOMAIN" ] || [ "$CLOUDFRONT_DOMAIN" = "None" ]; then
+            echo "No deployed CloudFront distribution found for ${STAGING_STACK_NAME}. Bootstrap the stack with a real frontend origin before using this workflow."
+            exit 1
           fi
-          echo "STAGING_FRONTEND_ORIGIN must be configured before deployment"
-          exit 1
+          echo "origin=https://${CLOUDFRONT_DOMAIN}" >> "$GITHUB_OUTPUT"
 
       - name: CDK synth (staging)
         run: npm run cdk:synth:staging -- --context frontendOriginStaging=${{ steps.frontend-origin.outputs.origin }}

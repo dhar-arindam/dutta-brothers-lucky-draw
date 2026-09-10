@@ -1,11 +1,11 @@
 # Business Rules
 
-Status: APPROVED  
+Status: APPROVED
 Owner: Principal Software Engineer  
-Version: 1.4
-Last Updated: 2026-08-21
-Change: Admin claim deletion and concurrency consistency
-Reason: Align business rules with approved claim deletion and transactional retry behaviour
+Version: 1.9
+Last Updated: 2026-09-08
+Change: Pending Mega Draw reset preservation, reverse order, click-to-draw, and terminal close review
+Reason: Approved Mega Draw reset preservation, reverse order, click-to-draw, and terminal close changes
 
 These are the confirmed business rules for the Dutta Brothers Festive Lucky Draw.
 
@@ -184,7 +184,7 @@ Prize weight and active status are the only controls.
 - Change a prize awarded to a customer
 - Restore or rollback historical draws
 
-Historical claim contents are immutable after creation. An explicitly confirmed admin deletion removes a claim and its claim-derived aggregate contributions; it does not rewrite the contents of any remaining claim.
+Historical claim contents are immutable after creation. Before campaign end, an explicitly confirmed admin deletion removes a claim and its claim-derived aggregate contributions. After campaign end, an explicitly confirmed admin deletion archives a claim instead. Archiving removes the claim from active reporting and claim-derived aggregates, releases its normalized bill for future participation, and preserves the archived record for audit and reconciliation.
 
 ## BR-007 — Campaign Period (Date-Only Configuration)
 
@@ -276,10 +276,11 @@ Transient contention while atomically creating a claim and updating aggregates m
 
 ### Claim Deletion
 
-- Deleting one claim removes that claim, decrements its prize `Given` count, decrements total successful claims, and decrements the applicable `Asia/Kolkata` daily count.
-- Clearing all claims removes all claims and resets claim-derived aggregate counts to zero.
+- Before campaign end, deleting one claim removes that claim, decrements its prize `Given` count, decrements total successful claims, and decrements the applicable `Asia/Kolkata` daily count.
+- After campaign end, deleting one claim archives that claim, applies the same aggregate decrements, and excludes the claim from normal reporting and CSV export.
+- Before campaign end, clearing all claims removes all claims and resets claim-derived aggregate counts to zero. After campaign end, it archives all active claims and applies the same aggregate and bill-release effects.
 - Both operations require explicit admin confirmation in the user interface.
-- Deleting a claim releases its normalized bill for future participation.
+- Removing or archiving a claim releases its normalized bill for future participation.
 - Prize configuration and campaign configuration are unaffected.
 
 ## BR-011 — Campaign Reporting Timezone
@@ -299,6 +300,21 @@ V1 Admin read APIs allow read-only access without login; Admin mutation and expo
 - MFA is disabled for the two V1 Admin users.
 - Admin mutation and export calls require a Cognito access token and Admin scope.
 - Business validation and backend-authoritative draw rules remain mandatory.
+
+## BR-014 - Year-End Mega Draw
+
+The Mega Draw is an Admin-scope-only year-end operation. Its configuration, preflight, execution, results, and route are not public Admin read data.
+
+- The Mega Draw can run only after the backend determines that the current `Asia/Kolkata` year's campaign has ended.
+- It awards 1 to 10 separately configured, uniquely named Mega prizes. Before the first successful selection, Admin may add, remove, rename, or reorder them; afterwards the ordered configuration is immutable. Main lucky-draw prize configuration, weighting, stock, and `Given` counts do not apply.
+- Each eligible successful, active main-draw claim in the execution year is a candidate identity defined by its normalized bill number and normalized phone number. The same phone number with different bill numbers may win more than one Mega prize.
+- The first successful wheel-initiated `draw next` action locks immutable campaign, candidate, and ordered-prize snapshots, then selects the last configured prize. Each later action atomically selects one distinct candidate identity for the next prize in reverse configured order using a cryptographically secure random source without replacement. Partial results are valid and persist across refresh.
+- `Prepare draw` opens a customer-page-themed festive modal with a flashing colorful rainbow-spoked wheel and surrounding glowing bulbs. Admin must explicitly click the wheel to initiate each draw, with no RUN checkbox, typed phrase, or secondary submit button. The backend selects and persists only after that click; any rotation begins after the authoritative result, is capped at seven full turns, and is presentation-only.
+- Saving valid configuration shows explicit success notification. Winners are viewable in chronological selection order.
+- After the final reveal, the modal hides the wheel and shows all winner labels in a responsive layout.
+- Reset requires Admin scope and a normal destructive confirmation dialog. It clears only active winner/lifecycle/preflight/idempotency state, preserves the editable ordered Mega prizes, and makes previously selected candidates eligible for the new lifecycle. Reset must not alter main lucky-draw claims, prizes, campaign, claim archives, aggregate records, or ordinary claims CSV.
+- A completed draw may be terminally closed with acknowledgement and exact typed confirmation `CLOSE MEGA DRAW <year>`. `CLOSED` results remain viewable, but no draw, configuration change, preflight, or reset is allowed for that execution year.
+- No Mega Draw audit, reset event, close event, history, or Mega-specific retention requirement exists. No separate Mega Draw winner export exists.
 
 ## BR-013 — Prize Given Count and Claims Drill-Down
 

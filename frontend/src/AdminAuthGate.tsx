@@ -13,6 +13,7 @@ interface AdminAuthGateProps {
     onSignIn: () => void,
     onSignOut: () => void,
     authMessage: string,
+    isChecking: boolean,
   ) => React.ReactNode;
 }
 
@@ -58,5 +59,11 @@ export const AdminAuthGate = ({ children }: AdminAuthGateProps) => {
     });
   };
 
-  return children(authState === 'SIGNED_IN', signIn, logoutCognito, authMessage);
+  return children(
+    authState === 'SIGNED_IN',
+    signIn,
+    logoutCognito,
+    authMessage,
+    authState === 'CHECKING',
+  );
 };

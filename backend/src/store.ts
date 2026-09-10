@@ -318,6 +318,10 @@ export class InMemoryDrawStore {
     return this.claimById.get(claimId);
   }
 
+  public listActiveClaims(): Claim[] {
+    return [...this.claimsInCreatedOrder];
+  }
+
   public listAdminClaims(query: AdminClaimsQuery): AdminClaimsQueryResult {
     const pageSize = clampPageSize(query.pageSize);
     const startIndex = decodePageToken(query.pageToken);

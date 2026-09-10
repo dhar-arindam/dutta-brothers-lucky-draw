@@ -3,6 +3,7 @@ import { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
 
 import { isCampaignActive } from './campaign.js';
 import type {
+  AdminErrorCode,
   AdminCsvResponse,
   AdminErrorResponse,
   AdminHttpResponse,
@@ -12,6 +13,8 @@ import type {
   DrawSuccessResponse,
 } from './contracts.js';
 import { DynamoDbDrawStore } from './durable-dynamodb-store.js';
+import { DurableMegaDrawService } from './durable-mega-draw.js';
+import { MegaDrawError } from './mega-draw.js';
 import { selectWeightedPrize } from './prize-selection.js';
 import {
   isRequestSizePolicyEndpoint,
@@ -37,6 +40,7 @@ if (!tableName) {
 const ddbClient = new DynamoDBClient({});
 const docClient = DynamoDBDocumentClient.from(ddbClient);
 const store = new DynamoDbDrawStore(docClient, { tableName });
+const megaDraw = new DurableMegaDrawService(docClient, tableName, store);
 
 const jsonHeaders = {
   'content-type': 'application/json; charset=utf-8',
@@ -178,6 +182,50 @@ const isCampaignUpdateRequest = (
   }
 
   return true;
+};
+
+const isMegaConfigurationRequest = (value: unknown): value is { prizes: string[] } =>
+  !!value &&
+  typeof value === 'object' &&
+  Array.isArray((value as { prizes?: unknown }).prizes) &&
+  (value as { prizes: unknown[] }).prizes.every((prize) => typeof prize === 'string');
+
+const isMegaDrawNextRequest = (value: unknown): value is { preflightReference?: string } =>
+  !!value &&
+  typeof value === 'object' &&
+  ((value as { preflightReference?: unknown }).preflightReference === undefined ||
+    typeof (value as { preflightReference?: unknown }).preflightReference === 'string');
+
+const isMegaResetRequest = (
+  value: unknown,
+): value is { acknowledgement: boolean; confirmation: string } =>
+  !!value &&
+  typeof value === 'object' &&
+  typeof (value as { acknowledgement?: unknown }).acknowledgement === 'boolean' &&
+  typeof (value as { confirmation?: unknown }).confirmation === 'string';
+
+const megaErrorResponse = (
+  error: MegaDrawError,
+): { statusCode: number; body: AdminErrorResponse } => ({
+  statusCode:
+    error.code === 'VALIDATION_ERROR'
+      ? 400
+      : error.code === 'MEGA_DRAW_IN_PROGRESS' ||
+          error.code === 'MEGA_DRAW_ALREADY_COMPLETED' ||
+          error.code === 'MEGA_DRAW_CLOSED' ||
+          error.code === 'MEGA_DRAW_REOPEN_NOT_ALLOWED' ||
+          error.code === 'CAMPAIGN_NOT_ENDED' ||
+          error.code === 'INSUFFICIENT_ELIGIBLE_PARTICIPANTS'
+        ? 409
+        : 400,
+  body: { status: 'ERROR', code: error.code as AdminErrorCode, message: error.message },
+});
+
+const megaOperatorSubject = (event: {
+  requestContext: { authorizer?: { jwt?: { claims?: Record<string, unknown> } } };
+}): string | undefined => {
+  const subject = event.requestContext.authorizer?.jwt?.claims?.sub;
+  return typeof subject === 'string' && subject.length > 0 ? subject : undefined;
 };
 
 const safeParseJson = (value: string | undefined): { ok: true; value: unknown } | { ok: false } => {
@@ -390,7 +438,11 @@ const responseJson = (statusCode: number, body: unknown) => {
 };
 
 export const handler = async (event: {
-  requestContext: { http: { method: string }; requestId?: string };
+  requestContext: {
+    http: { method: string };
+    requestId?: string;
+    authorizer?: { jwt?: { claims?: Record<string, unknown> } };
+  };
   rawPath: string;
   rawQueryString?: string;
   headers?: Record<string, string | undefined>;
@@ -422,6 +474,74 @@ export const handler = async (event: {
   }
 
   try {
+    if (path.startsWith('/api/admin/mega-draw')) {
+      const operatorSubject = megaOperatorSubject(event);
+      if (!operatorSubject) {
+        return responseJson(401, {
+          status: 'ERROR',
+          code: 'UNAUTHORIZED',
+          message: 'Authentication is required.',
+        });
+      }
+      if (method === 'GET' && path === '/api/admin/mega-draw')
+        return responseJson(200, { status: 'SUCCESS', ...(await megaDraw.get()) });
+      if (method === 'GET' && path.startsWith('/api/admin/mega-draw/status/')) {
+        const idempotencyKey = decodeURIComponent(
+          path.slice('/api/admin/mega-draw/status/'.length),
+        );
+        if (!idempotencyKey)
+          return responseJson(400, validationErrorResponse('Idempotency key is required.').body);
+        return responseJson(200, {
+          status: 'SUCCESS',
+          ...(await megaDraw.status(idempotencyKey, operatorSubject)),
+        });
+      }
+      if (method === 'PUT' && path === '/api/admin/mega-draw/configuration') {
+        const parsed = safeParseJson(event.body);
+        if (!parsed.ok || !isMegaConfigurationRequest(parsed.value))
+          return responseJson(400, validationErrorResponse().body);
+        return responseJson(200, {
+          status: 'SUCCESS',
+          prizes: await megaDraw.configure(parsed.value.prizes),
+        });
+      }
+      if (method === 'POST' && path === '/api/admin/mega-draw/preflight')
+        return responseJson(200, { status: 'SUCCESS', preflight: await megaDraw.preflight() });
+      if (method === 'POST' && path === '/api/admin/mega-draw/draw-next') {
+        const idempotencyKey = readIdempotencyKeyHeader(event.headers);
+        if (!idempotencyKey)
+          return responseJson(400, validationErrorResponse('Idempotency-Key is required.').body);
+        const parsed = safeParseJson(event.body);
+        if (!parsed.ok || !isMegaDrawNextRequest(parsed.value))
+          return responseJson(400, validationErrorResponse().body);
+        return responseJson(200, {
+          status: 'SUCCESS',
+          ...(await megaDraw.drawNext({
+            ...parsed.value,
+            idempotencyKey,
+            operatorSubject,
+            ...(event.requestContext.requestId
+              ? { correlationId: event.requestContext.requestId }
+              : {}),
+          })),
+        });
+      }
+      if (method === 'POST' && path === '/api/admin/mega-draw/reset') {
+        const parsed = safeParseJson(event.body);
+        if (!parsed.ok || !isMegaResetRequest(parsed.value))
+          return responseJson(400, validationErrorResponse().body);
+        return responseJson(200, { status: 'SUCCESS', ...(await megaDraw.reset(parsed.value)) });
+      }
+      if (method === 'POST' && path === '/api/admin/mega-draw/close') {
+        const parsed = safeParseJson(event.body);
+        if (!parsed.ok || !isMegaResetRequest(parsed.value))
+          return responseJson(400, validationErrorResponse().body);
+        return responseJson(200, { status: 'SUCCESS', ...(await megaDraw.close(parsed.value)) });
+      }
+      if (method === 'POST' && path === '/api/admin/mega-draw/reopen')
+        return responseJson(200, { status: 'SUCCESS', ...(await megaDraw.reopen()) });
+    }
+
     if (method === 'POST' && path === '/api/draw') {
       const idempotencyKey = readIdempotencyKeyHeader(event.headers);
       void idempotencyKey;
@@ -694,6 +814,11 @@ export const handler = async (event: {
         requestId: event.requestContext.requestId,
       }),
     );
+
+    if (error instanceof MegaDrawError) {
+      const response = megaErrorResponse(error);
+      return responseJson(response.statusCode, response.body);
+    }
 
     if (path === '/api/draw') {
       return responseJson(500, drawInternalErrorResponse().body);

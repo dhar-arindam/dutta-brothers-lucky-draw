@@ -1,11 +1,11 @@
 # Conceptual Data Model
 
-Status: APPROVED  
+Status: APPROVED
 Owner: Principal Software Engineer  
-Version: 1.3
-Last Updated: 2026-08-21
-Change: Claim deletion and atomic contention handling
-Reason: Align the conceptual model with implemented claim lifecycle behaviour
+Version: 1.8
+Last Updated: 2026-09-08
+Change: Pending Mega Draw reset preservation, reverse order, click-to-draw, and terminal close review
+Reason: Approved Mega Draw reset preservation, reverse order, click-to-draw, and terminal close changes
 
 This document defines the conceptual model only. The Principal Software Engineer must determine the final DynamoDB partition/sort key strategy.
 
@@ -56,6 +56,7 @@ Required information includes:
 - Prize ID
 - Prize name snapshot
 - Server-generated created timestamp
+- Archived status and archived timestamp where a post-campaign delete occurs
 
 The claim ID must match `DB26-######`, where `######` is exactly six digits, and must be unique within the campaign.
 
@@ -87,6 +88,12 @@ The data model must support these logical operations without prescribing the phy
 14. Retrieve date-based dashboard reporting without scanning all claims into the browser or requiring a full DynamoDB scan.
 15. Delete a claim by claim ID and atomically release its normalized bill and decrement claim-derived aggregates.
 16. Clear all claims and reset claim-derived aggregates without changing prize or campaign configuration.
+17. Archive a post-campaign claim by claim ID, atomically release its normalized bill, decrement active claim-derived aggregates, and omit it from normal reports and CSV export.
+18. Archive all active post-campaign claims while preserving archived records and Mega Draw records.
+19. Create and retrieve an immutable campaign snapshot and expiry-bound Mega Draw preflight for an execution year.
+20. Atomically select or recover one next Mega Draw prize ordinal per action, including its immutable snapshot, idempotency, and execution-state records.
+21. Clear only an execution year's active Mega Draw lifecycle, including winners, preflight, locked snapshots, and idempotency/execution records, while preserving editable ordered prize configuration and without changing main lucky-draw records.
+22. Terminally close a completed execution-year Mega Draw while retaining viewable results and rejecting further lifecycle operations.
 
 The Principal Software Engineer will determine the final DynamoDB key and index design during implementation design. The physical design must preserve the atomic uniqueness and immutable-claim requirements.
 
@@ -94,7 +101,17 @@ The Principal Software Engineer will determine the final DynamoDB key and index 
 
 The claim must preserve the prize awarded at the time of the draw. Later prize changes must not alter historical claims.
 
-Claim contents are immutable after creation. An explicitly confirmed admin deletion may remove a claim and its claim-derived aggregate contributions; it must not rewrite any remaining claim.
+Claim contents are immutable after creation. Before campaign end, an explicitly confirmed admin deletion may remove a claim and its claim-derived aggregate contributions; after campaign end, it archives the claim and removes its active aggregate contributions. Neither outcome rewrites any remaining claim.
+
+After campaign end, deletion is archival rather than physical removal. Archived claims are not active claims, are excluded from standard reports and CSV export, and do not contribute to active aggregates. Their archived records remain available only for authorized audit and reconciliation.
+
+## 5. Mega Draw
+
+A Mega Draw configuration and active lifecycle represent the current resumable year-end Admin draw cycle for an execution year. Multiple cycles may exist sequentially after each prior cycle is closed. Each cycle has a sequential cycle number and unique reference. Before its first successful selection, its 1 to 10 ordered prize slots may be added, removed, renamed, or reordered. That first wheel-initiated selection atomically locks campaign, preflight, candidate, and ordered-prize snapshots and persists exactly the winner row for the last configured prize. Thereafter the configuration is locked until reset or a closed-cycle reopen.
+
+Candidate snapshots contain active successful source claims for the execution year, identified by normalized bill number and normalized phone number. For a reopened cycle, candidates selected in every earlier closed cycle for the same year are excluded before the snapshot is locked. The record stores selected winner rows in chronological selection order, the next reverse prize ordinal, and `SETUP`, `IN_PROGRESS`, `COMPLETED`, or `CLOSED` status. Each wheel-initiated `draw next` action atomically persists one row for the next reverse ordinal and excludes identities in prior rows. Closed cycle records are retained for history with their close timestamp. The active lifecycle and history are readable only through Admin-authorized access paths.
+
+An authorized reset atomically clears the active lifecycle's preflight, winners, campaign/candidate/prize snapshots, and idempotency/execution records while retaining the ordered prize configuration as editable data. Cleared candidate selections must not remain as exclusions, allowing previously selected candidates to participate in the reset lifecycle. A completed lifecycle can be terminally closed using exact typed confirmation `CLOSE MEGA DRAW <year>`; `CLOSED` retains results and close timestamp but rejects draw, configuration update, preflight, and reset operations. Reopen/New Cycle creates a new setup lifecycle only from `CLOSED`, retains the closed record, and excludes all earlier closed-cycle winners from the new candidate snapshot. Reset must not remove or modify main lucky-draw claims, prizes, campaign, claim archives, aggregate records, or ordinary claims CSV data. Browser-wheel display data is derived from persisted prize rows for presentation only; the wheel click initiates the action but is never selection input.
 
 ## 4. Dashboard Summary Aggregates
 

@@ -14,6 +14,7 @@ export default defineConfig({
         'src/aws-integration.test.ts',
         'src/main.ts',
         'src/lambda.ts',
+        'src/local-mega-draw.ts',
         'src/contracts.ts',
         'src/domain.ts',
         'src/runtime-mode.ts',

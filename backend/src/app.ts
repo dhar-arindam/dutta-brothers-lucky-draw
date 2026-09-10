@@ -705,18 +705,20 @@ export const createNodeHandler = (handlers: NodeHandlers) => {
             res.end(JSON.stringify(response.body));
             return;
           }
+          const prizes = handlers.megaDraw.configure(parsed.value.prizes);
           res.writeHead(200, jsonHeaders);
           res.end(
             JSON.stringify({
               status: 'SUCCESS',
-              prizes: handlers.megaDraw.configure(parsed.value.prizes),
+              prizes,
             }),
           );
           return;
         }
         if (method === 'POST' && parsedUrl.pathname === '/api/admin/mega-draw/preflight') {
+          const preflight = handlers.megaDraw.preflight();
           res.writeHead(200, jsonHeaders);
-          res.end(JSON.stringify({ status: 'SUCCESS', preflight: handlers.megaDraw.preflight() }));
+          res.end(JSON.stringify({ status: 'SUCCESS', preflight }));
           return;
         }
         if (method === 'POST' && parsedUrl.pathname === '/api/admin/mega-draw/draw-next') {
@@ -734,15 +736,16 @@ export const createNodeHandler = (handlers: NodeHandlers) => {
             res.end(JSON.stringify(response.body));
             return;
           }
+          const result = handlers.megaDraw.drawNext({
+            ...parsed.value,
+            idempotencyKey,
+            operatorSubject: 'local-admin',
+          });
           res.writeHead(200, jsonHeaders);
           res.end(
             JSON.stringify({
               status: 'SUCCESS',
-              ...handlers.megaDraw.drawNext({
-                ...parsed.value,
-                idempotencyKey,
-                operatorSubject: 'local-admin',
-              }),
+              ...result,
             }),
           );
           return;
@@ -755,8 +758,9 @@ export const createNodeHandler = (handlers: NodeHandlers) => {
             res.end(JSON.stringify(response.body));
             return;
           }
+          const result = handlers.megaDraw.reset(parsed.value);
           res.writeHead(200, jsonHeaders);
-          res.end(JSON.stringify({ status: 'SUCCESS', ...handlers.megaDraw.reset(parsed.value) }));
+          res.end(JSON.stringify({ status: 'SUCCESS', ...result }));
           return;
         }
         if (method === 'POST' && parsedUrl.pathname === '/api/admin/mega-draw/close') {
@@ -767,8 +771,9 @@ export const createNodeHandler = (handlers: NodeHandlers) => {
             res.end(JSON.stringify(response.body));
             return;
           }
+          const result = handlers.megaDraw.close(parsed.value);
           res.writeHead(200, jsonHeaders);
-          res.end(JSON.stringify({ status: 'SUCCESS', ...handlers.megaDraw.close(parsed.value) }));
+          res.end(JSON.stringify({ status: 'SUCCESS', ...result }));
           return;
         }
         if (method === 'POST' && parsedUrl.pathname === '/api/admin/mega-draw/reopen') {

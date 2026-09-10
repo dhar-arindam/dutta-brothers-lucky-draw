@@ -209,4 +209,58 @@ describe('MegaDrawService', () => {
     expect(service.get().history).toHaveLength(1);
     expect(service.get().history[0]).toMatchObject({ cycleNumber: 1, status: 'CLOSED' });
   });
+
+  it('covers invalid lifecycle transitions and idempotency conflicts', () => {
+    const service = new MegaDrawService(
+      {
+        getCampaign: () => campaign,
+        listActiveClaims: () => [
+          claim('DB26-1', 'BILL-1', '9876543210'),
+          claim('DB26-2', 'BILL-2', '9123456789'),
+        ],
+      },
+      () => now,
+      () => 0,
+    );
+
+    expect(() => service.configure([])).toThrow(MegaDrawError);
+    expect(() => service.preflight()).toThrowError('Configure Mega Draw prizes before continuing.');
+    expect(service.status('missing', 'admin').execution).toBe('NOT_FOUND');
+    service.configure(['First prize', 'Second prize']);
+    expect(() =>
+      service.close({ acknowledgement: true, confirmation: 'CLOSE MEGA DRAW 2026' }),
+    ).toThrow(/completed/i);
+    expect(() =>
+      service.reset({ acknowledgement: false, confirmation: 'RESET MEGA DRAW 2026' }),
+    ).toThrow(/confirmation/i);
+    expect(() =>
+      service.drawNext({ idempotencyKey: 'missing-preflight', operatorSubject: 'admin' }),
+    ).toThrow(/preflight/i);
+    const preflight = service.preflight();
+    const result = service.drawNext({
+      preflightReference: preflight.reference,
+      idempotencyKey: 'draw',
+      operatorSubject: 'admin',
+    });
+    expect(service.status('draw', 'admin')).toMatchObject({
+      execution: 'COMPLETED',
+      selectedRow: result.selectedRow,
+    });
+    expect(() => service.configure(['Replacement'])).toThrow(/locked/i);
+    expect(() =>
+      service.drawNext({
+        idempotencyKey: 'draw',
+        operatorSubject: 'admin',
+        confirmation: 'different',
+      }),
+    ).toThrow(/idempotency/i);
+    service.drawNext({ idempotencyKey: 'next', operatorSubject: 'admin' });
+    expect(() => service.drawNext({ idempotencyKey: 'final', operatorSubject: 'admin' })).toThrow(
+      /completed/i,
+    );
+    expect(() => service.close({ acknowledgement: true, confirmation: 'wrong' })).toThrow(
+      /confirmation/i,
+    );
+    expect(() => service.reopen()).toThrow(/closing the current cycle/i);
+  });
 });

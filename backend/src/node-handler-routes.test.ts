@@ -9,6 +9,7 @@ import {
   type DrawApiHandler,
 } from './app.js';
 import type { AdminPrize, DrawHttpResponse } from './contracts.js';
+import { MegaDrawError, type MegaDrawErrorCode } from './mega-draw.js';
 
 const drawSuccess: DrawHttpResponse = {
   statusCode: 201,
@@ -253,5 +254,182 @@ describe('node handler admin and routing coverage', () => {
     expect(getSummary).toHaveBeenCalledTimes(1);
     expect(getCampaign).toHaveBeenCalledTimes(1);
     expect(updateCampaign).toHaveBeenCalledTimes(1);
+  });
+
+  it('routes Mega Draw operations and returns validation and domain errors', async () => {
+    const drawHandler: DrawApiHandler = { handle: () => drawSuccess };
+    const adminHandler: AdminPrizeApiHandler = {
+      listPrizes: () => ({ statusCode: 200, body: { status: 'SUCCESS', items: [] } }),
+      addPrize: () => ({ statusCode: 201, body: { status: 'SUCCESS', item: adminPrizeItem } }),
+      updatePrize: () => ({ statusCode: 200, body: { status: 'SUCCESS', item: adminPrizeItem } }),
+      listClaims: () => ({
+        statusCode: 200,
+        body: { status: 'SUCCESS', items: [], nextPageToken: null },
+      }),
+      deleteClaim: () => ({ statusCode: 200, body: { status: 'SUCCESS' } }),
+      clearAllClaims: () => ({ statusCode: 200, body: { status: 'SUCCESS', deletedCount: 0 } }),
+      exportClaimsCsv: () => ({
+        statusCode: 200,
+        headers: { 'content-type': 'text/csv' },
+        body: '',
+      }),
+      getSummary: () => ({
+        statusCode: 200,
+        body: {
+          status: 'SUCCESS',
+          totalSuccessfulSpins: 0,
+          today: { date: '2026-08-16', successfulSpins: 0 },
+          prizeDistribution: [],
+        },
+      }),
+      getCampaign: () => ({
+        statusCode: 200,
+        body: {
+          status: 'SUCCESS',
+          campaign: {
+            id: 'festive-2026',
+            fromDate: '2026-08-01',
+            toDate: '2026-11-01',
+            timezone: 'Asia/Kolkata',
+            status: 'ENDED',
+          },
+        },
+      }),
+      updateCampaign: () => ({
+        statusCode: 200,
+        body: {
+          status: 'SUCCESS',
+          campaign: {
+            id: 'festive-2026',
+            fromDate: '2026-08-01',
+            toDate: '2026-11-01',
+            timezone: 'Asia/Kolkata',
+            status: 'ENDED',
+          },
+        },
+      }),
+    };
+    const megaDraw = {
+      get: () => ({ configuration: [], history: [] }),
+      status: () => ({ execution: 'NOT_FOUND' as const }),
+      configure: (prizes: string[]) => prizes.map((name, index) => ({ position: index + 1, name })),
+      preflight: () => ({ reference: 'PF-1' }),
+      drawNext: () => ({ lifecycle: { status: 'COMPLETED' }, selectedRow: {} }),
+      reset: () => ({ executionYear: 2026 }),
+      close: () => ({ lifecycle: { status: 'CLOSED' } }),
+      reopen: () => ({ executionYear: 2026, cycleNumber: 2 }),
+    };
+    const baseUrl = await (async () => {
+      const nodeHandler = createNodeHandler({
+        drawApiHandler: drawHandler,
+        adminPrizeApiHandler: adminHandler,
+        megaDraw: megaDraw as never,
+      });
+      const server = createServer((req, res) => void nodeHandler(req, res));
+      openServers.push(server);
+      await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+      const address = server.address();
+      if (!address || typeof address === 'string') throw new Error('Could not resolve address.');
+      return `http://127.0.0.1:${address.port}`;
+    })();
+    const jsonHeaders = { 'content-type': 'application/json' };
+    const json = (body: unknown) => JSON.stringify(body);
+
+    expect((await fetch(`${baseUrl}/api/admin/mega-draw`)).status).toBe(200);
+    expect((await fetch(`${baseUrl}/api/admin/mega-draw/status/`)).status).toBe(400);
+    expect((await fetch(`${baseUrl}/api/admin/mega-draw/status/key%201`)).status).toBe(200);
+    expect(
+      (
+        await fetch(`${baseUrl}/api/admin/mega-draw/configuration`, {
+          method: 'PUT',
+          headers: jsonHeaders,
+          body: json({ prizes: ['TV'] }),
+        })
+      ).status,
+    ).toBe(200);
+    expect(
+      (
+        await fetch(`${baseUrl}/api/admin/mega-draw/configuration`, {
+          method: 'PUT',
+          headers: jsonHeaders,
+          body: '{',
+        })
+      ).status,
+    ).toBe(400);
+    expect(
+      (await fetch(`${baseUrl}/api/admin/mega-draw/preflight`, { method: 'POST' })).status,
+    ).toBe(200);
+    expect(
+      (
+        await fetch(`${baseUrl}/api/admin/mega-draw/draw-next`, {
+          method: 'POST',
+          headers: jsonHeaders,
+          body: '{}',
+        })
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await fetch(`${baseUrl}/api/admin/mega-draw/draw-next`, {
+          method: 'POST',
+          headers: { ...jsonHeaders, 'Idempotency-Key': 'draw-1' },
+          body: json({}),
+        })
+      ).status,
+    ).toBe(200);
+    expect(
+      (
+        await fetch(`${baseUrl}/api/admin/mega-draw/reset`, {
+          method: 'POST',
+          headers: jsonHeaders,
+          body: json({ acknowledgement: true, confirmation: 'RESET' }),
+        })
+      ).status,
+    ).toBe(200);
+    expect(
+      (
+        await fetch(`${baseUrl}/api/admin/mega-draw/close`, {
+          method: 'POST',
+          headers: jsonHeaders,
+          body: json({ acknowledgement: true, confirmation: 'CLOSE' }),
+        })
+      ).status,
+    ).toBe(200);
+    expect((await fetch(`${baseUrl}/api/admin/mega-draw/reopen`, { method: 'POST' })).status).toBe(
+      200,
+    );
+
+    let errorCode: MegaDrawErrorCode = 'CAMPAIGN_NOT_ENDED';
+    const failingMegaDraw = {
+      ...megaDraw,
+      preflight: () => {
+        throw new MegaDrawError(errorCode, 'Mega Draw operation failed.');
+      },
+    };
+    const failingHandler = createNodeHandler({
+      drawApiHandler: drawHandler,
+      adminPrizeApiHandler: adminHandler,
+      megaDraw: failingMegaDraw as never,
+    });
+    const failingServer = createServer((req, res) => void failingHandler(req, res));
+    openServers.push(failingServer);
+    await new Promise<void>((resolve) => failingServer.listen(0, '127.0.0.1', resolve));
+    const failingAddress = failingServer.address();
+    if (!failingAddress || typeof failingAddress === 'string')
+      throw new Error('Could not resolve address.');
+    const failingUrl = `http://127.0.0.1:${failingAddress.port}/api/admin/mega-draw/preflight`;
+    for (const [code, expectedStatus] of [
+      ['CAMPAIGN_NOT_ENDED', 409],
+      ['INSUFFICIENT_ELIGIBLE_PARTICIPANTS', 409],
+      ['MEGA_DRAW_IN_PROGRESS', 409],
+      ['MEGA_DRAW_ALREADY_COMPLETED', 409],
+      ['MEGA_DRAW_CLOSED', 409],
+      ['MEGA_DRAW_REOPEN_NOT_ALLOWED', 409],
+      ['VALIDATION_ERROR', 400],
+      ['MEGA_DRAW_NOT_CONFIGURED', 400],
+    ] as const) {
+      errorCode = code;
+      expect((await fetch(failingUrl, { method: 'POST' })).status).toBe(expectedStatus);
+    }
   });
 });

@@ -458,7 +458,15 @@ describe('dynamo db draw store persistence', () => {
     }));
 
     const fake = new FakeDocClient();
-    fake.enqueue(async () => ({ Items: oversizedPage }));
+    for (let pageStart = 0; pageStart < oversizedPage.length; pageStart += 100) {
+      const page = oversizedPage.slice(pageStart, pageStart + 100);
+      fake.enqueue(async () => ({
+        Items: page,
+        ...(pageStart + page.length < oversizedPage.length
+          ? { LastEvaluatedKey: { pk: 'CLAIM', sk: `DB26-${pageStart + page.length}` } }
+          : {}),
+      }));
+    }
 
     const store = new DynamoDbDrawStore(fake as never, {
       tableName: 'draws-table',

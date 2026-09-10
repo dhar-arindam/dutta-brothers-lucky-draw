@@ -1209,11 +1209,11 @@ export const AdminPrizePage = ({
             {sortedPrizes.map((prize) => (
               <article
                 key={prize.id}
-                className={`grid gap-2 rounded-xl border p-3 ${surfaceClass}`}
+                className={`grid min-w-0 gap-2 rounded-xl border p-3 ${surfaceClass}`}
               >
                 <button
                   type="button"
-                  className={`grid w-full gap-2 rounded-lg border p-3 text-left ${
+                  className={`grid w-full min-w-0 gap-2 rounded-lg border p-3 text-left ${
                     filters.prizeId === prize.id
                       ? isLightTheme
                         ? 'border-[#b88f20] bg-[#f7efdf] ring-2 ring-[#b88f20] ring-offset-2 ring-offset-[#f3e9d7]'
@@ -1252,7 +1252,7 @@ export const AdminPrizePage = ({
                     Given: {givenByPrizeId.get(prize.id) ?? prize.givenCount ?? 0}
                   </p>
                 </button>
-                <div className="grid gap-2">
+                <div className="grid min-w-0 gap-2">
                   <label
                     htmlFor={`weight-${prize.id}`}
                     className={`text-sm font-medium ${headingTextClass}`}

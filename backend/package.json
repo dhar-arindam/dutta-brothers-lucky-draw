@@ -13,16 +13,16 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "@aws-sdk/client-dynamodb": "^3.1126.0",
-    "@aws-sdk/client-secrets-manager": "^3.1126.0",
-    "@aws-sdk/lib-dynamodb": "^3.1126.0"
+    "@aws-sdk/client-dynamodb": "^3.1130.0",
+    "@aws-sdk/client-secrets-manager": "^3.1130.0",
+    "@aws-sdk/lib-dynamodb": "^3.1130.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.33.0",
     "@vitest/coverage-v8": "^5.0.0",
-    "eslint": "^10.9.1",
+    "eslint": "^10.10.0",
     "tsx": "^4.23.13",
-    "typescript-eslint": "^8.69.0",
+    "typescript-eslint": "^8.70.0",
     "vitest": "^5.0.0"
   }
 }

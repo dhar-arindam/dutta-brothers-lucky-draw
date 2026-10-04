@@ -42,10 +42,10 @@
   "devDependencies": {
     "@playwright/test": "^1.63.0",
     "husky": "^9.1.7",
-    "lint-staged": "^17.5.1",
-    "prettier": "^3.6.2",
+    "lint-staged": "^17.6.0",
+    "prettier": "^3.9.9",
     "typescript": "^5.9.3",
-    "vitest": "^5.0.0"
+    "vitest": "^5.0.3"
   },
   "lint-staged": {
     "*.{ts,tsx,css,html,json,md}": "prettier --write"

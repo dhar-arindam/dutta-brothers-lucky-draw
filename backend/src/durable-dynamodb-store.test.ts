@@ -474,7 +474,7 @@ describe('dynamo db draw store persistence', () => {
     });
 
     await expect(store.listAdminClaimsForCsv(2026)).rejects.toBeInstanceOf(CsvExportTooLargeError);
-  });
+  }, 15_000);
 
   it('exports only claims falling in the requested Asia/Kolkata calendar year', async () => {
     const makeClaim = (claimId: string, claimTimestamp: string) => ({

@@ -89,6 +89,7 @@ describe('AdminAuthGate', () => {
   });
 
   it('shows the sign-in error when Cognito login cannot be started', async () => {
+    vi.spyOn(cognitoAuth, 'completeCognitoLogin').mockResolvedValue(false);
     vi.spyOn(cognitoAuth, 'startCognitoLogin').mockRejectedValue(
       new Error('Cognito authentication is not configured.'),
     );

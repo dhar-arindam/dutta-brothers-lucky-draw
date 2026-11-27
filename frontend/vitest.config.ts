@@ -3,6 +3,10 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     environment: 'jsdom',
+    // Let jsdom provide browser storage instead of Node's file-backed Web Storage.
+    execArgv: process.allowedNodeEnvironmentFlags.has('--no-experimental-webstorage')
+      ? ['--no-experimental-webstorage']
+      : [],
     setupFiles: ['./src/test/setup.ts'],
     coverage: {
       provider: 'v8',

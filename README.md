@@ -71,6 +71,11 @@ Do not use production secrets for local development.
 npm test
 ```
 
+Frontend tests use jsdom's browser storage. The Vitest configuration disables
+Node's native Web Storage in test workers when that runtime flag is available,
+preventing `localStorage` failures on newer Node versions without requiring a
+shared storage file.
+
 ## Type-check and Build
 
 ```bash
